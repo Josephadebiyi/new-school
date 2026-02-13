@@ -243,14 +243,17 @@ const AdminUsers = () => {
   return (
     <div className="space-y-6" data-testid="admin-users">
       <div className="flex items-center justify-between">
-        <h2 className="font-heading text-xl font-bold text-slate-900">User Management</h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">User Management</h2>
+          <p className="text-gray-500 text-sm mt-1">Manage all users, lock accounts, and handle student expulsions</p>
+        </div>
         
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-uni-navy hover:bg-uni-navy-light text-white" data-testid="add-user-btn">
+            <button className="btn-modern btn-modern-dark" data-testid="add-user-btn">
               <UserPlus size={18} className="mr-2" />
               Add User
-            </Button>
+            </button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
