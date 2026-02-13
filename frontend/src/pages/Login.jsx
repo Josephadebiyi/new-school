@@ -93,34 +93,34 @@ const Login = () => {
   const secondaryColor = systemConfig?.secondary_color || "#FF8C00";
 
   return (
-    <div className="min-h-screen flex bg-white" data-testid="login-page">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-white" data-testid="login-page">
       {/* Left Side - Form */}
-      <div className="flex-1 flex flex-col justify-center px-8 lg:px-16 xl:px-24">
+      <div className="flex-1 flex flex-col justify-center px-6 py-8 sm:px-8 lg:px-16 xl:px-24">
         <div className="w-full max-w-md mx-auto">
           {/* Logo */}
-          <div className="mb-10">
+          <div className="mb-8 lg:mb-10">
             {logoUrl ? (
-              <img src={logoUrl} alt={universityName} className="h-12 object-contain" />
+              <img src={logoUrl} alt={universityName} className="h-10 lg:h-12 object-contain" />
             ) : (
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                  <GraduationCap size={28} className="text-gray-700" />
+                <div className="w-10 lg:w-12 h-10 lg:h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                  <GraduationCap size={24} className="text-gray-700" />
                 </div>
-                <span className="text-xl font-bold text-gray-900">{universityName}</span>
+                <span className="text-lg lg:text-xl font-bold text-gray-900">{universityName}</span>
               </div>
             )}
           </div>
 
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
-            <p className="text-gray-500 mt-2">Sign in to your account to continue</p>
+          <div className="mb-6 lg:mb-8">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Welcome Back</h1>
+            <p className="text-gray-500 mt-2 text-sm lg:text-base">Sign in to your account to continue</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-5">
             <div>
-              <Label className="text-gray-700 font-medium">Email Address</Label>
+              <Label className="text-gray-700 font-medium text-sm lg:text-base">Email Address</Label>
               <div className="relative mt-2">
                 <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -128,14 +128,14 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@university.edu"
-                  className="input-modern pl-11"
+                  className="input-modern pl-11 text-sm lg:text-base"
                   data-testid="login-email-input"
                 />
               </div>
             </div>
 
             <div>
-              <Label className="text-gray-700 font-medium">Password</Label>
+              <Label className="text-gray-700 font-medium text-sm lg:text-base">Password</Label>
               <div className="relative mt-2">
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -143,7 +143,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="input-modern pl-11 pr-11"
+                  className="input-modern pl-11 pr-11 text-sm lg:text-base"
                   data-testid="login-password-input"
                 />
                 <button
@@ -156,7 +156,7 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-xs lg:text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500" />
                 <span className="text-gray-600">Remember me</span>
@@ -167,7 +167,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="btn-modern btn-modern-dark w-full h-12 text-base"
+              className="btn-modern btn-modern-dark w-full h-11 lg:h-12 text-sm lg:text-base"
               style={{ backgroundColor: primaryColor }}
               data-testid="login-submit-btn"
             >
@@ -176,7 +176,7 @@ const Login = () => {
           </form>
 
           {/* Support */}
-          <p className="mt-8 text-center text-sm text-gray-500">
+          <p className="mt-6 lg:mt-8 text-center text-xs lg:text-sm text-gray-500">
             Need help? Contact{" "}
             <a 
               href={`mailto:${systemConfig?.support_email || "support@luminalms.edu"}`}
@@ -198,28 +198,28 @@ const Login = () => {
         </div>
         
         {/* Content Overlay */}
-        <div className="relative z-10 flex flex-col justify-end p-12 text-white">
-          <h2 className="text-2xl font-light mb-1">{loginHeadline}</h2>
-          <h3 className="text-4xl font-bold mb-4" style={{ color: secondaryColor }}>
+        <div className="relative z-10 flex flex-col justify-end p-8 xl:p-12 text-white">
+          <h2 className="text-xl xl:text-2xl font-light mb-1">{loginHeadline}</h2>
+          <h3 className="text-3xl xl:text-4xl font-bold mb-4" style={{ color: secondaryColor }}>
             {universityName}
           </h3>
-          <p className="text-white/70 max-w-md text-lg leading-relaxed">
+          <p className="text-white/70 max-w-md text-base xl:text-lg leading-relaxed">
             {loginSubtext}
           </p>
           
           {/* Stats */}
-          <div className="flex gap-8 mt-8">
+          <div className="flex gap-6 xl:gap-8 mt-6 xl:mt-8">
             <div>
-              <div className="text-3xl font-bold">1000+</div>
-              <div className="text-white/60 text-sm">Students</div>
+              <div className="text-2xl xl:text-3xl font-bold">1000+</div>
+              <div className="text-white/60 text-xs xl:text-sm">Students</div>
             </div>
             <div>
-              <div className="text-3xl font-bold">50+</div>
-              <div className="text-white/60 text-sm">Courses</div>
+              <div className="text-2xl xl:text-3xl font-bold">50+</div>
+              <div className="text-white/60 text-xs xl:text-sm">Courses</div>
             </div>
             <div>
-              <div className="text-3xl font-bold">95%</div>
-              <div className="text-white/60 text-sm">Success Rate</div>
+              <div className="text-2xl xl:text-3xl font-bold">95%</div>
+              <div className="text-white/60 text-xs xl:text-sm">Success Rate</div>
             </div>
           </div>
         </div>
