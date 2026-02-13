@@ -75,13 +75,25 @@ const StudentDashboard = () => {
 
   return (
     <div className="space-y-8" data-testid="student-dashboard">
-      {/* Welcome Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back, {user?.first_name || "Student"}!
-          </h1>
-          <p className="text-gray-500 mt-1">Continue your learning journey</p>
+      {/* Welcome Section with Gradient Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 rounded-2xl p-6 text-white">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div className="absolute top-1/2 right-1/4 w-20 h-20 bg-white/5 rounded-full"></div>
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">
+              Welcome back, {user?.first_name || "Student"}! 🎓
+            </h1>
+            <p className="text-white/80 mt-1">Continue your learning journey</p>
+          </div>
+          <div className="hidden md:flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3">
+            <TrendingUp size={20} />
+            <div>
+              <div className="text-sm opacity-80">Current Streak</div>
+              <div className="font-bold text-lg">7 Days 🔥</div>
+            </div>
+          </div>
         </div>
       </div>
 
