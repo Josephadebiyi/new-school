@@ -277,27 +277,35 @@ const AdminCourses = () => {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-uni-navy hover:bg-uni-navy">
-                <TableHead className="text-white font-medium">Code</TableHead>
-                <TableHead className="text-white font-medium">Title</TableHead>
-                <TableHead className="text-white font-medium">Level</TableHead>
-                <TableHead className="text-white font-medium">Units</TableHead>
-                <TableHead className="text-white font-medium">Type</TableHead>
-                <TableHead className="text-white font-medium">Status</TableHead>
-                <TableHead className="text-white font-medium">Actions</TableHead>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-semibold">Code</TableHead>
+                <TableHead className="font-semibold">Title</TableHead>
+                <TableHead className="font-semibold">Duration</TableHead>
+                <TableHead className="font-semibold">Type</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCourses.length > 0 ? (
                 filteredCourses.map((course) => (
-                  <TableRow key={course.id}>
+                  <TableRow key={course.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium text-slate-900">{course.code}</TableCell>
-                    <TableCell className="text-slate-600">{course.title}</TableCell>
-                    <TableCell className="text-slate-600">{course.level}</TableCell>
-                    <TableCell className="text-slate-600">{course.units}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-slate-900">{course.title}</p>
+                        <p className="text-xs text-slate-500">{course.department}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-slate-600">
+                        <Clock size={14} />
+                        <span>{course.duration_weeks || 12} {course.duration_type || 'weeks'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className={`px-3 py-1 rounded text-xs font-semibold ${
-                        course.course_type === 'CORE' ? 'bg-uni-navy text-white' : 'bg-slate-100 text-slate-700'
+                        course.course_type === 'CORE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
                       }`}>
                         {course.course_type}
                       </span>
@@ -311,10 +319,16 @@ const AdminCourses = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                          <Edit size={14} />
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8"
+                          onClick={() => navigate(`/admin/courses/${course.id}/edit`)}
+                          data-testid={`edit-course-${course.id}`}
+                        >
+                          <Edit size={14} className="mr-1" /> Edit
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                           <Trash2 size={14} />
                         </Button>
                       </div>
@@ -323,7 +337,7 @@ const AdminCourses = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-slate-500 py-8">
+                  <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                     No courses found
                   </TableCell>
                 </TableRow>
