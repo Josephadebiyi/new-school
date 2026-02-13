@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../App";
+import { useAuth, useSystemConfig } from "../App";
 import {
   LayoutDashboard,
   BookOpen,
@@ -17,7 +17,8 @@ import {
   Settings,
   UserPlus,
   DollarSign,
-  Briefcase
+  Lock,
+  Unlock
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,9 +28,11 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Badge } from "./ui/badge";
 
 const DashboardLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, accessInfo } = useAuth();
+  const { systemConfig } = useSystemConfig();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,18 +52,14 @@ const DashboardLayout = () => {
       { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
       { label: "Users", icon: Users, path: "/admin/users" },
       { label: "Courses", icon: BookOpen, path: "/admin/courses" },
-    ],
-    admissions_officer: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/admissions/dashboard" },
-    ],
-    finance_officer: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/finance/dashboard" },
+      { label: "Admissions", icon: UserPlus, path: "/admin/admissions" },
+      { label: "Payments", icon: DollarSign, path: "/admin/payments" },
+      { label: "Settings", icon: Settings, path: "/admin/settings" },
     ],
     registrar: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/registrar/dashboard" },
-    ],
-    support: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/support/dashboard" },
+      { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
+      { label: "Users", icon: Users, path: "/admin/users" },
+      { label: "Courses", icon: BookOpen, path: "/admin/courses" },
     ],
   };
 
@@ -80,12 +79,20 @@ const DashboardLayout = () => {
         {/* Logo */}
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-uni-navy rounded-lg flex items-center justify-center">
-              <span className="text-white font-heading font-bold text-lg">U</span>
-            </div>
+            {systemConfig?.logo_url ? (
+              <img src={systemConfig.logo_url} alt="Logo" className="h-10 w-10 object-contain" />
+            ) : (
+              <div className="w-10 h-10 bg-uni-navy rounded-lg flex items-center justify-center">
+                <span className="text-white font-heading font-bold text-lg">L</span>
+              </div>
+            )}
             <div>
-              <h1 className="font-heading font-bold text-lg text-uni-navy">UniLMS</h1>
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Open University</p>
+              <h1 className="font-heading font-bold text-lg text-uni-navy leading-tight">
+                {systemConfig?.university_name?.split(' ')[0] || "LuminaLMS"}
+              </h1>
+              <p className="text-xs text-slate-400 uppercase tracking-wider">
+                {systemConfig?.university_name?.split(' ').slice(1).join(' ') || "University"}
+              </p>
             </div>
           </div>
         </div>
@@ -123,10 +130,12 @@ const DashboardLayout = () => {
             <p className="text-sm text-white/70 mb-4">
               Having Trouble?<br />Please contact us for more questions.
             </p>
-            <div className="flex items-center gap-2 text-sm bg-white text-uni-navy rounded-lg px-3 py-2">
-              <Phone size={16} className="text-green-600" />
-              <span className="font-medium">+234 816 839 7949</span>
-            </div>
+            {systemConfig?.support_phone && (
+              <div className="flex items-center gap-2 text-sm bg-white text-uni-navy rounded-lg px-3 py-2">
+                <Phone size={16} className="text-green-600" />
+                <span className="font-medium">{systemConfig.support_phone}</span>
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -136,10 +145,30 @@ const DashboardLayout = () => {
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10" data-testid="header">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-4">
               <h2 className="font-heading text-2xl font-bold text-slate-900">
                 Welcome, {user?.first_name}
               </h2>
+              
+              {/* Access Status Badge */}
+              {user?.role === 'student' && (
+                <Badge 
+                  variant={user?.payment_status === 'paid' ? 'default' : 'destructive'}
+                  className="flex items-center gap-1"
+                >
+                  {user?.payment_status === 'paid' ? (
+                    <>
+                      <Unlock size={12} />
+                      Full Access
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={12} />
+                      Limited Access
+                    </>
+                  )}
+                </Badge>
+              )}
             </div>
             
             <div className="flex items-center gap-4">
@@ -166,6 +195,13 @@ const DashboardLayout = () => {
                   <ChevronDown size={16} className="text-slate-400" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  {user?.student_id && (
+                    <div className="px-2 py-1.5">
+                      <p className="text-xs text-slate-500">Student ID</p>
+                      <p className="text-sm font-mono font-medium">{user.student_id}</p>
+                    </div>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/profile")} data-testid="menu-profile">
                     <Users size={16} className="mr-2" />
                     Profile
