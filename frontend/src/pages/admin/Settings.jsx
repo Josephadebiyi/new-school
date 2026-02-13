@@ -8,7 +8,14 @@ import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Separator } from "../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { Settings, Upload, Palette, Save, RefreshCw, Building, Image, CreditCard } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Settings, Upload, Palette, Save, RefreshCw, Building, Image, CreditCard, Euro, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminSettings = () => {
@@ -32,7 +39,12 @@ const AdminSettings = () => {
     // Login Page Customization
     login_image_url: "",
     login_headline: "",
-    login_subtext: ""
+    login_subtext: "",
+    // Fees & Currency
+    default_currency: "EUR",
+    application_fee: 50,
+    tuition_fee: 2500,
+    tuition_fee_per: "semester"
   });
 
   useEffect(() => {
