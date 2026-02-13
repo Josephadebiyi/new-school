@@ -183,8 +183,36 @@ class LessonContent(BaseModel):
     url: Optional[str] = None
     duration_seconds: Optional[int] = None
     quiz_data: Optional[Dict] = None
+    quiz_attempts_allowed: int = 3
+    quiz_passing_score: float = 60.0
     description: Optional[str] = None
     order: int = 0
+
+# Quiz Models
+class QuizQuestion(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    question: str
+    options: List[str]
+    correct_answer: int  # index of correct option
+    points: float = 1.0
+
+class QuizCreate(BaseModel):
+    lesson_id: str
+    questions: List[QuizQuestion]
+    time_limit_minutes: Optional[int] = None
+    attempts_allowed: int = 3
+    passing_score: float = 60.0
+
+class QuizAttempt(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    lesson_id: str
+    course_id: str
+    answers: List[int]
+    score: float
+    passed: bool
+    attempt_number: int
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ModuleCreate(BaseModel):
     title: str
