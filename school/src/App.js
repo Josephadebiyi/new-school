@@ -672,11 +672,18 @@ const CourseDetailPage = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
+    high_school_cert_url: '',
+    identification_url: '',
+  });
+  const [docPreviews, setDocPreviews] = useState({
+    high_school_cert: null,
+    identification: null,
   });
 
   useEffect(() => {
@@ -693,15 +700,77 @@ const CourseDetailPage = () => {
     fetchCourse();
   }, [courseId]);
 
+  // Handle document upload to server
+  const handleDocumentUpload = async (e, docType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a JPG, PNG, or PDF file.');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB.');
+      return;
+    }
+
+    setUploadingDocs(true);
+    
+    try {
+      // Create form data for upload
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      uploadData.append('doc_type', docType);
+
+      const response = await axios.post(`${API}/upload/document`, uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.url) {
+        if (docType === 'high_school_cert') {
+          setFormData({ ...formData, high_school_cert_url: response.data.url });
+          setDocPreviews({ ...docPreviews, high_school_cert: file.name });
+        } else {
+          setFormData({ ...formData, identification_url: response.data.url });
+          setDocPreviews({ ...docPreviews, identification: file.name });
+        }
+      }
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      alert('Failed to upload document. Please try again.');
+    } finally {
+      setUploadingDocs(false);
+    }
+  };
+
   const handleApply = async (e) => {
     e.preventDefault();
+    
+    // Validate required documents
+    if (!formData.high_school_cert_url) {
+      alert('Please upload your high school certificate.');
+      return;
+    }
+    if (!formData.identification_url) {
+      alert('Please upload your means of identification (passport or national ID).');
+      return;
+    }
+
     setApplying(true);
     try {
       const response = await axios.post(`${API}/applications/create`, {
         course_id: courseId,
-        ...formData,
-        success_url: `${window.location.origin}/application-success`,
-        cancel_url: window.location.href,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        phone: formData.phone,
+        high_school_cert_url: formData.high_school_cert_url,
+        identification_url: formData.identification_url,
+        origin_url: window.location.origin,
       });
       
       if (response.data.checkout_url) {
@@ -709,7 +778,7 @@ const CourseDetailPage = () => {
       }
     } catch (error) {
       console.error('Error creating application:', error);
-      alert('Failed to start application. Please try again.');
+      alert(error.response?.data?.detail || 'Failed to start application. Please try again.');
     } finally {
       setApplying(false);
     }
