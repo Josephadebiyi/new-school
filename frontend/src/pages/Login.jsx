@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../App";
+import axios from "axios";
+import { useAuth, useSystemConfig, API } from "../App";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -13,19 +14,21 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login, user } = useAuth();
+  const { systemConfig, fetchSystemConfig } = useSystemConfig();
   const navigate = useNavigate();
   const location = useLocation();
 
-  React.useEffect(() => {
+  useEffect(() => {
+    fetchSystemConfig();
+  }, []);
+
+  useEffect(() => {
     if (user) {
       const roleRoutes = {
         student: "/student/dashboard",
         lecturer: "/lecturer/dashboard",
         admin: "/admin/dashboard",
-        admissions_officer: "/admissions/dashboard",
-        finance_officer: "/finance/dashboard",
-        registrar: "/registrar/dashboard",
-        support: "/support/dashboard"
+        registrar: "/admin/dashboard"
       };
       navigate(roleRoutes[user.role] || "/student/dashboard");
     }
@@ -39,14 +42,17 @@ const Login = () => {
       const userData = await login(email, password);
       toast.success(`Welcome back, ${userData.first_name}!`);
       
+      // Check access status
+      if (userData.account_status === 'locked') {
+        navigate("/limited-access");
+        return;
+      }
+      
       const roleRoutes = {
         student: "/student/dashboard",
         lecturer: "/lecturer/dashboard",
         admin: "/admin/dashboard",
-        admissions_officer: "/admissions/dashboard",
-        finance_officer: "/finance/dashboard",
-        registrar: "/registrar/dashboard",
-        support: "/support/dashboard"
+        registrar: "/admin/dashboard"
       };
       
       const from = location.state?.from?.pathname || roleRoutes[userData.role] || "/student/dashboard";
@@ -66,12 +72,20 @@ const Login = () => {
           {/* Logo */}
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-8">
-              <div className="w-12 h-12 bg-uni-navy rounded-lg flex items-center justify-center">
-                <span className="text-white font-heading font-bold text-xl">U</span>
-              </div>
+              {systemConfig?.logo_url ? (
+                <img src={systemConfig.logo_url} alt="Logo" className="h-12 object-contain" />
+              ) : (
+                <div className="w-12 h-12 bg-uni-navy rounded-lg flex items-center justify-center">
+                  <span className="text-white font-heading font-bold text-xl">L</span>
+                </div>
+              )}
               <div>
-                <h1 className="font-heading font-bold text-2xl text-uni-navy tracking-tight">UniLMS</h1>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Open University</p>
+                <h1 className="font-heading font-bold text-2xl tracking-tight" style={{ color: systemConfig?.primary_color || '#0F172A' }}>
+                  {systemConfig?.university_name?.split(' ')[0] || "LuminaLMS"}
+                </h1>
+                <p className="text-xs text-slate-500 uppercase tracking-wider">
+                  {systemConfig?.university_name?.split(' ').slice(1).join(' ') || "University"}
+                </p>
               </div>
             </div>
             
@@ -120,7 +134,7 @@ const Login = () => {
             </div>
 
             <div className="text-right">
-              <button type="button" className="text-sm text-uni-navy hover:text-uni-red transition-colors">
+              <button type="button" className="text-sm hover:underline" style={{ color: systemConfig?.primary_color || '#0F172A' }}>
                 Forgot Password?
               </button>
             </div>
@@ -128,7 +142,8 @@ const Login = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-[#C4A77D] hover:bg-[#B39669] text-white font-medium rounded-lg transition-colors"
+              className="w-full h-12 text-white font-medium rounded-lg transition-colors"
+              style={{ backgroundColor: systemConfig?.secondary_color || '#C4A77D' }}
               data-testid="login-submit-btn"
             >
               {loading ? <div className="spinner mx-auto"></div> : "Login"}
@@ -150,7 +165,9 @@ const Login = () => {
         <div className="absolute bottom-0 left-0 right-0 p-12 text-white">
           <h2 className="font-heading text-4xl font-bold mb-4">
             Learn with<br />
-            <span className="text-[#C4A77D]">UniLMS Open University</span>
+            <span style={{ color: systemConfig?.secondary_color || '#C4A77D' }}>
+              {systemConfig?.university_name || "LuminaLMS University"}
+            </span>
           </h2>
           <p className="text-lg text-white/80 max-w-md">
             Affordable higher education you can take wherever life takes you. Learn anywhere at your own pace.
@@ -162,7 +179,7 @@ const Login = () => {
               <span className="text-white font-bold text-sm">NUC</span>
             </div>
             <p className="text-sm text-white/90">
-              UniLMS Open University is licensed by the<br />
+              {systemConfig?.university_name || "LuminaLMS University"} is licensed by the<br />
               National Universities Commission
             </p>
           </div>
