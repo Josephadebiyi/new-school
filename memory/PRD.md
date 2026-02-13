@@ -1,30 +1,32 @@
-# University LMS - Product Requirements Document
+# LuminaLMS - Product Requirements Document
 
 ## Original Problem Statement
-Build a University LMS similar to MIVA Open University with:
-- All roles (Student, Lecturer, Admin, Registrar, Finance Officer, Admissions Officer, Support)
-- Full scope modules (Auth, Dashboard, Courses, Results, Payments, Admissions)
-- No email service (mocked)
-- Mock payments
+Build a University LMS (LuminaLMS) with comprehensive features including:
+- Dynamic white-labeling (admin can customize branding, colors, login page)
+- Rigid access control with role-based permissions
+- Advanced course content engine with video, PDF, and quizzes
+- Graduation and student services (certificates, transcripts)
+- Automated onboarding with email notifications
+- Student management (enrollment, expulsion, reinstatement)
+- Financial management with bank details for invoices
 
 ## Architecture
 
 ### Tech Stack
 - **Frontend**: React 19 + Tailwind CSS + Shadcn/UI
 - **Backend**: FastAPI (Python)
-- **Database**: MongoDB
-- **Auth**: JWT-based authentication
+- **Database**: MongoDB (local instance)
+- **Auth**: JWT-based authentication with RBAC
+- **Email**: Resend (for notifications)
+- **Media**: Uploadcare (for image uploads)
 
 ### User Roles & Permissions
 | Role | Permissions |
 |------|-------------|
 | Student | View courses, enrollments, grades, payments |
-| Lecturer | Manage assigned courses, enter grades |
-| Admin | Full system access, user/course management |
+| Lecturer | Manage assigned courses, build content, enter grades |
+| Admin | Full system access, user/course management, white-labeling |
 | Registrar | Academic records, transcripts, student data |
-| Finance Officer | Payment management, financial reports |
-| Admissions Officer | Application review, student onboarding |
-| Support | Help desk access |
 
 ## Core Requirements (Static)
 
@@ -32,66 +34,65 @@ Build a University LMS similar to MIVA Open University with:
 - Email/password login (no self-signup)
 - JWT token-based sessions
 - Role-based access control
+- Account locking/unlocking
+- Student expulsion/reinstatement
+
+### White-Labeling
+- University name, logo, favicon customization
+- Primary/secondary color theming
+- Login page text and image customization
+- Bank details for invoices
 
 ### Student Features
-- Dashboard with GPA, payment alerts, transactions
-- Course enrollment and viewing
+- Dashboard with stats (courses, lessons, quizzes, minutes)
+- Course enrollment and progress tracking
+- XP/points earning system
 - Grade/result viewing with CGPA calculation
-- Payment history and outstanding balance
+- Payment history and invoices
 
 ### Lecturer Features
 - Dashboard with course stats
-- Course content management
+- Course builder with modules and lessons
+- Quiz creation and management
 - Grade entry for enrolled students
 
 ### Admin Features
-- User management (CRUD)
-- Course management (CRUD)
-- System overview dashboard
-
-### Admissions Features
-- Application review and status updates
-- Automatic student account creation on acceptance
-
-### Finance Features
-- Payment tracking and reports
-- Mark payments as paid
+- User management (CRUD, lock/unlock, expel/reinstate)
+- Course management (CRUD, lecturer assignment)
+- System settings (branding, colors, bank details)
+- Overview dashboard with stats
 
 ## What's Been Implemented
 
-### Date: Feb 2026 - MVP Complete
+### Date: Feb 13, 2026 - UI Redesign Complete
 
-**Backend (FastAPI)**
+**UI/UX Overhaul**
+- ✅ Modern pastel-themed design (pink, blue, mint, yellow cards)
+- ✅ Clean sidebar navigation with icon-based items
+- ✅ Streak badge and notification counter in header
+- ✅ Global search bar placeholder
+- ✅ "Made with Emergent" badge removed
+- ✅ Responsive layout with collapsible sidebar
+
+**Backend Improvements**
+- ✅ Added `/api/student/stats` endpoint
+- ✅ Added `/api/enrollments/my` endpoint
+- ✅ All 22+ API tests passing
+
+**Frontend Fixes**
+- ✅ Fixed login function (was calling with wrong parameters)
+- ✅ Added Outlet for nested route rendering
+- ✅ Added index routes for /student, /lecturer, /admin paths
+- ✅ Fixed navigation links (billing -> payments)
+
+### Previously Implemented
 - ✅ JWT authentication with bcrypt password hashing
-- ✅ User CRUD endpoints with role-based permissions
-- ✅ Course management with lecturer assignment
-- ✅ Enrollment system with completion tracking
-- ✅ Grade entry with automatic GPA calculation
-- ✅ Payment tracking with summary endpoints
-- ✅ Admission application workflow
-- ✅ Role-specific dashboard stats
-- ✅ Database seeding endpoint
-
-**Frontend (React)**
-- ✅ Login page with split-screen design
-- ✅ Responsive sidebar navigation
-- ✅ Student dashboard with payment alerts, GPA cards
-- ✅ Student courses with slanted badge design
-- ✅ Student results with grade table
-- ✅ Student payments with history
-- ✅ Lecturer dashboard and courses
-- ✅ Lecturer grade entry system
-- ✅ Admin dashboard with stats
-- ✅ Admin user management
-- ✅ Admin course management
-- ✅ Admissions dashboard with application workflow
-- ✅ Finance dashboard with payment overview
-- ✅ Registrar dashboard
-- ✅ Support dashboard
-
-## Mocked Features
-- Email service (credentials displayed in UI on acceptance)
-- Payment processing (mark as paid only, no actual gateway)
+- ✅ User CRUD with lock/unlock/expel/reinstate
+- ✅ Course management with modules and lessons
+- ✅ Enrollment system with progress tracking
+- ✅ Grade entry with GPA calculation
+- ✅ Payment tracking with invoices
+- ✅ Admin settings with tabbed interface (Branding, Login Page, Bank Details)
 
 ## Test Credentials
 | Role | Email | Password |
@@ -99,40 +100,43 @@ Build a University LMS similar to MIVA Open University with:
 | Admin | admin@unilms.edu | admin123 |
 | Student | student@unilms.edu | student123 |
 | Lecturer | lecturer@unilms.edu | lecturer123 |
-| Registrar | registrar@unilms.edu | registrar123 |
-| Finance | finance@unilms.edu | finance123 |
-| Admissions | admissions@unilms.edu | admissions123 |
-| Support | support@unilms.edu | support123 |
 
 ## Prioritized Backlog
 
-### P0 (Critical)
-- All implemented ✅
+### P0 (Critical) - COMPLETE
+- ✅ UI/UX redesign to modern pastel theme
+- ✅ All role dashboards working
+- ✅ Navigation and routing fixed
+- ✅ Emergent badge removed
 
 ### P1 (High Priority - Next Phase)
-- Live class scheduling with video integration
-- Assessment/quiz system
-- File upload for course content
-- Transcript PDF generation
-- Email notifications (real integration)
+- Quiz system with bulk upload from Excel
+- Quiz grading and attempt tracking
+- Student course enrollment based on program
+- Graduation features (confetti, PDF certificates)
+- PDF invoice generation
+- Automated onboarding with email credentials
 
 ### P2 (Medium Priority)
-- Student profile editing
-- Course search and filtering
-- Attendance tracking
-- Discussion forums
-- Mobile responsive improvements
+- Backend refactoring (break server.py into modules)
+- Transcript request feature
+- Course progress visualization
+- Real-time notifications
 
 ### P3 (Nice to Have)
 - Analytics dashboard
-- Bulk user import
 - Calendar integration
-- Push notifications
+- Mobile app version
 - Dark mode theme
 
+## Technical Notes
+- MongoDB Atlas connection has SSL certificate issues - using local MongoDB
+- Uploadcare is configured for image uploads
+- Resend is configured for email notifications
+
 ## Next Tasks
-1. Integrate payment gateway (Stripe/Paystack)
-2. Add email service (SendGrid/Resend)
-3. Implement live class scheduling
-4. Build assessment/quiz module
-5. Add file upload for course materials
+1. Implement quiz system backend (bulk upload, grading)
+2. Add PDF generation for certificates and invoices
+3. Implement canvas-confetti for course completion
+4. Refactor server.py into modular routers
+5. Add transcript request feature
