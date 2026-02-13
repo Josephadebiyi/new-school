@@ -1112,6 +1112,168 @@ async def delete_module(
         raise HTTPException(status_code=404, detail="Module not found")
     return {"message": "Module deleted"}
 
+# ============== QUIZ ENDPOINTS ==============
+
+class QuizSubmission(BaseModel):
+    lesson_id: str
+    answers: List[int]
+
+@api_router.post("/quiz/submit")
+async def submit_quiz(
+    submission: QuizSubmission,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit quiz answers and get result"""
+    if current_user["role"] != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can submit quizzes")
+    
+    # Find the lesson with quiz
+    lesson = None
+    module = None
+    async for m in db.modules.find({"is_active": True}, {"_id": 0}):
+        for l in m.get("lessons", []):
+            if l.get("id") == submission.lesson_id and l.get("content_type") == "quiz":
+                lesson = l
+                module = m
+                break
+        if lesson:
+            break
+    
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    quiz_data = lesson.get("quiz_data", {})
+    questions = quiz_data.get("questions", [])
+    attempts_allowed = lesson.get("quiz_attempts_allowed", 3)
+    passing_score = lesson.get("quiz_passing_score", 60.0)
+    
+    # Check attempts
+    existing_attempts = await db.quiz_attempts.count_documents({
+        "student_id": current_user["id"],
+        "lesson_id": submission.lesson_id
+    })
+    
+    if existing_attempts >= attempts_allowed:
+        raise HTTPException(status_code=400, detail=f"Maximum attempts ({attempts_allowed}) reached")
+    
+    # Calculate score
+    correct = 0
+    total = len(questions)
+    for i, q in enumerate(questions):
+        if i < len(submission.answers) and submission.answers[i] == q.get("correct_answer", q.get("answer")):
+            correct += 1
+    
+    score = (correct / total * 100) if total > 0 else 0
+    passed = score >= passing_score
+    
+    # Save attempt
+    attempt = {
+        "id": str(uuid.uuid4()),
+        "student_id": current_user["id"],
+        "lesson_id": submission.lesson_id,
+        "course_id": module.get("course_id"),
+        "answers": submission.answers,
+        "score": score,
+        "passed": passed,
+        "attempt_number": existing_attempts + 1,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.quiz_attempts.insert_one(attempt)
+    
+    return {
+        "score": round(score, 2),
+        "passed": passed,
+        "correct": correct,
+        "total": total,
+        "attempts_used": existing_attempts + 1,
+        "attempts_allowed": attempts_allowed
+    }
+
+@api_router.get("/quiz/attempts/{lesson_id}")
+async def get_quiz_attempts(
+    lesson_id: str,
+    student_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get quiz attempts for a lesson"""
+    query = {"lesson_id": lesson_id}
+    if current_user["role"] == UserRole.STUDENT:
+        query["student_id"] = current_user["id"]
+    elif student_id:
+        query["student_id"] = student_id
+    
+    attempts = await db.quiz_attempts.find(query, {"_id": 0}).to_list(100)
+    return attempts
+
+@api_router.post("/quiz/bulk-upload/{lesson_id}")
+async def bulk_upload_quiz(
+    lesson_id: str,
+    questions: List[dict],
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.LECTURER]))
+):
+    """Bulk upload quiz questions (from Excel data)"""
+    # Find and update the lesson
+    formatted_questions = []
+    for q in questions:
+        formatted_questions.append({
+            "q": q.get("question", q.get("q", "")),
+            "options": q.get("options", []),
+            "answer": q.get("correct_answer", q.get("answer", 0))
+        })
+    
+    # Update the lesson's quiz_data
+    result = await db.modules.update_one(
+        {"lessons.id": lesson_id},
+        {"$set": {"lessons.$.quiz_data.questions": formatted_questions}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    
+    return {"message": f"Uploaded {len(formatted_questions)} questions"}
+
+# ============== PROGRAMS ENDPOINT ==============
+
+@api_router.get("/programs")
+async def get_programs():
+    """Get available programs and their courses"""
+    # Get unique programs from courses
+    courses = await db.courses.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    
+    programs = {}
+    for course in courses:
+        dept = course.get("department", "General")
+        if dept not in programs:
+            programs[dept] = {
+                "department": dept,
+                "courses": []
+            }
+        programs[dept]["courses"].append({
+            "id": course["id"],
+            "code": course["code"],
+            "title": course["title"],
+            "level": course["level"],
+            "units": course["units"],
+            "semester": course["semester"],
+            "course_type": course["course_type"]
+        })
+    
+    return list(programs.values())
+
+@api_router.get("/programs/{department}/courses")
+async def get_program_courses(
+    department: str,
+    level: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get courses for a specific program/department"""
+    query = {"department": department, "is_active": True}
+    if level:
+        query["level"] = level
+    
+    courses = await db.courses.find(query, {"_id": 0}).to_list(1000)
+    return courses
+
 # ============== ENROLLMENT ENDPOINTS ==============
 
 @api_router.get("/enrollments")
