@@ -443,22 +443,22 @@ const Footer = () => (
             <a href="#" className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
               <Facebook size={16} />
             </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-              <Instagram size={18} />
+            <a href="#" className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+              <Instagram size={16} />
             </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-              <Twitter size={18} />
+            <a href="#" className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+              <Twitter size={16} />
             </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-              <Linkedin size={18} />
+            <a href="#" className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+              <Linkedin size={16} />
             </a>
           </div>
         </div>
 
         {/* Quick Links */}
         <div>
-          <h4 className="font-semibold text-lg mb-6">Quick Links</h4>
-          <ul className="space-y-3 text-white/70">
+          <h4 className="font-semibold text-base md:text-lg mb-4 md:mb-6">Quick Links</h4>
+          <ul className="space-y-2 md:space-y-3 text-white/70 text-sm">
             <li><Link to="/" className="hover:text-white transition-colors">Home</Link></li>
             <li><Link to="/courses" className="hover:text-white transition-colors">Courses</Link></li>
             <li><a href="#about" className="hover:text-white transition-colors">About Us</a></li>
@@ -468,36 +468,36 @@ const Footer = () => (
 
         {/* Programs */}
         <div>
-          <h4 className="font-semibold text-lg mb-6">Programs</h4>
-          <ul className="space-y-3 text-white/70">
+          <h4 className="font-semibold text-base md:text-lg mb-4 md:mb-6">Programs</h4>
+          <ul className="space-y-2 md:space-y-3 text-white/70 text-sm">
             <li><a href="#" className="hover:text-white transition-colors">Engineering</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">Business Administration</a></li>
+            <li><a href="#" className="hover:text-white transition-colors">Business</a></li>
             <li><a href="#" className="hover:text-white transition-colors">Computer Science</a></li>
             <li><a href="#" className="hover:text-white transition-colors">Psychology</a></li>
           </ul>
         </div>
 
         {/* Contact */}
-        <div>
-          <h4 className="font-semibold text-lg mb-6">Contact Us</h4>
-          <ul className="space-y-4 text-white/70">
+        <div className="col-span-2 md:col-span-1">
+          <h4 className="font-semibold text-base md:text-lg mb-4 md:mb-6">Contact Us</h4>
+          <ul className="space-y-3 md:space-y-4 text-white/70 text-sm">
             <li className="flex items-start gap-3">
-              <MapPin size={18} className="flex-shrink-0 mt-1" />
+              <MapPin size={16} className="flex-shrink-0 mt-1" />
               <span>123 Education Street, Academic City, 10001</span>
             </li>
             <li className="flex items-center gap-3">
-              <Mail size={18} />
+              <Mail size={16} />
               <span>info@gitb.lt</span>
             </li>
             <li className="flex items-center gap-3">
-              <Phone size={18} />
+              <Phone size={16} />
               <span>+370 XXX XXXXX</span>
             </li>
           </ul>
         </div>
       </div>
 
-      <div className="border-t border-white/20 mt-12 pt-8 text-center text-white/60 text-sm">
+      <div className="border-t border-white/20 mt-8 md:mt-12 pt-6 md:pt-8 text-center text-white/60 text-xs md:text-sm">
         <p>© {new Date().getFullYear()} Global Institute of Tech and Business. All rights reserved.</p>
       </div>
     </div>
