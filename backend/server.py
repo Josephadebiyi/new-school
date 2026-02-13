@@ -667,9 +667,9 @@ async def generate_invoice_pdf(student_name: str, student_id: str, transaction: 
     # Payment details
     payment_data = [
         ["Description", "Amount"],
-        [transaction.get("description", "Payment"), f"${transaction.get('amount', 0):.2f}"],
+        [transaction.get("description", "Payment"), f"€{transaction.get('amount', 0):.2f}"],
         ["", ""],
-        ["Total Paid", f"${transaction.get('amount', 0):.2f}"],
+        ["Total Paid", f"€{transaction.get('amount', 0):.2f}"],
     ]
     
     payment_table = Table(payment_data, colWidths=[4*inch, 2*inch])
