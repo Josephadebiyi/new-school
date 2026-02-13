@@ -297,6 +297,140 @@ const AdminSettings = () => {
             </div>
           </TabsContent>
 
+          {/* Fees & Currency Tab */}
+          <TabsContent value="fees">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-white border border-slate-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading flex items-center gap-2">
+                    <Euro size={20} />
+                    Currency & Fee Settings
+                  </CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Configure default currency and fee amounts
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Default Currency</Label>
+                    <Select 
+                      value={formData.default_currency} 
+                      onValueChange={(value) => setFormData({ ...formData, default_currency: value })}
+                    >
+                      <SelectTrigger data-testid="currency-select">
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EUR">EUR (€) - Euro</SelectItem>
+                        <SelectItem value="USD">USD ($) - US Dollar</SelectItem>
+                        <SelectItem value="GBP">GBP (£) - British Pound</SelectItem>
+                        <SelectItem value="NGN">NGN (₦) - Nigerian Naira</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      Application Fee
+                      <span className="text-xs text-slate-500">(One-time, non-refundable)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-slate-600">
+                        {formData.default_currency === 'EUR' ? '€' : formData.default_currency === 'USD' ? '$' : formData.default_currency === 'GBP' ? '£' : '₦'}
+                      </span>
+                      <Input
+                        type="number"
+                        value={formData.application_fee}
+                        onChange={(e) => setFormData({ ...formData, application_fee: parseFloat(e.target.value) || 0 })}
+                        className="max-w-32"
+                        min="0"
+                        step="0.01"
+                        data-testid="application-fee-input"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Charged when students apply to a program via Stripe
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      Tuition Fee
+                      <span className="text-xs text-slate-500">(Displayed in admission letter)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-slate-600">
+                        {formData.default_currency === 'EUR' ? '€' : formData.default_currency === 'USD' ? '$' : formData.default_currency === 'GBP' ? '£' : '₦'}
+                      </span>
+                      <Input
+                        type="number"
+                        value={formData.tuition_fee}
+                        onChange={(e) => setFormData({ ...formData, tuition_fee: parseFloat(e.target.value) || 0 })}
+                        className="max-w-32"
+                        min="0"
+                        step="0.01"
+                        data-testid="tuition-fee-input"
+                      />
+                      <span className="text-slate-500">per</span>
+                      <Select 
+                        value={formData.tuition_fee_per} 
+                        onValueChange={(value) => setFormData({ ...formData, tuition_fee_per: value })}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="semester">Semester</SelectItem>
+                          <SelectItem value="year">Year</SelectItem>
+                          <SelectItem value="program">Program</SelectItem>
+                          <SelectItem value="month">Month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Shown in admission letters and student portal
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Preview Card */}
+              <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+                <CardHeader>
+                  <CardTitle className="text-emerald-800">Fee Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <p className="text-sm text-slate-500 mb-1">Application Fee</p>
+                      <p className="text-3xl font-bold text-emerald-700">
+                        {formData.default_currency === 'EUR' ? '€' : formData.default_currency === 'USD' ? '$' : formData.default_currency === 'GBP' ? '£' : '₦'}
+                        {formData.application_fee?.toLocaleString() || 50}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">One-time fee per program application</p>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <p className="text-sm text-slate-500 mb-1">Tuition Fee</p>
+                      <p className="text-3xl font-bold text-blue-700">
+                        {formData.default_currency === 'EUR' ? '€' : formData.default_currency === 'USD' ? '$' : formData.default_currency === 'GBP' ? '£' : '₦'}
+                        {formData.tuition_fee?.toLocaleString() || 2500}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">Per {formData.tuition_fee_per || 'semester'}</p>
+                    </div>
+
+                    <div className="text-sm text-emerald-700 mt-4 p-3 bg-emerald-100/50 rounded-lg">
+                      <p className="font-medium">Note:</p>
+                      <p className="text-xs">Application fee is collected via Stripe. Tuition fee is displayed in admission letters for student reference.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           {/* Login Page Tab */}
           <TabsContent value="login">
             <Card className="bg-white border border-slate-200">
