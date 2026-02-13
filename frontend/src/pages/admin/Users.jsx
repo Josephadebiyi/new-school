@@ -417,6 +417,55 @@ const AdminUsers = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
+      </div>
+
+      {/* Student Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-blue-500 rounded-xl">
+              <GraduationCap className="text-white" size={24} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-700">{users.filter(u => u.role === 'student').length}</p>
+              <p className="text-sm text-blue-600">Total Students</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-emerald-500 rounded-xl">
+              <CreditCard className="text-white" size={24} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-700">{users.filter(u => u.role === 'student' && u.payment_status === 'paid').length}</p>
+              <p className="text-sm text-emerald-600">Paid Students</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-amber-500 rounded-xl">
+              <Lock className="text-white" size={24} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-700">{users.filter(u => u.account_status === 'locked').length}</p>
+              <p className="text-sm text-amber-600">Locked Accounts</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-red-500 rounded-xl">
+              <Ban className="text-white" size={24} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-700">{users.filter(u => u.account_status === 'expelled').length}</p>
+              <p className="text-sm text-red-600">Expelled Students</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
