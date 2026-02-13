@@ -392,7 +392,7 @@ const CourseBuilder = () => {
 
       {/* Lesson Dialog */}
       <Dialog open={lessonDialog.open} onOpenChange={(open) => setLessonDialog({ open, moduleId: null, editId: null })}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{lessonDialog.editId ? 'Edit Lesson' : 'Add Lesson'}</DialogTitle>
           </DialogHeader>
@@ -434,6 +434,144 @@ const CourseBuilder = () => {
                 />
               </div>
             )}
+            
+            {/* Quiz Configuration */}
+            {lessonForm.content_type === 'quiz' && (
+              <div className="space-y-4 border rounded-lg p-4 bg-slate-50">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-slate-900">Quiz Settings</h4>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Attempts Allowed</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={lessonForm.quiz_attempts_allowed || 3}
+                      onChange={(e) => setLessonForm({ ...lessonForm, quiz_attempts_allowed: parseInt(e.target.value) })}
+                      data-testid="quiz-attempts-input"
+                    />
+                  </div>
+                  <div>
+                    <Label>Passing Score (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={lessonForm.quiz_passing_score || 60}
+                      onChange={(e) => setLessonForm({ ...lessonForm, quiz_passing_score: parseFloat(e.target.value) })}
+                      data-testid="quiz-passing-score-input"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Questions ({(lessonForm.quiz_data?.questions || []).length})</Label>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        const questions = lessonForm.quiz_data?.questions || [];
+                        setLessonForm({
+                          ...lessonForm,
+                          quiz_data: {
+                            ...lessonForm.quiz_data,
+                            questions: [...questions, { q: '', options: ['', '', '', ''], answer: 0 }]
+                          }
+                        });
+                      }}
+                    >
+                      <Plus size={14} className="mr-1" />
+                      Add Question
+                    </Button>
+                  </div>
+                  
+                  {(lessonForm.quiz_data?.questions || []).map((question, qIdx) => (
+                    <div key={qIdx} className="border rounded-lg p-3 bg-white space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <Label className="text-xs">Question {qIdx + 1}</Label>
+                          <Input
+                            value={question.q}
+                            onChange={(e) => {
+                              const questions = [...(lessonForm.quiz_data?.questions || [])];
+                              questions[qIdx] = { ...questions[qIdx], q: e.target.value };
+                              setLessonForm({
+                                ...lessonForm,
+                                quiz_data: { ...lessonForm.quiz_data, questions }
+                              });
+                            }}
+                            placeholder="Enter your question..."
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-700 mt-5"
+                          onClick={() => {
+                            const questions = [...(lessonForm.quiz_data?.questions || [])];
+                            questions.splice(qIdx, 1);
+                            setLessonForm({
+                              ...lessonForm,
+                              quiz_data: { ...lessonForm.quiz_data, questions }
+                            });
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        {(question.options || ['', '', '', '']).map((option, oIdx) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name={`correct-${qIdx}`}
+                              checked={question.answer === oIdx}
+                              onChange={() => {
+                                const questions = [...(lessonForm.quiz_data?.questions || [])];
+                                questions[qIdx] = { ...questions[qIdx], answer: oIdx };
+                                setLessonForm({
+                                  ...lessonForm,
+                                  quiz_data: { ...lessonForm.quiz_data, questions }
+                                });
+                              }}
+                              className="text-emerald-600"
+                            />
+                            <Input
+                              value={option}
+                              onChange={(e) => {
+                                const questions = [...(lessonForm.quiz_data?.questions || [])];
+                                const options = [...(questions[qIdx].options || ['', '', '', ''])];
+                                options[oIdx] = e.target.value;
+                                questions[qIdx] = { ...questions[qIdx], options };
+                                setLessonForm({
+                                  ...lessonForm,
+                                  quiz_data: { ...lessonForm.quiz_data, questions }
+                                });
+                              }}
+                              placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
+                              className="text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-500">Select the radio button next to the correct answer</p>
+                    </div>
+                  ))}
+                  
+                  {(lessonForm.quiz_data?.questions || []).length === 0 && (
+                    <p className="text-center text-slate-500 py-4 text-sm">No questions added yet. Click "Add Question" to start.</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div>
               <Label>Description (optional)</Label>
               <Textarea
