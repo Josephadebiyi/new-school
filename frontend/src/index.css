@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,31 +6,27 @@
 
 body {
     margin: 0;
-    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #F8FAFC;
+    background-color: #F5F5F7;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Manrope', sans-serif;
-}
-
-code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 @layer base {
     :root {
-        --background: 210 40% 98%;
+        --background: 0 0% 96%;
         --foreground: 222 47% 11%;
         --card: 0 0% 100%;
         --card-foreground: 222 47% 11%;
         --popover: 0 0% 100%;
         --popover-foreground: 222 47% 11%;
-        --primary: 0 65% 51%;
+        --primary: 145 40% 24%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 215 25% 27%;
+        --secondary: 32 95% 50%;
         --secondary-foreground: 0 0% 100%;
         --muted: 210 40% 96%;
         --muted-foreground: 215 16% 47%;
@@ -40,17 +36,22 @@ code {
         --destructive-foreground: 0 0% 100%;
         --border: 214 32% 91%;
         --input: 214 32% 91%;
-        --ring: 0 65% 51%;
-        --chart-1: 0 65% 51%;
-        --chart-2: 215 25% 27%;
-        --chart-3: 160 60% 45%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
-        --uni-red: #D32F2F;
-        --uni-navy: #0F172A;
-        --uni-success: #10B981;
-        --uni-warning: #F59E0B;
+        --ring: 145 40% 24%;
+        --radius: 0.75rem;
+        
+        /* Brand Colors */
+        --brand-green: #2D4A2D;
+        --brand-orange: #FF8C00;
+        --brand-light-green: #E8F5E9;
+        --brand-light-orange: #FFF3E0;
+        
+        /* Pastel Card Colors */
+        --card-pink: #FFE4E8;
+        --card-yellow: #FFF9E6;
+        --card-mint: #E0F7EF;
+        --card-blue: #E3F2FD;
+        --card-purple: #F3E5F5;
+        --card-peach: #FFEDE0;
     }
 }
 
@@ -65,122 +66,200 @@ code {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f5f9;
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
+    background: #D1D5DB;
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #9CA3AF;
 }
 
-/* Slanted Badge for Course Cards */
-.slanted-badge {
-    position: absolute;
-    top: 0;
-    left: 0;
-    background: linear-gradient(135deg, #0F172A 50%, transparent 50%);
+/* Modern Card Styles */
+.stat-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.stat-card-pink {
+    background: linear-gradient(135deg, #FFE4E8 0%, #FFF0F3 100%);
+}
+
+.stat-card-yellow {
+    background: linear-gradient(135deg, #FFF9E6 0%, #FFFDF5 100%);
+}
+
+.stat-card-mint {
+    background: linear-gradient(135deg, #E0F7EF 0%, #F0FBF7 100%);
+}
+
+.stat-card-blue {
+    background: linear-gradient(135deg, #E3F2FD 0%, #F5FAFF 100%);
+}
+
+.stat-card-purple {
+    background: linear-gradient(135deg, #F3E5F5 0%, #FAF5FB 100%);
+}
+
+.stat-card-peach {
+    background: linear-gradient(135deg, #FFEDE0 0%, #FFF8F3 100%);
+}
+
+/* Progress Ring */
+.progress-ring {
+    transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+    transition: stroke-dashoffset 0.5s ease;
+}
+
+/* Modern Sidebar */
+.sidebar-modern {
+    background: white;
+    border-right: none;
+    box-shadow: 1px 0 10px rgba(0,0,0,0.03);
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: #64748B;
+    transition: all 0.2s ease;
+    margin: 4px 8px;
+}
+
+.sidebar-item:hover {
+    background: #F8FAFC;
+    color: #1E293B;
+}
+
+.sidebar-item.active {
+    background: var(--brand-green);
     color: white;
-    padding: 8px 24px 16px 8px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    clip-path: polygon(0 0, 100% 0, 70% 100%, 0 100%);
 }
 
-/* Glass morphism effect */
-.glass {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-}
-
-/* Sidebar active state */
-.sidebar-active {
-    background: #F1F5F9;
-    border-left: 3px solid #0F172A;
-}
-
-/* Stats card with navy background */
-.stats-navy {
-    background: #0F172A;
+.sidebar-item.active svg {
     color: white;
 }
 
-/* Payment alert card */
-.payment-alert {
-    background: #FEF2F2;
-    border: 1px solid #FECACA;
+/* Course Card Modern */
+.course-card-modern {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: all 0.3s ease;
 }
 
-/* Course card hover effect */
-.course-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.course-card:hover {
+.course-card-modern:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
 }
 
-/* Button transitions */
-.btn-primary {
-    background: #D32F2F;
+/* Level Badge */
+.level-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(45, 74, 45, 0.9);
     color: white;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
 }
 
-.btn-primary:hover {
-    background: #B71C1C;
+/* Progress Bar Modern */
+.progress-bar-modern {
+    background: #E5E7EB;
+    border-radius: 100px;
+    height: 8px;
+    overflow: hidden;
 }
 
-.btn-primary:active {
-    transform: scale(0.98);
+.progress-bar-fill {
+    background: linear-gradient(90deg, #2D4A2D 0%, #4A7C4A 100%);
+    height: 100%;
+    border-radius: 100px;
+    transition: width 0.5s ease;
 }
 
-.btn-navy {
-    background: #0F172A;
+/* Button Styles */
+.btn-primary-modern {
+    background: var(--brand-green);
     color: white;
-    transition: background-color 0.2s ease;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.2s ease;
 }
 
-.btn-navy:hover {
-    background: #1E293B;
+.btn-primary-modern:hover {
+    background: #3D5A3D;
+    transform: translateY(-1px);
 }
 
-/* Badge styles */
-.badge-core {
-    background: #0F172A;
+.btn-secondary-modern {
+    background: var(--brand-orange);
     color: white;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.2s ease;
 }
 
-.badge-success {
-    background: #D1FAE5;
-    color: #065F46;
+.btn-secondary-modern:hover {
+    background: #E67E00;
 }
 
-.badge-warning {
-    background: #FEF3C7;
-    color: #92400E;
+/* Table Modern */
+.table-modern {
+    border-radius: 16px;
+    overflow: hidden;
 }
 
-.badge-enrolled {
-    background: #DBEAFE;
-    color: #1E40AF;
+.table-modern thead {
+    background: var(--brand-green);
 }
 
-/* Animation for page transitions */
-@keyframes fadeIn {
+.table-modern th {
+    color: white;
+    font-weight: 600;
+    padding: 16px;
+}
+
+.table-modern td {
+    padding: 16px;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+/* Animation */
+@keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
@@ -188,27 +267,14 @@ code {
     }
 }
 
-.animate-fadeIn {
-    animation: fadeIn 0.3s ease-out;
+.animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out;
 }
 
-/* Table styles */
-.table-header {
-    background: #0F172A;
-    color: white;
-}
-
-/* Input focus states */
-input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #D32F2F;
-    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1);
-}
-
-/* Loading spinner */
+/* Spinner */
 .spinner {
-    border: 3px solid #E2E8F0;
-    border-top: 3px solid #D32F2F;
+    border: 3px solid #E5E7EB;
+    border-top: 3px solid var(--brand-green);
     border-radius: 50%;
     width: 24px;
     height: 24px;
@@ -218,6 +284,57 @@ input:focus, select:focus, textarea:focus {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Avatar Group */
+.avatar-stack {
+    display: flex;
+}
+
+.avatar-stack > * {
+    margin-left: -8px;
+    border: 2px solid white;
+}
+
+.avatar-stack > *:first-child {
+    margin-left: 0;
+}
+
+/* Status Badges */
+.badge-success {
+    background: #D1FAE5;
+    color: #065F46;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-warning {
+    background: #FEF3C7;
+    color: #92400E;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-danger {
+    background: #FEE2E2;
+    color: #991B1B;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-info {
+    background: #DBEAFE;
+    color: #1E40AF;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
 }
 
 @layer base {
