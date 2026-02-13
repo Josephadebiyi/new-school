@@ -412,13 +412,17 @@ const CoursePlayer = () => {
                   )}
                   
                   {currentLesson.content_type === 'quiz' && (
-                    <div className="text-center py-12">
-                      <HelpCircle size={48} className="mx-auto mb-4 text-slate-400" />
-                      <p className="text-slate-300 mb-4">Practice Assessment</p>
-                      <p className="text-slate-500 text-sm">
-                        Quiz functionality coming soon
-                      </p>
-                    </div>
+                    <QuizComponent 
+                      lesson={currentLesson}
+                      quizAnswers={quizAnswers}
+                      setQuizAnswers={setQuizAnswers}
+                      quizSubmitted={quizSubmitted}
+                      quizResult={quizResult}
+                      submittingQuiz={submittingQuiz}
+                      onSubmit={handleQuizSubmit}
+                      onRetry={handleQuizRetry}
+                      isCompleted={isLessonCompleted(currentLesson?.id)}
+                    />
                   )}
                 </CardContent>
               </Card>
