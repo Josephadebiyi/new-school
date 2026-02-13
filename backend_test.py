@@ -11,7 +11,7 @@ from datetime import datetime
 import time
 
 class LuminaLMSAPITester:
-    def __init__(self, base_url="https://ui-overhaul-test.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://lumina-redesign-wip.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.tokens = {}  # Store tokens for different users
         self.users = {}   # Store user data
