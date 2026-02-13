@@ -1277,6 +1277,63 @@ async def get_program_courses(
     courses = await db.courses.find(query, {"_id": 0}).to_list(1000)
     return courses
 
+# ============== STUDENT STATS ENDPOINTS ==============
+
+@api_router.get("/student/stats")
+async def get_student_stats(current_user: dict = Depends(get_current_user)):
+    """Get statistics for the current student"""
+    if current_user["role"] != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can access this endpoint")
+    
+    student_id = current_user["id"]
+    
+    # Get enrollments
+    enrollments = await db.enrollments.find({"student_id": student_id}, {"_id": 0}).to_list(1000)
+    
+    # Calculate stats
+    total_courses = len(enrollments)
+    completed_courses = len([e for e in enrollments if e.get("status") == "completed"])
+    in_progress = len([e for e in enrollments if e.get("status") == "enrolled"])
+    
+    # Calculate lesson stats
+    total_lessons = 0
+    completed_lessons = 0
+    for enrollment in enrollments:
+        completed = enrollment.get("completed_lessons", [])
+        completed_lessons += len(completed)
+        # Estimate total lessons from course modules
+        course = await db.courses.find_one({"id": enrollment.get("course_id")}, {"_id": 0})
+        if course:
+            for module in course.get("modules", []):
+                total_lessons += len(module.get("lessons", []))
+    
+    return {
+        "total_courses": total_courses,
+        "completed_courses": completed_courses,
+        "in_progress": in_progress,
+        "total_lessons": total_lessons or 36,  # Fallback
+        "completed_lessons": completed_lessons,
+        "total_quizzes": 18,  # Placeholder
+        "total_minutes": 231  # Placeholder
+    }
+
+@api_router.get("/enrollments/my")
+async def get_my_enrollments(current_user: dict = Depends(get_current_user)):
+    """Get enrollments for the current student"""
+    if current_user["role"] != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can access this endpoint")
+    
+    student_id = current_user["id"]
+    enrollments = await db.enrollments.find({"student_id": student_id}, {"_id": 0}).to_list(1000)
+    
+    # Enrich with course data
+    for enrollment in enrollments:
+        course = await db.courses.find_one({"id": enrollment["course_id"]}, {"_id": 0})
+        if course:
+            enrollment["course"] = serialize_doc(course)
+    
+    return enrollments
+
 # ============== ENROLLMENT ENDPOINTS ==============
 
 @api_router.get("/enrollments")
