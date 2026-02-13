@@ -9,6 +9,8 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - Separate landing page for public course catalog
 - Application workflow with email notifications
 - PDF admission letters and certificates
+- Document upload for student applications (high school certificate, identification)
+- Admin course image management
 
 ## Architecture
 
@@ -21,32 +23,35 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - **Email**: Resend API
 - **Auth**: JWT with RBAC
 - **PDF**: ReportLab for admission letters
+- **File Storage**: Local uploads in /app/backend/uploads/
 
 ### Project Structure
 ```
 /app/
 ├── backend/
 │   ├── server.py        # Main API (~2800 lines)
+│   ├── uploads/         # Uploaded documents and images
 │   ├── .env             # Stripe keys, Resend, MongoDB
 │   └── tests/           # pytest test files
 ├── frontend/
 │   └── src/
 │       ├── pages/
 │       │   ├── admin/
-│       │   │   ├── CourseEditor.jsx   # Full course management
+│       │   │   ├── CourseEditor.jsx   # Course image upload added
 │       │   │   ├── Admissions.jsx     # Application workflow
+│       │   │   ├── Dashboard.jsx      # Enhanced gradient banner
 │       │   │   ├── Payments.jsx       # EUR currency display
 │       │   │   └── Settings.jsx       # Fees & Currency tab
 │       │   └── student/
-│       │       └── Dashboard.jsx      # Student dashboard
+│       │       └── Dashboard.jsx      # Enhanced gradient banner with streak
 │       ├── utils/
 │       │   └── currency.js            # EUR formatting utility
 │       └── components/ui/
 │           └── dialog.jsx, etc.       # Shadcn components
 ├── school/                            # Separate landing page app
 │   ├── src/
-│   │   ├── App.js                     # Homepage, courses, application form
-│   │   └── index.css                  # Tailwind CSS + custom styles
+│   │   ├── App.js                     # Document upload in application form
+│   │   └── index.css                  # Enhanced styles
 │   ├── tailwind.config.js
 │   └── .env
 └── memory/PRD.md
@@ -54,52 +59,48 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 
 ## What's Been Implemented
 
-### Date: Feb 13, 2026 - Session 3 (Current)
+### Date: Feb 13, 2026 - Session 4 (Current)
 
-**School Landing Page (FIXED & WORKING)**
-- ✅ Fixed Tailwind CSS configuration - installed v3.4 and fixed postcss.config.js syntax
-- ✅ Fixed route ordering - moved /courses/public before /courses/{course_id}
+**Document Upload for Applications**
+- ✅ Backend endpoint /api/upload/document for high school cert and ID
+- ✅ File validation (JPG, PNG, PDF, max 5MB)
+- ✅ Frontend UI with dashed upload zones in school landing page
+- ✅ Application model stores document URLs
+
+**Course Image Management**
+- ✅ Backend endpoint /api/upload/course-image for admin/lecturers
+- ✅ File validation (JPG, PNG, WEBP, max 5MB)
+- ✅ Course Editor UI with image upload/preview
+- ✅ Edit/remove image functionality
+
+**UI/UX Beautification**
+- ✅ Admin Dashboard: Emerald gradient welcome banner
+- ✅ Student Dashboard: Purple gradient welcome banner with "7 Days 🔥" streak
+- ✅ Enhanced stat cards with hover effects and gradient icons
+- ✅ School app CSS enhancements (animations, patterns, glass effects)
+
+### Date: Feb 13, 2026 - Session 3
+
+**School Landing Page (FIXED & REDESIGNED)**
+- ✅ Fixed Tailwind CSS configuration
+- ✅ Redesigned to match "Univerz University" design spec
 - ✅ School app runs on port 3001 with GITB green/orange branding
-- ✅ Homepage with hero section, statistics, featured courses
-- ✅ Course catalog page with search functionality
-- ✅ Course detail page with application form
-- ✅ Application form with €50 fee display and Stripe checkout
-- ✅ Application success page with payment status polling
 
 **EUR Currency Formatting (COMPLETED)**
-- ✅ Applied formatCurrency() to Admin Payments page (€500,365.00, €315.00, etc.)
-- ✅ Admin Admissions page shows EUR format
-- ✅ Invoice PDF generation updated from $ to €
-- ✅ Backend system config returns EUR as default currency
+- ✅ Applied formatCurrency() across all dashboards
+- ✅ Invoice PDF generation uses €
 
-### Date: Feb 13, 2026 - Session 2
+### Previous Sessions
+- User management with RBAC
+- Course management with modules and lessons
+- Stripe payment integration
+- Email notifications via Resend
+- PDF admission letters
 
-**UI/UX Fixes**
-- ✅ Fixed transparent dialog/popup backgrounds (bg-background → bg-white)
-- ✅ Fixed alert-dialog, dropdown-menu, select components
-- ✅ All action buttons in dropdown menus working correctly
-
-**Course Builder/Editor**
-- ✅ Full course editing UI at `/admin/courses/:id/edit`
-- ✅ Duration settings (weeks/months/years dropdown)
-- ✅ Course Content section with module accordion
-- ✅ Add Module and Lesson dialogs
-
-**Student Management**
-- ✅ Student Quick Stats cards
-- ✅ Export Students to Excel (names, emails, student IDs)
-
-**Applications & Admissions**
-- ✅ Applications table with filtering
-- ✅ Approve/Reject application buttons
-- ✅ Auto-create student account on approval
-- ✅ Send admission email with credentials
-- ✅ PDF admission letter generation
-
-## Test Results (Latest)
-- **Backend**: 100% (13/13 tests passed)
+## Test Results (Latest - Session 4)
+- **Backend**: 100% (14/14 tests passed)
 - **Frontend**: 100% - All features verified
-- **Test Report**: /app/test_reports/iteration_4.json
+- **Test Report**: /app/test_reports/iteration_5.json
 
 ## Test Credentials
 | Role | Email | Password |
@@ -115,13 +116,14 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - `GET /api/courses/public/{course_id}` - Get course with modules
 - `POST /api/applications/create` - Create application with Stripe checkout
 - `GET /api/applications/status/{session_id}` - Check payment status
+- `POST /api/upload/document` - Upload application documents
 
 ### Protected (Auth Required)
 - `GET /api/courses` - List courses (filtered by role)
+- `POST /api/upload/course-image` - Upload course cover image (admin/lecturer)
 - `GET /api/applications` - List all applications
 - `POST /api/applications/{id}/approve` - Approve and create user
 - `GET /api/system-config` - Get system configuration
-- `GET /api/users` - List users
 
 ## Stripe Configuration
 - Public Key: pk_live_51SHqYK... (configured)
@@ -131,23 +133,26 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 ## Remaining Tasks
 
 ### P1 (Next Priority)
+- [ ] Admin approval workflow - view uploaded documents, approve/reject applications
+- [ ] Bulk quiz upload from Excel
 - [ ] Canvas-confetti on course completion
 - [ ] PDF certificates for completed courses
-- [ ] Personalized student welcome ("Welcome, John!")
-- [ ] Bulk quiz upload from Excel
 
 ### P2 (Medium Priority)
 - [ ] Admin payment tracking dashboard
 - [ ] Interactive course card hover effects
 - [ ] PDF template editor for admission letters
+- [ ] Document preview in admin admissions
 
 ### P3 (Nice to Have)
 - [ ] Backend refactoring (modular routers)
 - [ ] Real-time notifications
 - [ ] Course change fee enforcement
+- [ ] Move uploads to cloud storage (S3/Uploadcare)
 
 ## Technical Notes
 - MongoDB Atlas SSL issue - using local MongoDB
 - Stripe live keys configured (handle with care)
-- School landing page requires `yarn start` in /app/school OR build for production
-- Public course endpoints must be defined BEFORE /courses/{course_id} to avoid route conflicts
+- School landing page requires supervisor to start: `sudo supervisorctl start school`
+- Public course endpoints must be defined BEFORE /courses/{course_id}
+- Uploaded files stored in /app/backend/uploads/
