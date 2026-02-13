@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAuth, useSystemConfig, API } from "../App";
+import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, GraduationCap, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { login, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login, user } = useAuth();
-  const { systemConfig, fetchSystemConfig } = useSystemConfig();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [systemConfig, setSystemConfig] = useState(null);
 
   useEffect(() => {
     fetchSystemConfig();
@@ -24,174 +23,210 @@ const Login = () => {
 
   useEffect(() => {
     if (user) {
-      const roleRoutes = {
-        student: "/student/dashboard",
-        lecturer: "/lecturer/dashboard",
-        admin: "/admin/dashboard",
-        registrar: "/admin/dashboard"
-      };
-      navigate(roleRoutes[user.role] || "/student/dashboard");
+      navigateByRole(user.role);
     }
-  }, [user, navigate]);
+  }, [user]);
+
+  const fetchSystemConfig = async () => {
+    try {
+      const response = await axios.get(`${API}/system-config`);
+      setSystemConfig(response.data);
+      // Update page title
+      if (response.data.university_name) {
+        document.title = response.data.university_name;
+      }
+      // Update favicon
+      if (response.data.favicon_url) {
+        const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+        link.rel = 'icon';
+        link.href = response.data.favicon_url;
+        document.head.appendChild(link);
+      }
+    } catch (error) {
+      console.log("Using default config");
+    }
+  };
+
+  const navigateByRole = (role) => {
+    switch (role) {
+      case "admin":
+        navigate("/admin");
+        break;
+      case "lecturer":
+        navigate("/lecturer");
+        break;
+      case "student":
+        navigate("/student");
+        break;
+      default:
+        navigate("/");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    if (!email || !password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
     
+    setLoading(true);
     try {
-      const userData = await login(email, password);
-      toast.success(`Welcome back, ${userData.first_name}!`);
+      const response = await axios.post(`${API}/auth/login`, {
+        email,
+        password
+      });
       
-      if (userData.account_status === 'locked' || userData.account_status === 'expelled') {
-        navigate("/limited-access");
-        return;
-      }
+      const { access_token, user: userData, access_info } = response.data;
+      login(access_token, userData, access_info);
       
-      const roleRoutes = {
-        student: "/student/dashboard",
-        lecturer: "/lecturer/dashboard",
-        admin: "/admin/dashboard",
-        registrar: "/admin/dashboard"
-      };
-      
-      const from = location.state?.from?.pathname || roleRoutes[userData.role] || "/student/dashboard";
-      navigate(from, { replace: true });
+      toast.success(`Welcome back, ${userData.first_name || userData.email}!`);
+      navigateByRole(userData.role);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Invalid credentials");
+      const message = error.response?.data?.detail || "Invalid credentials";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const loginImageUrl = systemConfig?.login_image_url || "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200";
-  const headline = systemConfig?.login_headline || "Learn with";
-  const subtext = systemConfig?.login_subtext || "Affordable higher education you can take wherever life takes you. Learn anywhere at your own pace.";
+  // Default values
+  const universityName = systemConfig?.university_name || "LuminaLMS";
+  const logoUrl = systemConfig?.logo_url;
+  const loginImageUrl = systemConfig?.login_image_url || "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80";
+  const loginHeadline = systemConfig?.login_headline || "Learn with";
+  const loginSubtext = systemConfig?.login_subtext || "Affordable higher education you can take wherever life takes you. Learn anywhere at your own pace.";
+  const primaryColor = systemConfig?.primary_color || "#1A1A1A";
+  const secondaryColor = systemConfig?.secondary_color || "#FF8C00";
 
   return (
-    <div className="min-h-screen flex" data-testid="login-page">
+    <div className="min-h-screen flex bg-white" data-testid="login-page">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-[45%] flex items-center justify-center p-8 lg:p-16 bg-white">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex-1 flex flex-col justify-center px-8 lg:px-16 xl:px-24">
+        <div className="w-full max-w-md mx-auto">
           {/* Logo */}
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-10">
-              {systemConfig?.logo_url ? (
-                <img src={systemConfig.logo_url} alt="Logo" className="h-14 object-contain" />
-              ) : (
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: systemConfig?.primary_color || '#2D4A2D' }}>
-                  <span className="text-white font-heading font-bold text-2xl">G</span>
+          <div className="mb-10">
+            {logoUrl ? (
+              <img src={logoUrl} alt={universityName} className="h-12 object-contain" />
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                  <GraduationCap size={28} className="text-gray-700" />
                 </div>
-              )}
-            </div>
-            
-            <h2 className="font-heading text-3xl font-bold text-slate-900">Welcome Back</h2>
-            <p className="text-slate-500 mt-2 text-base">Sign in to your account to continue</p>
+                <span className="text-xl font-bold text-gray-900">{universityName}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
+            <p className="text-gray-500 mt-2">Sign in to your account to continue</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700 font-medium">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@university.edu"
-                required
-                className="h-12 border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-[#2D4A2D] focus:ring-[#2D4A2D]/20 transition-all"
-                data-testid="login-email-input"
-              />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <Label className="text-gray-700 font-medium">Email Address</Label>
+              <div className="relative mt-2">
+                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@university.edu"
+                  className="input-modern pl-11"
+                  data-testid="login-email-input"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
+            <div>
+              <Label className="text-gray-700 font-medium">Password</Label>
+              <div className="relative mt-2">
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  required
-                  className="h-12 border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-[#2D4A2D] focus:ring-[#2D4A2D]/20 pr-12 transition-all"
+                  className="input-modern pl-11 pr-11"
                   data-testid="login-password-input"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  data-testid="toggle-password-visibility"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="rounded border-slate-300 text-[#2D4A2D] focus:ring-[#2D4A2D]" />
-                <span className="text-sm text-slate-600">Remember me</span>
+                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500" />
+                <span className="text-gray-600">Remember me</span>
               </label>
-              <button type="button" className="text-sm font-medium hover:underline" style={{ color: systemConfig?.primary_color || '#2D4A2D' }}>
-                Forgot Password?
-              </button>
+              <a href="#" className="text-gray-600 hover:text-gray-900 font-medium">Forgot Password?</a>
             </div>
 
-            <Button
+            <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 text-white font-semibold rounded-xl transition-all text-base"
-              style={{ background: systemConfig?.primary_color || '#2D4A2D' }}
+              className="btn-modern btn-modern-dark w-full h-12 text-base"
+              style={{ backgroundColor: primaryColor }}
               data-testid="login-submit-btn"
             >
-              {loading ? <div className="spinner mx-auto border-white border-t-transparent"></div> : "Sign In"}
-            </Button>
+              {loading ? <div className="spinner"></div> : "Sign In"}
+            </button>
           </form>
-          
-          {/* Support Info */}
-          {systemConfig?.support_email && (
-            <p className="text-center text-sm text-slate-500">
-              Need help? Contact <a href={`mailto:${systemConfig.support_email}`} className="font-medium text-[#2D4A2D] hover:underline">{systemConfig.support_email}</a>
-            </p>
-          )}
+
+          {/* Support */}
+          <p className="mt-8 text-center text-sm text-gray-500">
+            Need help? Contact{" "}
+            <a 
+              href={`mailto:${systemConfig?.support_email || "support@luminalms.edu"}`}
+              className="font-medium text-gray-900 hover:underline"
+            >
+              {systemConfig?.support_email || "support@luminalms.edu"}
+            </a>
+          </p>
         </div>
       </div>
 
       {/* Right Side - Image */}
-      <div className="hidden lg:block lg:w-[55%] relative overflow-hidden">
-        <img
-          src={loginImageUrl}
-          alt="Students learning"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+      <div className="hidden lg:flex lg:flex-1 relative overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${loginImageUrl})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+        </div>
         
-        {/* Content overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-12 text-white">
-          <h2 className="font-heading text-4xl lg:text-5xl font-bold mb-4 leading-tight">
-            {headline}<br />
-            <span style={{ color: systemConfig?.secondary_color || '#FF8C00' }}>
-              {systemConfig?.university_name || "Our University"}
-            </span>
-          </h2>
-          <p className="text-lg text-white/80 max-w-lg leading-relaxed">
-            {subtext}
+        {/* Content Overlay */}
+        <div className="relative z-10 flex flex-col justify-end p-12 text-white">
+          <h2 className="text-2xl font-light mb-1">{loginHeadline}</h2>
+          <h3 className="text-4xl font-bold mb-4" style={{ color: secondaryColor }}>
+            {universityName}
+          </h3>
+          <p className="text-white/70 max-w-md text-lg leading-relaxed">
+            {loginSubtext}
           </p>
           
           {/* Stats */}
           <div className="flex gap-8 mt-8">
             <div>
-              <p className="text-3xl font-bold">1000+</p>
-              <p className="text-white/60 text-sm">Students</p>
+              <div className="text-3xl font-bold">1000+</div>
+              <div className="text-white/60 text-sm">Students</div>
             </div>
             <div>
-              <p className="text-3xl font-bold">50+</p>
-              <p className="text-white/60 text-sm">Courses</p>
+              <div className="text-3xl font-bold">50+</div>
+              <div className="text-white/60 text-sm">Courses</div>
             </div>
             <div>
-              <p className="text-3xl font-bold">95%</p>
-              <p className="text-white/60 text-sm">Success Rate</p>
+              <div className="text-3xl font-bold">95%</div>
+              <div className="text-white/60 text-sm">Success Rate</div>
             </div>
           </div>
         </div>
