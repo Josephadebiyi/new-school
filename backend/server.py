@@ -1134,6 +1134,8 @@ async def create_application(app_data: ApplicationCreate):
         "amount": APPLICATION_FEE_EUR,
         "currency": "EUR",
         "session_id": None,
+        "high_school_cert_url": app_data.high_school_cert_url,
+        "identification_url": app_data.identification_url,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
