@@ -1,26 +1,24 @@
-import React from "react";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth, useSystemConfig } from "../App";
-import {
-  LayoutDashboard,
-  BookOpen,
-  ClipboardList,
+import { 
+  Home, 
+  BookOpen, 
+  Users, 
+  FileText, 
+  Settings, 
   CreditCard,
-  Users,
-  FileText,
-  GraduationCap,
-  Bell,
-  ChevronDown,
   LogOut,
-  HelpCircle,
-  Phone,
-  Settings,
-  UserPlus,
-  DollarSign,
-  Lock,
-  Unlock,
-  Search
+  GraduationCap,
+  BarChart3,
+  Bell,
+  Search,
+  Menu,
+  X,
+  Flame,
+  ChevronDown
 } from "lucide-react";
+import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,205 +26,211 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Input } from "./ui/input";
 
-const DashboardLayout = () => {
-  const { user, logout, accessInfo } = useAuth();
+const DashboardLayout = ({ children }) => {
+  const { user, logout } = useAuth();
   const { systemConfig } = useSystemConfig();
-  const navigate = useNavigate();
   const location = useLocation();
-
-  const roleMenus = {
-    student: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/student/dashboard" },
-      { label: "My Courses", icon: BookOpen, path: "/student/courses" },
-      { label: "Results", icon: ClipboardList, path: "/student/results" },
-      { label: "Payments", icon: CreditCard, path: "/student/payments" },
-    ],
-    lecturer: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/lecturer/dashboard" },
-      { label: "My Courses", icon: BookOpen, path: "/lecturer/courses" },
-      { label: "Grade Entry", icon: ClipboardList, path: "/lecturer/grades" },
-    ],
-    admin: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-      { label: "Users", icon: Users, path: "/admin/users" },
-      { label: "Courses", icon: BookOpen, path: "/admin/courses" },
-      { label: "Admissions", icon: UserPlus, path: "/admin/admissions" },
-      { label: "Payments", icon: DollarSign, path: "/admin/payments" },
-      { label: "Settings", icon: Settings, path: "/admin/settings" },
-    ],
-    registrar: [
-      { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-      { label: "Users", icon: Users, path: "/admin/users" },
-      { label: "Courses", icon: BookOpen, path: "/admin/courses" },
-    ],
-  };
-
-  const menuItems = roleMenus[user?.role] || [];
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
+  // Navigation items based on role
+  const getNavItems = () => {
+    const role = user?.role;
+    
+    if (role === "admin") {
+      return [
+        { path: "/admin", label: "Home", icon: Home },
+        { path: "/admin/users", label: "Users", icon: Users },
+        { path: "/admin/courses", label: "Courses", icon: BookOpen },
+        { path: "/admin/admissions", label: "Admissions", icon: GraduationCap },
+        { path: "/admin/payments", label: "Payments", icon: CreditCard },
+        { path: "/admin/settings", label: "Settings", icon: Settings },
+      ];
+    }
+    
+    if (role === "lecturer") {
+      return [
+        { path: "/lecturer", label: "Home", icon: Home },
+        { path: "/lecturer/courses", label: "Courses", icon: BookOpen },
+        { path: "/lecturer/grades", label: "Grades", icon: BarChart3 },
+      ];
+    }
+    
+    if (role === "student") {
+      return [
+        { path: "/student", label: "Home", icon: Home },
+        { path: "/student/courses", label: "Courses", icon: BookOpen },
+        { path: "/student/billing", label: "Billing", icon: CreditCard },
+      ];
+    }
+    
+    return [];
+  };
+
+  const navItems = getNavItems();
   const isActive = (path) => location.pathname === path;
 
-  const primaryColor = systemConfig?.primary_color || '#2D4A2D';
+  // Get user initials
+  const getInitials = () => {
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+    }
+    return user?.email?.[0]?.toUpperCase() || "U";
+  };
+
+  // Get role color
+  const getRoleColor = () => {
+    switch (user?.role) {
+      case "admin": return "bg-violet-500";
+      case "lecturer": return "bg-blue-500";
+      case "student": return "bg-emerald-500";
+      default: return "bg-gray-500";
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] flex" data-testid="dashboard-layout">
+    <div className="min-h-screen bg-[#F5F5F7]" data-testid="dashboard-layout">
       {/* Sidebar */}
-      <aside className="w-64 bg-white flex flex-col fixed h-full shadow-sm" data-testid="sidebar">
-        {/* Logo */}
-        <div className="p-5 border-b border-slate-100">
-          <div className="flex items-center gap-3">
+      <aside 
+        className={`fixed left-0 top-0 h-full sidebar-modern z-40 transition-all duration-300 ${
+          sidebarOpen ? 'w-[100px]' : 'w-0 -translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col h-full py-6">
+          {/* Logo */}
+          <div className="px-4 mb-8">
             {systemConfig?.logo_url ? (
-              <img src={systemConfig.logo_url} alt="Logo" className="h-10 object-contain" />
+              <img 
+                src={systemConfig.logo_url} 
+                alt={systemConfig.university_name || "Logo"}
+                className="h-10 w-auto mx-auto object-contain"
+              />
             ) : (
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: primaryColor }}>
-                <span className="text-white font-heading font-bold text-lg">G</span>
+              <div className="w-12 h-12 mx-auto bg-gray-100 rounded-xl flex items-center justify-center">
+                <GraduationCap size={24} className="text-gray-600" />
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <h1 className="font-heading font-bold text-sm text-slate-900 truncate">
-                {systemConfig?.university_name || "GITB"}
-              </h1>
-            </div>
           </div>
-        </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            return (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  active
-                    ? "text-white shadow-lg"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-                style={active ? { background: primaryColor } : {}}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, "-")}`}
-              >
-                <Icon size={20} />
-                <span className="font-medium text-sm">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+          {/* Navigation */}
+          <nav className="flex-1 px-3 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`sidebar-item ${active ? 'active' : ''}`}
+                  data-testid={`nav-${item.label.toLowerCase()}`}
+                >
+                  <Icon className="sidebar-item-icon" strokeWidth={active ? 2.5 : 2} />
+                  <span className="sidebar-item-label">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
 
-        {/* User Card */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback className="text-white font-semibold text-sm" style={{ background: primaryColor }}>
-                {user?.first_name?.[0]}{user?.last_name?.[0]}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">
-                {user?.first_name} {user?.last_name}
-              </p>
-              <p className="text-xs text-slate-500 capitalize truncate">{user?.role?.replace("_", " ")}</p>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              data-testid="logout-btn"
-            >
-              <LogOut size={18} />
-            </button>
+          {/* User Section */}
+          <div className="px-3 mt-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="sidebar-item w-full" data-testid="user-menu-trigger">
+                  <div className={`avatar avatar-sm ${getRoleColor()}`}>
+                    {getInitials()}
+                  </div>
+                  <span className="sidebar-item-label mt-1 truncate max-w-[80px]">
+                    {user?.first_name || "User"}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" side="right" className="w-48 ml-2">
+                <div className="px-3 py-2">
+                  <p className="font-medium text-sm">{user?.first_name} {user?.last_name}</p>
+                  <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+                  <LogOut size={14} className="mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 ml-64">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 px-8 py-4 sticky top-0 z-10" data-testid="header">
-          <div className="flex items-center justify-between">
+      <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-[100px]' : 'ml-0'}`}>
+        {/* Top Header */}
+        <header className="sticky top-0 bg-[#F5F5F7]/80 backdrop-blur-md z-30 px-8 py-4">
+          <div className="flex items-center justify-between max-w-[1600px] mx-auto">
+            {/* Left: Toggle + Page Title */}
             <div className="flex items-center gap-4">
-              <div>
-                <p className="text-sm text-slate-500">Welcome back,</p>
-                <h2 className="font-heading text-xl font-bold text-slate-900">
-                  {user?.first_name} {user?.last_name}
-                </h2>
-              </div>
-              
-              {/* Access Status Badge */}
-              {user?.role === 'student' && (
-                <span className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
-                  user?.payment_status === 'paid' 
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {user?.payment_status === 'paid' ? (
-                    <>
-                      <Unlock size={12} />
-                      Full Access
-                    </>
-                  ) : (
-                    <>
-                      <Lock size={12} />
-                      Limited
-                    </>
-                  )}
-                </span>
-              )}
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                data-testid="toggle-sidebar"
+              >
+                {sidebarOpen ? <Menu size={20} /> : <Menu size={20} />}
+              </button>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {navItems.find(item => isActive(item.path))?.label || "Dashboard"}
+              </h1>
             </div>
-            
+
+            {/* Center: Search */}
+            <div className="search-bar w-[400px] hidden md:flex">
+              <Search size={18} className="text-gray-400 mr-3" />
+              <input 
+                type="text"
+                placeholder="Search by course, people, theme..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="global-search"
+              />
+            </div>
+
+            {/* Right: Actions */}
             <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative hidden md:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <Input
-                  placeholder="Search..."
-                  className="w-64 pl-10 h-10 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-slate-200"
-                />
+              {/* Streak Badge */}
+              <div className="streak-badge hidden sm:flex">
+                <Flame size={16} className="text-orange-400" />
+                <span>3 days</span>
               </div>
-              
+
               {/* Notifications */}
-              <button className="relative p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors" data-testid="notifications-btn">
-                <Bell size={20} />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors" data-testid="notifications-btn">
+                <Bell size={20} className="text-gray-600" />
+                <span className="notification-badge">6</span>
               </button>
 
-              {/* User Menu */}
+              {/* User Avatar */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-slate-50 rounded-xl px-2 py-1.5 transition-colors" data-testid="user-menu-trigger">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback className="text-white font-semibold text-sm" style={{ background: primaryColor }}>
-                      {user?.first_name?.[0]}{user?.last_name?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <ChevronDown size={16} className="text-slate-400" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                  {user?.student_id && (
-                    <div className="px-3 py-2">
-                      <p className="text-xs text-slate-500">Student ID</p>
-                      <p className="text-sm font-mono font-medium">{user.student_id}</p>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 hover:bg-gray-100 rounded-full p-1 pr-3 transition-colors" data-testid="header-user-menu">
+                    <div className={`avatar avatar-sm ${getRoleColor()}`}>
+                      {getInitials()}
                     </div>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="rounded-lg">
-                    <Users size={16} className="mr-2" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="rounded-lg">
-                    <Settings size={16} className="mr-2" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 rounded-lg">
-                    <LogOut size={16} className="mr-2" />
-                    Sign Out
+                    <ChevronDown size={16} className="text-gray-500" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-3 py-3 border-b">
+                    <p className="font-semibold">{user?.first_name} {user?.last_name}</p>
+                    <p className="text-sm text-gray-500">{user?.email}</p>
+                    <span className="badge badge-dark mt-2 text-xs capitalize">{user?.role}</span>
+                  </div>
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer m-1">
+                    <LogOut size={14} className="mr-2" />
+                    Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -235,10 +239,10 @@ const DashboardLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="p-8 animate-fade-in-up" data-testid="main-content">
-          <Outlet />
-        </main>
-      </div>
+        <div className="px-8 py-6 max-w-[1600px] mx-auto animate-fade-in">
+          {children}
+        </div>
+      </main>
     </div>
   );
 };
