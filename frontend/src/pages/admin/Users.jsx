@@ -46,8 +46,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
-import { Users, Plus, Search, Edit, Trash2, UserPlus, Lock, Unlock, MoreVertical, CreditCard, DollarSign, Ban, UserCheck, AlertTriangle } from "lucide-react";
+import { Users, Plus, Search, Edit, Trash2, UserPlus, Lock, Unlock, MoreVertical, CreditCard, DollarSign, Ban, UserCheck, AlertTriangle, Download, Mail, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const AdminUsers = () => {
   const { token } = useAuth();
