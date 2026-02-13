@@ -33,12 +33,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
-# Add TLS settings for MongoDB Atlas
-client = AsyncIOMotorClient(
-    mongo_url,
-    tls=True,
-    tlsAllowInvalidCertificates=True
-)
+client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Resend configuration
