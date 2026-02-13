@@ -1,77 +1,78 @@
 <analysis>**original_problem_statement:**
-The user initially requested to build a uni lms with the prd uploaded. This evolved into a major system upgrade to LuminaLMS with a comprehensive set of requirements. The project is currently undergoing a second major UI overhaul based on new design mockups provided by the user.
+The user wants to build a white-label Learning Management System (LMS) called LuminaLMS.
 
-**PRODUCT REQUIREMENTS (LuminaLMS):**
-1.  **Dynamic White-Labeling:** Admin can change , , , , and login page text/image via a System Settings page.
-2.  **Rigid Access Control:** Role-based access with  and  enforcement.
-3.  **Advanced Content Engine:** Course builder with video, PDF, and quizzes. Linear progression enforcement. Quiz system with attempt limits and bulk upload from Excel.
-4.  **Graduation & Student Services:**  on completion, dynamic PDF certificates/invoices, and transcript requests.
-5.  **Automated Onboarding:** Grant Admission button to create a user and email credentials via Resend.
-6.  **Student Management:** Expel button for admins and course self-enrollment for students.
-7.  **Financials:** Admin can set company IBAN/bank details for invoices.
-8.  **UI/UX Overhaul:** A complete redesign of the application to match a modern, user-provided design aesthetic (currently in progress).
+**PRODUCT REQUIREMENTS:**
+1.  **Separate Landing Page ():** A standalone, public-facing website for course discovery and student applications. The design must match a Univerz University style provided by the user.
+2.  **Student Application & Onboarding Flow:**
+    *   Students apply from the landing page with a **€50 application fee** via Stripe.
+    *   Admins review applications.
+    *   On approval, an account is created, and an **Admission Letter PDF** with login details is emailed.
+    *   Admins must be able to edit the **tuition fee** and **application fee**.
+    *   **NEW:** The application page must allow students to upload educational documents: a high school certificate and a means of identification (passport or national ID).
+3.  **Advanced Course Management:**
+    *   A Course Builder for admins/lecturers to edit courses, add materials (PDF/video), and upload quizzes.
+    *   **NEW:** Admins must be able to update course images.
+4.  **Financials & Payments:**
+    *   Integrate Stripe for the application fee.
+    *   Display all monetary values in **EUR (€)**.
+5.  **User & Student Management:**
+    *   Admins need a Student List and the ability to export it to Excel.
+6.  **UI/UX Enhancements:**
+    *   **NEW:** Make pages look visually rich, avoiding plain white areas, to beautify the application.
+7.  **Security:**
+    *   API credentials must be secured and not publicly available in the codebase.
 
 **User's preferred language**: English
 
 **what currently exists?**
-A full-stack application (React, FastAPI, local MongoDB) that is in the middle of a significant, user-directed UI redesign. The previous agent implemented several new features, including a tabbed admin settings page for branding, login page content, and bank details. It also added Edit User and Expel Student functionality. However, this work was superseded by a request for a new visual style. The agent has partially applied this new pastel-themed design across several key components but has not completed or tested the changes.
+The project is a full-stack LMS (React/FastAPI/MongoDB). The core LMS application is stable. The separate school landing page application, previously blocked by a build error, is now fully functional and has been completely redesigned to match the user's Univerz University visual specifications. All currency values across the application dashboards and backend processes have been standardized to EUR (€). Backend API credentials have been confirmed to be loaded from environment variables and excluded from version control via .
 
 **Last working item**:
--   **Last item agent was working:** The agent was in the middle of a site-wide UI redesign based on new images provided by the user. The most recent action was attempting to find and remove the Made with Emergent tag, likely from a root component like , and addressing the user's request to fix any errors.
--   **Status:** IN PROGRESS
--   **Agent Testing Done:** N
--   **Which testing method agent to use?** both
+-   **Last item agent was working:** The agent was implementing the user's latest requests after completing a major UI overhaul of the  landing page. The user asked for document uploads on the application page, admin controls for course images, and general visual enhancements to make the site look less plain. The agent started planning for these features.
+-   **Status:** NOT STARTED
+-   **Agent Testing Done:** Y (for the previous redesign and bug fixes)
+-   **Which testing method agent to use?** Both. A backend testing agent will be needed to verify the new file upload logic and database interactions. A frontend testing agent will be needed to test the new UI components for file upload and course image management.
 -   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Incomplete UI Redesign and Potential Errors (P0)**
-    -   **Description:** The application is in a broken state due to an unfinished UI overhaul. The user requested a new design, and the agent updated multiple files but did not complete the process. The user's last message, continue and fix any errors, implies the recent changes may have introduced bugs.
-    -   **Attempted fixes:** The agent updated CSS variables and rewrote sections of , , , , , and . It also viewed  to find the Made with Emergent tag.
-    -   **Next debug checklist:**
-        1.  Locate and remove the Made with Emergent tag from the codebase (likely in  or ).
-        2.  Check application logs ( and ) for errors introduced by the partial redesign.
-        3.  Systematically review all recently modified frontend files to ensure consistency and fix any obvious UI bugs.
-        4.  Complete the redesign across all remaining components (, , , etc.) to match the new aesthetic.
-        5.  Once the UI is stable, perform a full regression test using the testing agent.
-    -   **Why fix this issue and what will be achieved with the fix?** To fulfill the user's explicit design request, stabilize the application, and ensure it is visually consistent and fully functional.
-    -   **Status:** IN PROGRESS
-    -   **Is recurring issue?** N
-    -   **Should Test frontend/backend/both after fix?** both
-    -   **Blocked on other issue:** None
+There are no active blocking issues. The work consists of new feature development.
 
 **In progress Task List**:
--   **Task 1: Complete the LuminaLMS UI/UX Overhaul (P0)**
-    -   **Where to resume:** Verify the changes in the already-edited files, fix any errors, remove the Made with Emergent tag, and then continue applying the new design to all remaining pages and components.
-    -   **What will be achieved with this?** A fully redesigned, modern, and visually coherent application that aligns with the user's latest mockups.
-    -   **Status:** IN PROGRESS
+-   **Task 1: Implement New User Features (P0)**
+    -   **Where to resume:** Begin implementation of the three new features requested by the user: document upload, admin course image updates, and general UI beautification.
+    -   **What will be achieved with this?** The application will have a more complete student application flow and improved administrative capabilities, along with a richer user interface.
+    -   **Status:** NOT STARTED
     -   **Should Test frontend/backend/both after fix?** both
-    -   **Blocked on something:** None
+    -   **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
--   **(P0) Advanced Quiz System:**
-    -   Implement backend logic for bulk quiz upload from Excel sheets.
-    -   Implement backend logic for grading quizzes and storing results/attempts.
--   **(P1) Course & Enrollment Logic:**
-    -   Allow students to enroll in courses based on their selected program.
--   **(P1) Graduation & Student Services:**
-    -   Integrate  for a celebration on 100% course completion.
-    -   Implement dynamic generation of PDF certificates and invoices.
-    -   Allow students to request a PDF transcript.
--   **(P1) Automated Onboarding:**
-    -   Create a Grant Admission button for admins that creates a user and sends credentials via Resend.
--   **(P2) Refactor Backend:**
-    -   Break down the monolithic  into a modular structure using FastAPI's  (e.g., , , ).
+-   **(P0) Document Upload on Application Page:** Add file inputs on the application page for High School Certificate and Means of Identification. This will require backend storage logic (e.g., using Uploadcare) and updates to the  model.
+-   **(P0) Admin Course Image Management:** Create a UI in the Course Editor for admins to upload or change the image associated with a course. The  model will need a field for the image URL.
+-   **(P0) General UI/UX Enrichment:** Review other pages in the main LMS and the school site to add visual elements, reduce empty white space, and align with the new Univerz design language.
+-   **(P1) Finalize Application Workflow:** Implement the admin-side approval/rejection logic on the  page and trigger the admission letter email upon approval.
+-   **(P1) Bulk Quiz Upload:** Implement the backend logic and frontend UI for uploading quiz questions from an Excel file in the Course Editor.
+-   **(P1) PDF Generation Enhancements:** Create an admin interface to edit the template for the admission letter PDF.
+-   **(P1) Admin Payment Tracking:** Build a new dashboard for admins to view and track all Stripe payments.
+-   **(P2) Graduation Features:** Integrate  for a celebration effect on 100% course completion.
+-   **(P2) Refactor Backend:** Break down the monolithic  into a modular structure using FastAPI's  (e.g., , ).
 
 **Completed work in this session**
--   **Admin Settings:** Implemented a tabbed interface in  for Branding, Login Page, and Bank Details with live previews.
--   **User Management:** Added a dropdown action menu to the  page with working Edit User (modal) and Expel Student functionality.
--   **Quiz Foundation:** Added UI stubs for quiz creation in  and a placeholder  in .
--   **UI Redesign (In Progress):** Began a second major UI overhaul, updating CSS variables and modifying several dashboard and page components to match a new pastel-themed design.
+-   **School Landing Page Fixed & Redesigned:**
+    -   Resolved the critical  build error in the  app.
+    -   Completely redesigned the  landing page, courses page, and application page to match the user's Univerz University design spec.
+-   **API & CORS Bugs Fixed:**
+    -   Corrected a FastAPI route ordering issue where  was being incorrectly shadowed by a parameterized route, causing 403 errors.
+    -   Resolved CORS issues preventing the local school app from fetching data from the backend.
+-   **EUR Currency Standardization:**
+    -   Successfully implemented EUR (€) currency formatting across the Admin Dashboard, Student Dashboard, Admissions, and Payments pages.
+    -   Updated backend PDF generation logic to use the EUR symbol.
+-   **Security Verification:**
+    -   Confirmed that backend API credentials in  files are correctly ignored by git, preventing them from being committed to the repository.
 
 **Earlier issues found/mentioned but not fixed**
 -   **Issue 1: MongoDB Atlas connection failure.**
-    -   **Debug checklist:** An SSL certificate verification error occurred when connecting to MongoDB Atlas. Bypassing SSL verification did not work. The root cause is likely missing CA certificates in the execution environment.
-    -   **Why to solve this issue and what will be achieved with this?** To allow the application to connect to the intended production database instead of the local workaround.
+    -   **Debug checklist:** An SSL certificate verification error occurs when connecting to MongoDB Atlas. The root cause is likely missing CA certificates in the execution environment. The application continues to use a local MongoDB instance as a workaround.
+    -   **Why to solve this issue and what will be achieved with this?** To allow the application to connect to a production-ready, managed database service.
     -   **Should Test frontend/backend/both after fix:** backend
     -   **Is recurring issue?** N
 
@@ -86,73 +87,72 @@ A full-stack application (React, FastAPI, local MongoDB) that is in the middle o
 -   **Backend:** FastAPI, Python
 -   **Database:** MongoDB (local instance)
 -   **Authentication:** JWT with Role-Based Access Control (RBAC)
+-   **Payments:** Stripe
+-   **File Generation:**  for Excel,  for PDF.
+-   **File Hosting:** Uploadcare
 
 **key DB schema**
 -   **SystemConfig:** 
 -   **User:** 
--   **Course:** 
--   **Quiz:** 
+-   **Course:**  (will need an  field)
+-   **Application:**  (will need fields for  and )
 
 **changes in tech stack**
--   The application continues to use a local MongoDB instance due to an unresolved SSL connection error with MongoDB Atlas.
+-   None in this session. Existing stack was configured and fixed.
 
 **All files of reference**
--   : The monolithic backend file (viewed extensively).
--   : Updated with new color variables for the latest redesign.
--   : Viewed to find and remove the Made with Emergent tag.
--   **/app/frontend/src/pages/Settings.jsx**: Heavily modified for the new tabbed layout and settings fields.
--   **/app/frontend/src/pages/Users.jsx**: Heavily modified for action menus, modals, and the new design.
--   : Modified to add quiz creation UI.
--   : Modified to add a quiz component.
--   **Redesigned Files (In Progress):** , , , , .
+-   **/app/school/**: The entire directory was heavily modified to fix the build and implement the new design. Key files: , , , .
+-   **/app/backend/server.py**: Modified to reorder API routes to fix the  endpoint.
+-   **/app/frontend/src/pages/admin/Dashboard.jsx**: Updated for currency formatting.
+-   **/app/frontend/src/pages/admin/Payments.jsx**: Updated for currency formatting.
+-   **/app/frontend/src/pages/student/Dashboard.jsx**: Updated for currency formatting.
+-   **/app/backend/.gitignore**: Verified to ensure it excludes  files.
+-   **/app/memory/PRD.md**: Updated with completed tasks.
 
 **Areas that need refactoring**:
--   The  file is over 1000 lines and should be broken into a modular structure with FastAPI Routers.
+-   The  file remains a monolithic beast. It is a high-priority candidate for refactoring into smaller, feature-specific modules using FastAPI's  to improve maintainability.
 
 **key api endpoints**
--   
+-    (GET) - Now functional without authentication.
+-    (GET)
+-    (POST)
 -    (GET, PUT)
--    (GET, PUT, POST)
--   
--   
--    (CRUD)
 
 **Critical Info for New Agent**
--   **Priority 1:** The user has requested a new UI redesign. You must complete this task across the entire application and fix any resulting errors. This is the most pressing task.
--   The application is in a transitional, likely broken state. Do not assume functionality works without testing.
--   The Made with Emergent tag needs to be removed from the UI.
--   Continue using the local MongoDB instance. Do not attempt to switch to Atlas unless you are prepared to debug the SSL certificate issue.
--   After stabilizing the UI, the next major functional task is to implement the backend logic for the quiz system (bulk upload, grading).
+-   The immediate priority is to implement the new user requests: document uploads on the application page, admin course image management, and general UI enrichment.
+-   The  app is now stable and redesigned. The agent who picks this up should focus on building the new features on top of this stable foundation.
+-   The monolithic  is a known technical debt. Plan to refactor it after delivering the current high-priority features.
+-   When implementing file uploads, leverage the existing Uploadcare integration.
 
 **documents and test reports created in this job**
 -   
--   
+-    (Updated)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (Latest):** continue and fix any errors (PENDING)
-2.  **User:** implement these new design but maintain app functions just design style , remove made with emergent tag n all pages (IN PROGRESS)
-3.  **AI:** Was about to run the testing agent before being interrupted by the new design request. (INTERRUPTED)
-4.  **AI:** Logged in as a lecturer to test the course builder. (DONE)
-5.  **AI:** Tested the Edit User dialog. (DONE)
-6.  **AI:** Verified the Expel Student option appears correctly in the user action menu. (DONE)
-7.  **AI:** Checked the user action dropdown menu functionality. (DONE)
-8.  **AI:** Analyzed the bank details preview behavior on the settings page. (DONE)
-9.  **AI:** Tested the Bank Details tab on the settings page. (DONE)
-10. **AI:** Tested the Login Page customization tab on the settings page. (DONE)
+1.  **User (Latest):** users can upload their educational documents on the application page high school certificate and means of identification , passport or national identity card , course images can be updated from the admin and make the other pages look rich and not too plain with many white areas and scanty and things to beautify it
+    -   **Summary:** Requested three new features: document upload for applications, admin management of course images, and general UI beautification.
+    -   **Status:** Not Started.
+2.  **User:** yes but I dont like the landing page use these exact design for the landing page I sent to you also implement the design style for the application page and the hide all api credentials hash everything so it wont be publicly available (with image)
+    -   **Summary:** Requested a complete redesign of the landing page based on a provided image and asked to secure API keys.
+    -   **Status:** Completed. The landing page was redesigned and credentials were confirmed secure.
+3.  ... (Previous messages relate to the successful test run and minor UI fixes that are now completed).
 
 **Project Health Check:**
--   **Broken:** The application is in the middle of a major UI refactor. Key components have been modified, but the work is incomplete and untested, making the app's state unstable.
+-   **Healthy:** The main LMS application () and the school landing page application ().
+-   **Broken:** None.
 
 **3rd Party Integrations**
--   **Resend:** For sending emails.
--   **Uploadcare:** For media hosting.
--   **canvas-confetti:** For UI effects (planned, not fully integrated).
+-   **Resend:** Email sending.
+-   **Uploadcare:** Media hosting (to be used for new document/image uploads).
+-   **Stripe:** Payment processing.
+-   **xlsxwriter:** Excel file generation.
+-   **reportlab:** PDF generation.
 
 **Testing status**
--   **Testing agent used after significant changes:** NO (not since the latest UI overhaul started).
+-   **Testing agent used after significant changes:** YES. The agent ran a full test suite after fixing the currency and API bugs, which passed.
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** None
--   **Known regressions:** The entire UI is in a state of flux. Functionality that was working before the redesign may now be broken.
+-   **Known regressions:** None.
 
 **Credentials to test flow:**
 -   **Admin:**  / 
@@ -160,8 +160,4 @@ A full-stack application (React, FastAPI, local MongoDB) that is in the middle o
 -   **Student:**  / 
 
 **What agent forgot to execute**
-The agent was interrupted mid-task. It needs to:
-1.  Complete the full UI redesign as requested.
-2.  Remove the Made with Emergent tag.
-3.  Address the user's request to fix any errors that arose from the recent changes.
-4.  Implement the backend logic for bulk quiz uploads.</analysis>
+-   All previously forgotten items (like currency formatting) were addressed in this session. The current pending work is based on the user's most recent requests, so nothing has been missed.</analysis>

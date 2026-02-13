@@ -39,7 +39,7 @@ const Navbar = ({ isScrolled }) => {
         {/* Student Portal Button */}
         <div className="hidden md:block">
           <a 
-            href="https://lumina-school.preview.emergentagent.com/login" 
+            href="https://lumina-student-flow.preview.emergentagent.com/login" 
             className={`px-6 py-2 rounded-full font-semibold transition-all ${
               isScrolled 
                 ? 'bg-primary-green text-white hover:bg-primary-green-dark' 
@@ -71,7 +71,7 @@ const Navbar = ({ isScrolled }) => {
             <a href="#about" className="nav-link-dark" onClick={() => setMobileMenuOpen(false)}>About Us</a>
             <a href="#contact" className="nav-link-dark" onClick={() => setMobileMenuOpen(false)}>Contact</a>
             <a 
-              href="https://lumina-school.preview.emergentagent.com/login" 
+              href="https://lumina-student-flow.preview.emergentagent.com/login" 
               className="btn-green text-center"
               onClick={() => setMobileMenuOpen(false)}
             >
