@@ -30,6 +30,7 @@ import AdminCourses from "./pages/admin/Courses";
 import AdminSettings from "./pages/admin/Settings";
 import AdminAdmissions from "./pages/admin/Admissions";
 import AdminPayments from "./pages/admin/Payments";
+import CourseEditor from "./pages/admin/CourseEditor";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
