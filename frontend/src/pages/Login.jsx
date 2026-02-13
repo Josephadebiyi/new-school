@@ -72,14 +72,7 @@ const Login = () => {
     
     setLoading(true);
     try {
-      const response = await axios.post(`${API}/auth/login`, {
-        email,
-        password
-      });
-      
-      const { access_token, user: userData, access_info } = response.data;
-      login(access_token, userData, access_info);
-      
+      const userData = await login(email, password);
       toast.success(`Welcome back, ${userData.first_name || userData.email}!`);
       navigateByRole(userData.role);
     } catch (error) {
