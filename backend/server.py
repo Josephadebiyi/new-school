@@ -1569,9 +1569,11 @@ async def get_admission_letter(
     
     Following your application and the payment of the application fee, we are pleased to inform you that 
     you have been offered admission to study <b>{application.get('course_title', 'your selected program')}</b> 
-    at the Global Institute of Tech and Business (GITB).<br/><br/>
+    at {university_name}.<br/><br/>
     
     <b>Student ID:</b> {application.get('student_id', 'To be assigned')}<br/><br/>
+    
+    <b>Tuition Fee:</b> {currency_symbol}{tuition_fee:,.2f} per {tuition_fee_per}<br/><br/>
     
     Please log in to the student portal to access your courses and begin your studies. Your temporary 
     login credentials have been sent to your email address.<br/><br/>
@@ -1584,7 +1586,7 @@ async def get_admission_letter(
     
     <b>Dr. Jane Smith</b><br/>
     Director of Admissions<br/>
-    Global Institute of Tech and Business
+    {university_name}
     """
     elements.append(Paragraph(body_text, body_style))
     
