@@ -14,7 +14,7 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 
 ### Tech Stack
 - **Main LMS App**: React 19 + Tailwind CSS + Shadcn/UI (port 3000)
-- **Landing Page**: Separate React app in `/app/school` (GITB branding)
+- **Landing Page**: Separate React app in `/app/school` (GITB branding, port 3001)
 - **Backend**: FastAPI (Python) on port 8001
 - **Database**: MongoDB (local instance)
 - **Payments**: Stripe (live keys configured)
@@ -26,26 +26,51 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 ```
 /app/
 ├── backend/
-│   ├── server.py        # Main API (2500+ lines)
+│   ├── server.py        # Main API (~2800 lines)
 │   ├── .env             # Stripe keys, Resend, MongoDB
 │   └── tests/           # pytest test files
 ├── frontend/
 │   └── src/
 │       ├── pages/
 │       │   ├── admin/
-│       │   │   ├── CourseEditor.jsx   # NEW - Full course management
-│       │   │   ├── Admissions.jsx     # UPDATED - Application workflow
-│       │   │   └── ...
+│       │   │   ├── CourseEditor.jsx   # Full course management
+│       │   │   ├── Admissions.jsx     # Application workflow
+│       │   │   ├── Payments.jsx       # EUR currency display
+│       │   │   └── Settings.jsx       # Fees & Currency tab
+│       │   └── student/
+│       │       └── Dashboard.jsx      # Student dashboard
+│       ├── utils/
+│       │   └── currency.js            # EUR formatting utility
 │       └── components/ui/
-│           ├── dialog.jsx             # FIXED - bg-white
-│           └── ...
-├── school/                            # NEW - Separate landing page app
-│   ├── src/App.js                     # Homepage, courses, application
+│           └── dialog.jsx, etc.       # Shadcn components
+├── school/                            # Separate landing page app
+│   ├── src/
+│   │   ├── App.js                     # Homepage, courses, application form
+│   │   └── index.css                  # Tailwind CSS + custom styles
+│   ├── tailwind.config.js
 │   └── .env
 └── memory/PRD.md
 ```
 
 ## What's Been Implemented
+
+### Date: Feb 13, 2026 - Session 3 (Current)
+
+**School Landing Page (FIXED & WORKING)**
+- ✅ Fixed Tailwind CSS configuration - installed v3.4 and fixed postcss.config.js syntax
+- ✅ Fixed route ordering - moved /courses/public before /courses/{course_id}
+- ✅ School app runs on port 3001 with GITB green/orange branding
+- ✅ Homepage with hero section, statistics, featured courses
+- ✅ Course catalog page with search functionality
+- ✅ Course detail page with application form
+- ✅ Application form with €50 fee display and Stripe checkout
+- ✅ Application success page with payment status polling
+
+**EUR Currency Formatting (COMPLETED)**
+- ✅ Applied formatCurrency() to Admin Payments page (€500,365.00, €315.00, etc.)
+- ✅ Admin Admissions page shows EUR format
+- ✅ Invoice PDF generation updated from $ to €
+- ✅ Backend system config returns EUR as default currency
 
 ### Date: Feb 13, 2026 - Session 2
 
@@ -54,52 +79,27 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - ✅ Fixed alert-dialog, dropdown-menu, select components
 - ✅ All action buttons in dropdown menus working correctly
 
-**Course Builder/Editor (NEW)**
+**Course Builder/Editor**
 - ✅ Full course editing UI at `/admin/courses/:id/edit`
-- ✅ Course information section (code, title, description, department, lecturer)
 - ✅ Duration settings (weeks/months/years dropdown)
-- ✅ Course settings panel (level, semester, type, image URL)
 - ✅ Course Content section with module accordion
-- ✅ Add Module dialog
-- ✅ Add Lesson dialog (video, PDF, text, quiz types)
-- ✅ Upload Quiz from Excel with template download
+- ✅ Add Module and Lesson dialogs
 
-**Student Management (Enhanced)**
-- ✅ Student Quick Stats cards (Total, Paid, Locked, Expelled)
+**Student Management**
+- ✅ Student Quick Stats cards
 - ✅ Export Students to Excel (names, emails, student IDs)
-- ✅ xlsx library integration for Excel generation
 
-**Applications & Admissions (NEW)**
+**Applications & Admissions**
 - ✅ Applications table with filtering
-- ✅ Stats: Pending Payment, Pending Review, Approved, Rejected, Total Revenue
-- ✅ EUR (€) currency display throughout
 - ✅ Approve/Reject application buttons
 - ✅ Auto-create student account on approval
 - ✅ Send admission email with credentials
-- ✅ PDF admission letter generation (ReportLab)
+- ✅ PDF admission letter generation
 
-**Landing Page (`/app/school/`) - NEW**
-- ✅ Homepage with hero, stats, featured courses
-- ✅ Course catalog with search
-- ✅ Course detail page with application form
-- ✅ Stripe checkout for €50 application fee
-- ✅ Application success page with payment polling
-- ✅ About and Contact pages
-- ✅ Green/orange GITB branding
-
-**Backend API Additions**
-- ✅ `/api/courses/public` - Public course listing
-- ✅ `/api/applications/create` - Create application with Stripe
-- ✅ `/api/applications` - List all applications
-- ✅ `/api/applications/{id}/approve` - Approve & create user
-- ✅ `/api/applications/{id}/reject` - Reject application
-- ✅ `/api/applications/{id}/admission-letter` - PDF download
-- ✅ `/api/modules/{id}/lessons` - Add lesson to module
-- ✅ `/api/modules/{id}/quiz` - Upload quiz from Excel
-
-### Test Results
-- **Backend**: 100% (31/31 tests passing)
-- **Frontend**: 100% (all features verified)
+## Test Results (Latest)
+- **Backend**: 100% (13/13 tests passed)
+- **Frontend**: 100% - All features verified
+- **Test Report**: /app/test_reports/iteration_4.json
 
 ## Test Credentials
 | Role | Email | Password |
@@ -108,47 +108,46 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 | Student | student@unilms.edu | student123 |
 | Lecturer | lecturer@unilms.edu | lecturer123 |
 
+## Key API Endpoints
+
+### Public (No Auth Required)
+- `GET /api/courses/public` - List all active courses
+- `GET /api/courses/public/{course_id}` - Get course with modules
+- `POST /api/applications/create` - Create application with Stripe checkout
+- `GET /api/applications/status/{session_id}` - Check payment status
+
+### Protected (Auth Required)
+- `GET /api/courses` - List courses (filtered by role)
+- `GET /api/applications` - List all applications
+- `POST /api/applications/{id}/approve` - Approve and create user
+- `GET /api/system-config` - Get system configuration
+- `GET /api/users` - List users
+
 ## Stripe Configuration
 - Public Key: pk_live_51SHqYK... (configured)
 - Secret Key: sk_live_51SHqYK... (configured)
 - Application Fee: €50.00
-
-## Completed Features Summary
-1. ✅ Dialog/popup transparency fix
-2. ✅ All action buttons working (Edit, Lock, Unlock, Expel, Delete)
-3. ✅ Student list with Excel export
-4. ✅ Course Builder with modules, lessons, quiz upload
-5. ✅ Course duration settings (weeks/months/years)
-6. ✅ EUR currency display
-7. ✅ Admin approval workflow for applications
-8. ✅ PDF admission letter generation
-9. ✅ Stripe payment integration
-10. ✅ Landing page (separate app in /school)
-11. ✅ Application flow with Stripe payment
-12. ✅ Welcome emails with credentials
 
 ## Remaining Tasks
 
 ### P1 (Next Priority)
 - [ ] Canvas-confetti on course completion
 - [ ] PDF certificates for completed courses
-- [ ] PDF invoices for payments
 - [ ] Personalized student welcome ("Welcome, John!")
-- [ ] Run and test the /school landing page build
+- [ ] Bulk quiz upload from Excel
 
 ### P2 (Medium Priority)
 - [ ] Admin payment tracking dashboard
 - [ ] Interactive course card hover effects
-- [ ] Course change fee enforcement
+- [ ] PDF template editor for admission letters
 
 ### P3 (Nice to Have)
-- [ ] Transcript PDF generation
 - [ ] Backend refactoring (modular routers)
 - [ ] Real-time notifications
+- [ ] Course change fee enforcement
 
 ## Technical Notes
 - MongoDB Atlas SSL issue - using local MongoDB
 - Stripe live keys configured (handle with care)
-- School landing page requires `npm start` in /app/school
-- ReportLab installed for PDF generation
-- xlsx library for Excel export
+- School landing page requires `yarn start` in /app/school OR build for production
+- Public course endpoints must be defined BEFORE /courses/{course_id} to avoid route conflicts
