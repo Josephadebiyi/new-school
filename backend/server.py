@@ -1433,6 +1433,19 @@ async def send_admission_email(email: str, first_name: str, last_name: str, prog
                 </table>
             </div>
             
+            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1976d2;">
+                <h3 style="margin: 0 0 10px 0; color: #1565c0;">Tuition Fee Information</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0; color: #666;">Tuition Fee:</td>
+                        <td style="padding: 5px 0; font-weight: bold; color: #1565c0; font-size: 18px;">{currency_symbol}{tuition_fee:,.2f} per {tuition_fee_per}</td>
+                    </tr>
+                </table>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
+                    Payment details and deadlines will be available in your student portal.
+                </p>
+            </div>
+            
             <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
                 <p style="margin: 0; color: #e65100; font-size: 14px;">
                     <strong>Important:</strong> Please change your password after your first login.
