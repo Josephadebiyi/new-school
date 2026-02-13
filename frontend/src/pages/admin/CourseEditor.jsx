@@ -31,7 +31,7 @@ import {
 import { 
   BookOpen, Plus, ArrowLeft, Save, Trash2, Upload, FileText, 
   Video, HelpCircle, GripVertical, Edit, Clock, Calendar,
-  FileSpreadsheet, Download
+  FileSpreadsheet, Download, Image, X
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
