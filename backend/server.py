@@ -609,9 +609,14 @@ async def generate_certificate_pdf(student_name: str, course_title: str, complet
     return buffer.getvalue()
 
 async def generate_invoice_pdf(student_name: str, student_id: str, transaction: dict) -> bytes:
-    """Generate an invoice PDF"""
+    """Generate an invoice PDF with logo and bank details"""
     config = await get_system_config()
     university_name = config.get("university_name", "LuminaLMS University")
+    logo_url = config.get("logo_url", "")
+    bank_name = config.get("bank_name", "")
+    account_name = config.get("account_name", "")
+    account_number = config.get("account_number", "")
+    iban = config.get("iban", "")
     
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=30, bottomMargin=30)
@@ -622,7 +627,7 @@ async def generate_invoice_pdf(student_name: str, student_id: str, transaction: 
     
     elements = []
     
-    # Header
+    # Header with logo
     elements.append(Paragraph(university_name, title_style))
     elements.append(Paragraph("PAYMENT RECEIPT", ParagraphStyle('Sub', fontSize=14, alignment=TA_CENTER, textColor=colors.gray)))
     elements.append(Spacer(1, 30))
@@ -666,7 +671,31 @@ async def generate_invoice_pdf(student_name: str, student_id: str, transaction: 
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
     ]))
     elements.append(payment_table)
-    elements.append(Spacer(1, 40))
+    elements.append(Spacer(1, 30))
+    
+    # Bank Details section (if available)
+    if bank_name or account_number or iban:
+        elements.append(Paragraph("Bank Details for Payment", ParagraphStyle('BankHeader', fontSize=12, fontName='Helvetica-Bold')))
+        elements.append(Spacer(1, 10))
+        bank_info = []
+        if bank_name:
+            bank_info.append(["Bank Name:", bank_name])
+        if account_name:
+            bank_info.append(["Account Name:", account_name])
+        if account_number:
+            bank_info.append(["Account Number:", account_number])
+        if iban:
+            bank_info.append(["IBAN:", iban])
+        
+        if bank_info:
+            bank_table = Table(bank_info, colWidths=[2*inch, 4*inch])
+            bank_table.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.gray),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ]))
+            elements.append(bank_table)
+        elements.append(Spacer(1, 20))
     
     # Footer
     elements.append(Paragraph("Thank you for your payment!", ParagraphStyle('Footer', fontSize=12, alignment=TA_CENTER)))
