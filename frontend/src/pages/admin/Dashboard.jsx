@@ -145,31 +145,31 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <div 
               key={index} 
-              className="card-modern p-5 hover:shadow-lg transition-all duration-300 group" 
+              className="card-modern p-3 md:p-5 hover:shadow-lg transition-all duration-300 group" 
               data-testid={`stat-${stat.label.toLowerCase().replace(/\s/g, '-')}`}
             >
               <div className="flex items-start justify-between">
-                <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                  <Icon size={24} className={stat.iconColor} />
+                <div className={`w-10 md:w-12 h-10 md:h-12 rounded-xl ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                  <Icon size={20} className={`${stat.iconColor} md:w-6 md:h-6`} />
                 </div>
                 {stat.trendUp !== null && (
-                  <span className={`flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-full ${
+                  <span className={`hidden sm:flex items-center gap-1 text-xs md:text-sm font-medium px-2 py-1 rounded-full ${
                     stat.trendUp ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
                   }`}>
-                    {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    {stat.trendUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                     {stat.trend}
                   </span>
                 )}
               </div>
-              <div className="mt-4">
-                <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
-                <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
+              <div className="mt-3 md:mt-4">
+                <div className="text-xl md:text-3xl font-bold text-gray-900">{stat.value}</div>
+                <div className="text-xs md:text-sm text-gray-500 mt-1">{stat.label}</div>
               </div>
             </div>
           );
