@@ -2844,6 +2844,98 @@ async def seed_database():
         }
     }
 
+# ============== FILE UPLOAD ENDPOINTS ==============
+
+UPLOAD_DIR = Path(__file__).parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@api_router.post("/upload/document")
+async def upload_document(
+    file: UploadFile = File(...),
+    doc_type: str = Form(...)
+):
+    """Upload a document (high school certificate or identification)"""
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPG, PNG, PDF")
+    
+    # Validate file size (5MB max)
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+    
+    # Generate unique filename
+    ext = Path(file.filename).suffix
+    unique_filename = f"{doc_type}_{uuid.uuid4().hex}{ext}"
+    file_path = UPLOAD_DIR / unique_filename
+    
+    # Save file
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    # Generate URL (relative to API)
+    file_url = f"/api/uploads/{unique_filename}"
+    
+    logger.info(f"Document uploaded: {unique_filename}")
+    return {"url": file_url, "filename": unique_filename}
+
+@api_router.get("/uploads/{filename}")
+async def serve_upload(filename: str):
+    """Serve uploaded files"""
+    file_path = UPLOAD_DIR / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    ext = file_path.suffix.lower()
+    content_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".pdf": "application/pdf"
+    }
+    content_type = content_types.get(ext, "application/octet-stream")
+    
+    with open(file_path, "rb") as f:
+        content = f.read()
+    
+    return Response(content=content, media_type=content_type)
+
+@api_router.post("/upload/course-image")
+async def upload_course_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.LECTURER]))
+):
+    """Upload a course image"""
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPG, PNG, WEBP")
+    
+    # Validate file size (5MB max)
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+    
+    # Generate unique filename
+    ext = Path(file.filename).suffix
+    unique_filename = f"course_{uuid.uuid4().hex}{ext}"
+    file_path = UPLOAD_DIR / unique_filename
+    
+    # Save file
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    # Generate URL
+    file_url = f"/api/uploads/{unique_filename}"
+    
+    logger.info(f"Course image uploaded: {unique_filename}")
+    return {"url": file_url, "filename": unique_filename}
+
 # ============== ROOT ==============
 
 @api_router.get("/")
