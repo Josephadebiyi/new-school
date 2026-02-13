@@ -442,7 +442,6 @@ const AllCoursesPage = () => {
 // Course Detail & Application Page
 const CourseDetailPage = () => {
   const { courseId } = useParams();
-  const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -622,7 +621,7 @@ const CourseDetailPage = () => {
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   ) : (
                     <>
-                      <DollarSign size={18} />
+                      <Euro size={18} />
                       Pay & Apply Now
                     </>
                   )}
@@ -643,7 +642,6 @@ const CourseDetailPage = () => {
 
 // Application Success Page
 const ApplicationSuccessPage = () => {
-  const navigate = useNavigate();
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('session_id');
   const [status, setStatus] = useState('checking');
