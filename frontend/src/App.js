@@ -240,6 +240,7 @@ function App() {
               <DashboardLayout />
             </ProtectedRoute>
           }>
+            <Route index element={<StudentDashboard />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="courses" element={<StudentCourses />} />
             <Route path="results" element={<StudentResults />} />
@@ -258,6 +259,7 @@ function App() {
               <DashboardLayout />
             </ProtectedRoute>
           }>
+            <Route index element={<LecturerDashboard />} />
             <Route path="dashboard" element={<LecturerDashboard />} />
             <Route path="courses" element={<LecturerCourses />} />
             <Route path="grades" element={<LecturerGrades />} />
@@ -275,6 +277,7 @@ function App() {
               <DashboardLayout />
             </ProtectedRoute>
           }>
+            <Route index element={<AdminDashboard />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="courses" element={<AdminCourses />} />
