@@ -42,8 +42,7 @@ const Login = () => {
       const userData = await login(email, password);
       toast.success(`Welcome back, ${userData.first_name}!`);
       
-      // Check access status
-      if (userData.account_status === 'locked') {
+      if (userData.account_status === 'locked' || userData.account_status === 'expelled') {
         navigate("/limited-access");
         return;
       }
@@ -64,39 +63,35 @@ const Login = () => {
     }
   };
 
+  const loginImageUrl = systemConfig?.login_image_url || "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200";
+  const headline = systemConfig?.login_headline || "Learn with";
+  const subtext = systemConfig?.login_subtext || "Affordable higher education you can take wherever life takes you. Learn anywhere at your own pace.";
+
   return (
     <div className="min-h-screen flex" data-testid="login-page">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-[45%] flex items-center justify-center p-8 lg:p-16 bg-white">
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-8">
+            <div className="flex items-center justify-center gap-3 mb-10">
               {systemConfig?.logo_url ? (
-                <img src={systemConfig.logo_url} alt="Logo" className="h-12 object-contain" />
+                <img src={systemConfig.logo_url} alt="Logo" className="h-14 object-contain" />
               ) : (
-                <div className="w-12 h-12 bg-uni-navy rounded-lg flex items-center justify-center">
-                  <span className="text-white font-heading font-bold text-xl">L</span>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: systemConfig?.primary_color || '#2D4A2D' }}>
+                  <span className="text-white font-heading font-bold text-2xl">G</span>
                 </div>
               )}
-              <div>
-                <h1 className="font-heading font-bold text-2xl tracking-tight" style={{ color: systemConfig?.primary_color || '#0F172A' }}>
-                  {systemConfig?.university_name?.split(' ')[0] || "LuminaLMS"}
-                </h1>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">
-                  {systemConfig?.university_name?.split(' ').slice(1).join(' ') || "University"}
-                </p>
-              </div>
             </div>
             
-            <h2 className="font-heading text-2xl font-bold text-slate-900">Log In</h2>
-            <p className="text-slate-500 mt-2">Enter your account details</p>
+            <h2 className="font-heading text-3xl font-bold text-slate-900">Welcome Back</h2>
+            <p className="text-slate-500 mt-2 text-base">Sign in to your account to continue</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6" data-testid="login-form">
+          <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700">Email</Label>
+              <Label htmlFor="email" className="text-slate-700 font-medium">Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -104,13 +99,13 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@university.edu"
                 required
-                className="h-12 border-slate-200 focus:border-uni-red focus:ring-uni-red/20"
+                className="h-12 border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-[#2D4A2D] focus:ring-[#2D4A2D]/20 transition-all"
                 data-testid="login-email-input"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700">Password</Label>
+              <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -119,13 +114,13 @@ const Login = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="h-12 border-slate-200 focus:border-uni-red focus:ring-uni-red/20 pr-12 bg-yellow-50"
+                  className="h-12 border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-[#2D4A2D] focus:ring-[#2D4A2D]/20 pr-12 transition-all"
                   data-testid="login-password-input"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   data-testid="toggle-password-visibility"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -133,8 +128,12 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="text-right">
-              <button type="button" className="text-sm hover:underline" style={{ color: systemConfig?.primary_color || '#0F172A' }}>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="rounded border-slate-300 text-[#2D4A2D] focus:ring-[#2D4A2D]" />
+                <span className="text-sm text-slate-600">Remember me</span>
+              </label>
+              <button type="button" className="text-sm font-medium hover:underline" style={{ color: systemConfig?.primary_color || '#2D4A2D' }}>
                 Forgot Password?
               </button>
             </div>
@@ -142,46 +141,58 @@ const Login = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 text-white font-medium rounded-lg transition-colors"
-              style={{ backgroundColor: systemConfig?.secondary_color || '#C4A77D' }}
+              className="w-full h-12 text-white font-semibold rounded-xl transition-all text-base"
+              style={{ background: systemConfig?.primary_color || '#2D4A2D' }}
               data-testid="login-submit-btn"
             >
-              {loading ? <div className="spinner mx-auto"></div> : "Login"}
+              {loading ? <div className="spinner mx-auto border-white border-t-transparent"></div> : "Sign In"}
             </Button>
           </form>
+          
+          {/* Support Info */}
+          {systemConfig?.support_email && (
+            <p className="text-center text-sm text-slate-500">
+              Need help? Contact <a href={`mailto:${systemConfig.support_email}`} className="font-medium text-[#2D4A2D] hover:underline">{systemConfig.support_email}</a>
+            </p>
+          )}
         </div>
       </div>
 
       {/* Right Side - Image */}
-      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+      <div className="hidden lg:block lg:w-[55%] relative overflow-hidden">
         <img
-          src="https://images.unsplash.com/photo-1632647895256-3f75c1865a0f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwzfHx1bml2ZXJzaXR5JTIwc3R1ZGVudCUyMGhhcHB5JTIwbGFwdG9wfGVufDB8fHx8MTc3MDkzODI5MHww&ixlib=rb-4.1.0&q=85"
-          alt="Student learning"
+          src={loginImageUrl}
+          alt="Students learning"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
         
         {/* Content overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-12 text-white">
-          <h2 className="font-heading text-4xl font-bold mb-4">
-            Learn with<br />
-            <span style={{ color: systemConfig?.secondary_color || '#C4A77D' }}>
-              {systemConfig?.university_name || "LuminaLMS University"}
+          <h2 className="font-heading text-4xl lg:text-5xl font-bold mb-4 leading-tight">
+            {headline}<br />
+            <span style={{ color: systemConfig?.secondary_color || '#FF8C00' }}>
+              {systemConfig?.university_name || "Our University"}
             </span>
           </h2>
-          <p className="text-lg text-white/80 max-w-md">
-            Affordable higher education you can take wherever life takes you. Learn anywhere at your own pace.
+          <p className="text-lg text-white/80 max-w-lg leading-relaxed">
+            {subtext}
           </p>
           
-          {/* Accreditation badge */}
-          <div className="mt-8 inline-flex items-center gap-3 bg-white/10 backdrop-blur-md rounded-lg px-4 py-3">
-            <div className="w-10 h-10 bg-white/20 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm">NUC</span>
+          {/* Stats */}
+          <div className="flex gap-8 mt-8">
+            <div>
+              <p className="text-3xl font-bold">1000+</p>
+              <p className="text-white/60 text-sm">Students</p>
             </div>
-            <p className="text-sm text-white/90">
-              {systemConfig?.university_name || "LuminaLMS University"} is licensed by the<br />
-              National Universities Commission
-            </p>
+            <div>
+              <p className="text-3xl font-bold">50+</p>
+              <p className="text-white/60 text-sm">Courses</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold">95%</p>
+              <p className="text-white/60 text-sm">Success Rate</p>
+            </div>
           </div>
         </div>
       </div>
