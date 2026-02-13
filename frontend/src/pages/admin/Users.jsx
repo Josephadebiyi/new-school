@@ -221,6 +221,42 @@ const AdminUsers = () => {
     }
   };
 
+  // Export students to Excel
+  const exportStudentsToExcel = () => {
+    const students = users.filter(u => u.role === 'student');
+    if (students.length === 0) {
+      toast.error("No students to export");
+      return;
+    }
+
+    const exportData = students.map(student => ({
+      'Full Name': `${student.first_name} ${student.last_name}`,
+      'Email': student.email,
+      'Student ID': student.student_id || '',
+      'Program': student.program || '',
+      'Department': student.department || '',
+      'Level': student.level || '',
+      'Payment Status': student.payment_status || 'unpaid',
+      'Account Status': student.account_status || 'active'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    
+    // Auto-size columns
+    const maxWidth = exportData.reduce((w, r) => Math.max(w, Object.values(r).join('').length), 10);
+    ws['!cols'] = Array(8).fill({ wch: maxWidth / 8 });
+
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(data, `student_contacts_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success(`Exported ${students.length} students to Excel`);
+  };
+
+  // Get student count
+  const studentCount = users.filter(u => u.role === 'student').length;
+
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
