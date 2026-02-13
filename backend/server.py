@@ -997,6 +997,28 @@ async def delete_user(
 
 # ============== COURSE ENDPOINTS ==============
 
+# ============== PUBLIC COURSE ENDPOINTS (No Auth) - Must be before /courses/{course_id} ==============
+
+@api_router.get("/courses/public")
+async def get_public_courses():
+    """Get all active courses for public display (no authentication required)"""
+    courses = await db.courses.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    for course in courses:
+        modules = await db.modules.find({"course_id": course["id"], "is_active": True}, {"_id": 0}).sort("order", 1).to_list(100)
+        course["modules"] = modules
+    return courses
+
+@api_router.get("/courses/public/{course_id}")
+async def get_public_course(course_id: str):
+    """Get a single course for public display (no authentication required)"""
+    course = await db.courses.find_one({"id": course_id}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    modules = await db.modules.find({"course_id": course_id, "is_active": True}, {"_id": 0}).sort("order", 1).to_list(100)
+    course["modules"] = modules
+    return course
+
 @api_router.get("/courses")
 async def get_courses(
     department: Optional[str] = None,
