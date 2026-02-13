@@ -136,6 +136,10 @@ const AdminSettings = () => {
               <Settings size={16} className="mr-2" />
               Branding
             </TabsTrigger>
+            <TabsTrigger value="fees" className="data-[state=active]:bg-white px-6">
+              <Euro size={16} className="mr-2" />
+              Fees & Currency
+            </TabsTrigger>
             <TabsTrigger value="login" className="data-[state=active]:bg-white px-6">
               <Image size={16} className="mr-2" />
               Login Page
