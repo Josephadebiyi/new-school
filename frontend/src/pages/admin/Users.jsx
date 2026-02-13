@@ -36,7 +36,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
-import { Users, Plus, Search, Edit, Trash2, UserPlus, Lock, Unlock, MoreVertical, CreditCard, DollarSign } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import { Users, Plus, Search, Edit, Trash2, UserPlus, Lock, Unlock, MoreVertical, CreditCard, DollarSign, Ban, UserCheck, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminUsers = () => {
@@ -46,6 +56,9 @@ const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [expelDialogOpen, setExpelDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -55,6 +68,14 @@ const AdminUsers = () => {
     department: "",
     program: "",
     level: 100
+  });
+  const [editFormData, setEditFormData] = useState({
+    first_name: "",
+    last_name: "",
+    department: "",
+    program: "",
+    level: 100,
+    payment_status: "unpaid"
   });
 
   useEffect(() => {
