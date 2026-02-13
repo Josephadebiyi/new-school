@@ -1523,17 +1523,26 @@ async def get_admission_letter(
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
     
+    # Get system config for fees
+    system_config = await db.system_config.find_one({}, {"_id": 0}) or {}
+    tuition_fee = system_config.get("tuition_fee", 2500)
+    tuition_fee_per = system_config.get("tuition_fee_per", "semester")
+    currency = system_config.get("default_currency", "EUR")
+    currency_symbol = {"EUR": "€", "USD": "$", "GBP": "£", "NGN": "₦"}.get(currency, "€")
+    university_name = system_config.get("university_name", "Global Institute of Tech and Business")
+    
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
     
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20, textColor=colors.HexColor('#3d7a4a'))
     body_style = ParagraphStyle('CustomBody', parent=styles['Normal'], fontSize=11, leading=16)
+    fee_style = ParagraphStyle('FeeStyle', parent=styles['Normal'], fontSize=12, leading=18, textColor=colors.HexColor('#1565c0'))
     
     elements = []
     
     # Header
-    elements.append(Paragraph("<b>GLOBAL INSTITUTE OF TECH AND BUSINESS</b>", title_style))
+    elements.append(Paragraph(f"<b>{university_name.upper()}</b>", title_style))
     elements.append(Paragraph("Vilnius, Lithuania | support@gitb.lt", body_style))
     elements.append(Spacer(1, 0.3*inch))
     
@@ -1554,7 +1563,7 @@ async def get_admission_letter(
     elements.append(Paragraph("<b>LETTER OF ADMISSION</b>", title_style))
     elements.append(Spacer(1, 0.2*inch))
     
-    # Body
+    # Body with tuition fee
     body_text = f"""
     Dear {application['first_name']},<br/><br/>
     
