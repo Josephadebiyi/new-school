@@ -427,21 +427,21 @@ const CTASection = () => (
 
 // Footer
 const Footer = () => (
-  <footer id="contact" className="footer py-16 text-white">
-    <div className="max-w-7xl mx-auto px-6">
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
+  <footer id="contact" className="footer py-12 md:py-16 text-white">
+    <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
         {/* About */}
-        <div>
-          <div className="flex items-center gap-2 mb-6">
-            <GraduationCap size={32} />
-            <span className="font-display text-2xl font-bold">GITB</span>
+        <div className="col-span-2 md:col-span-1">
+          <div className="flex items-center gap-2 mb-4 md:mb-6">
+            <GraduationCap size={28} />
+            <span className="font-display text-xl md:text-2xl font-bold">GITB</span>
           </div>
           <p className="text-white/70 text-sm leading-relaxed">
             Global Institute of Tech and Business - Empowering students with knowledge and skills for a successful future.
           </p>
-          <div className="flex gap-4 mt-6">
-            <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-              <Facebook size={18} />
+          <div className="flex gap-3 mt-4 md:mt-6">
+            <a href="#" className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+              <Facebook size={16} />
             </a>
             <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
               <Instagram size={18} />
