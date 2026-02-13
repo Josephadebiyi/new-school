@@ -74,24 +74,24 @@ const StudentDashboard = () => {
   }
 
   return (
-    <div className="space-y-8" data-testid="student-dashboard">
+    <div className="space-y-6 md:space-y-8" data-testid="student-dashboard">
       {/* Welcome Section with Gradient Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 rounded-2xl p-6 text-white">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
-        <div className="absolute top-1/2 right-1/4 w-20 h-20 bg-white/5 rounded-full"></div>
-        <div className="relative z-10 flex items-center justify-between">
+      <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
+        <div className="absolute top-0 right-0 w-32 md:w-64 h-32 md:h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-16 md:w-32 h-16 md:h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div className="absolute top-1/2 right-1/4 w-12 md:w-20 h-12 md:h-20 bg-white/5 rounded-full hidden sm:block"></div>
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-xl md:text-2xl font-bold">
               Welcome back, {user?.first_name || "Student"}! 🎓
             </h1>
-            <p className="text-white/80 mt-1">Continue your learning journey</p>
+            <p className="text-white/80 mt-1 text-sm md:text-base">Continue your learning journey</p>
           </div>
-          <div className="hidden md:flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3">
-            <TrendingUp size={20} />
+          <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl px-3 md:px-4 py-2 md:py-3 self-start sm:self-auto">
+            <TrendingUp size={18} />
             <div>
-              <div className="text-sm opacity-80">Current Streak</div>
-              <div className="font-bold text-lg">7 Days 🔥</div>
+              <div className="text-xs md:text-sm opacity-80">Current Streak</div>
+              <div className="font-bold text-sm md:text-lg">7 Days 🔥</div>
             </div>
           </div>
         </div>
