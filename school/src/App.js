@@ -827,27 +827,27 @@ const CourseDetailPage = () => {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="bg-white rounded-xl p-6 text-center">
-                  <Clock className="mx-auto text-primary-green mb-2" size={28} />
-                  <div className="text-2xl font-bold text-text-dark">
+              <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
+                <div className="bg-white rounded-xl p-3 md:p-6 text-center">
+                  <Clock className="mx-auto text-primary-green mb-1 md:mb-2" size={24} />
+                  <div className="text-lg md:text-2xl font-bold text-text-dark">
                     {course.duration_value || 12}
                   </div>
-                  <div className="text-text-light text-sm">
+                  <div className="text-text-light text-xs md:text-sm">
                     {course.duration_unit || 'Weeks'}
                   </div>
                 </div>
-                <div className="bg-white rounded-xl p-6 text-center">
-                  <BookOpen className="mx-auto text-primary-green mb-2" size={28} />
-                  <div className="text-2xl font-bold text-text-dark">
+                <div className="bg-white rounded-xl p-3 md:p-6 text-center">
+                  <BookOpen className="mx-auto text-primary-green mb-1 md:mb-2" size={24} />
+                  <div className="text-lg md:text-2xl font-bold text-text-dark">
                     {course.modules?.length || 0}
                   </div>
-                  <div className="text-text-light text-sm">Modules</div>
+                  <div className="text-text-light text-xs md:text-sm">Modules</div>
                 </div>
-                <div className="bg-white rounded-xl p-6 text-center">
-                  <Award className="mx-auto text-primary-green mb-2" size={28} />
-                  <div className="text-2xl font-bold text-text-dark">Yes</div>
-                  <div className="text-text-light text-sm">Certificate</div>
+                <div className="bg-white rounded-xl p-3 md:p-6 text-center">
+                  <Award className="mx-auto text-primary-green mb-1 md:mb-2" size={24} />
+                  <div className="text-lg md:text-2xl font-bold text-text-dark">Yes</div>
+                  <div className="text-text-light text-xs md:text-sm">Certificate</div>
                 </div>
               </div>
 
