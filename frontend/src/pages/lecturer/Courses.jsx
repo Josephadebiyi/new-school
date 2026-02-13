@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "../../App";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { BookOpen, Users, Plus, Video, FileText } from "lucide-react";
+import { BookOpen, Users, Plus, Video, FileText, Settings, Play } from "lucide-react";
 import { toast } from "sonner";
 
 const LecturerCourses = () => {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,7 +22,6 @@ const LecturerCourses = () => {
       const response = await axios.get(`${API}/courses`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Filter courses assigned to this lecturer
       const myCourses = response.data.filter(c => c.lecturer_id === user.id);
       setCourses(myCourses);
     } catch (error) {
@@ -69,10 +70,22 @@ const LecturerCourses = () => {
                 <h3 className="font-heading font-semibold text-slate-900 mb-3 line-clamp-2">
                   {course.title}
                 </h3>
+                
+                <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
+                  <span>{course.total_lessons || 0} lessons</span>
+                  <span>•</span>
+                  <span className="capitalize">{course.grouping_type || 'week'}-by-{course.grouping_type || 'week'}</span>
+                </div>
+                
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1 text-xs">
-                    <Video size={14} className="mr-1" />
-                    Content
+                  <Button 
+                    size="sm" 
+                    className="flex-1 bg-uni-navy hover:bg-uni-navy-light"
+                    onClick={() => navigate(`/lecturer/course/${course.id}/builder`)}
+                    data-testid={`build-course-btn-${course.id}`}
+                  >
+                    <Settings size={14} className="mr-1" />
+                    Build Course
                   </Button>
                   <Button size="sm" variant="outline" className="flex-1 text-xs">
                     <Users size={14} className="mr-1" />
