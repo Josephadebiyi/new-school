@@ -4,36 +4,68 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import axios from "axios";
 import { Toaster, toast } from "sonner";
 
-// Components
+// Pages
 import Login from "./pages/Login";
 import DashboardLayout from "./components/DashboardLayout";
+import LimitedAccess from "./pages/LimitedAccess";
+import BillingPage from "./pages/BillingPage";
+
+// Student Pages
 import StudentDashboard from "./pages/student/Dashboard";
 import StudentCourses from "./pages/student/Courses";
 import StudentResults from "./pages/student/Results";
 import StudentPayments from "./pages/student/Payments";
+import CoursePlayer from "./pages/student/CoursePlayer";
+
+// Lecturer Pages
 import LecturerDashboard from "./pages/lecturer/Dashboard";
 import LecturerCourses from "./pages/lecturer/Courses";
 import LecturerGrades from "./pages/lecturer/Grades";
+import CourseBuilder from "./pages/lecturer/CourseBuilder";
+
+// Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminUsers from "./pages/admin/Users";
 import AdminCourses from "./pages/admin/Courses";
-import AdmissionsDashboard from "./pages/admissions/Dashboard";
-import FinanceDashboard from "./pages/finance/Dashboard";
-import RegistrarDashboard from "./pages/registrar/Dashboard";
-import SupportDashboard from "./pages/support/Dashboard";
+import AdminSettings from "./pages/admin/Settings";
+import AdminAdmissions from "./pages/admin/Admissions";
+import AdminPayments from "./pages/admin/Payments";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
+// System Config Context
+const SystemConfigContext = createContext(null);
+export const useSystemConfig = () => useContext(SystemConfigContext);
+
 // Auth Context
 const AuthContext = createContext(null);
-
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
+  const [systemConfig, setSystemConfig] = useState({
+    university_name: "LuminaLMS University",
+    logo_url: "",
+    primary_color: "#0F172A",
+    secondary_color: "#D32F2F"
+  });
+  const [accessInfo, setAccessInfo] = useState({ allowed: true });
+
+  const fetchSystemConfig = async () => {
+    try {
+      const response = await axios.get(`${API}/system-config`);
+      setSystemConfig(response.data);
+    } catch (error) {
+      console.error("Failed to fetch system config:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSystemConfig();
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -43,6 +75,10 @@ export const AuthProvider = ({ children }) => {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUser(response.data);
+          setAccessInfo(response.data.access || { allowed: true });
+          if (response.data.system_config) {
+            setSystemConfig(response.data.system_config);
+          }
         } catch (error) {
           console.error("Auth error:", error);
           localStorage.removeItem("token");
@@ -56,10 +92,22 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
-    const { access_token, user: userData } = response.data;
+    const { access_token, user: userData, system_config } = response.data;
     localStorage.setItem("token", access_token);
     setToken(access_token);
     setUser(userData);
+    if (system_config) {
+      setSystemConfig(system_config);
+    }
+    
+    // Check access after login
+    try {
+      const meResponse = await axios.get(`${API}/auth/me`, {
+        headers: { Authorization: `Bearer ${access_token}` }
+      });
+      setAccessInfo(meResponse.data.access || { allowed: true });
+    } catch (e) {}
+    
     return userData;
   };
 
@@ -67,16 +115,60 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
+    setAccessInfo({ allowed: true });
+  };
+
+  const refreshUser = async () => {
+    if (token) {
+      try {
+        const response = await axios.get(`${API}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUser(response.data);
+        setAccessInfo(response.data.access || { allowed: true });
+      } catch (error) {}
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
+    <SystemConfigContext.Provider value={{ systemConfig, setSystemConfig, fetchSystemConfig }}>
+      <AuthContext.Provider value={{ user, token, login, logout, loading, accessInfo, refreshUser }}>
+        {children}
+      </AuthContext.Provider>
+    </SystemConfigContext.Provider>
   );
 };
 
-// Protected Route Component
+// Access Check Wrapper
+const AccessCheck = ({ children }) => {
+  const { user, accessInfo, loading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      // Check if account is locked
+      if (accessInfo?.reason === "locked" && location.pathname !== "/limited-access") {
+        navigate("/limited-access", { replace: true });
+        return;
+      }
+      
+      // Check if payment required (only for students accessing content)
+      if (accessInfo?.reason === "unpaid" && user.role === "student") {
+        const allowedPaths = ["/billing", "/student/dashboard", "/student/payments"];
+        const isAllowed = allowedPaths.some(p => location.pathname.startsWith(p));
+        if (!isAllowed && location.pathname.includes("/course/")) {
+          toast.error("Please complete your payment to access course content");
+          navigate("/billing", { replace: true });
+        }
+      }
+    }
+  }, [loading, user, accessInfo, location.pathname, navigate]);
+
+  return children;
+};
+
+// Protected Route
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -97,7 +189,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to={`/${user.role}`} replace />;
   }
 
-  return children;
+  return <AccessCheck>{children}</AccessCheck>;
 };
 
 // Role-based redirect
@@ -111,10 +203,7 @@ const RoleRedirect = () => {
         student: "/student/dashboard",
         lecturer: "/lecturer/dashboard",
         admin: "/admin/dashboard",
-        admissions_officer: "/admissions/dashboard",
-        finance_officer: "/finance/dashboard",
-        registrar: "/registrar/dashboard",
-        support: "/support/dashboard"
+        registrar: "/admin/dashboard"
       };
       navigate(roleRoutes[user.role] || "/student/dashboard");
     }
@@ -138,6 +227,12 @@ function App() {
         <Toaster position="top-right" richColors />
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/limited-access" element={<LimitedAccess />} />
+          <Route path="/billing" element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <BillingPage />
+            </ProtectedRoute>
+          } />
           
           {/* Student Routes */}
           <Route path="/student" element={
@@ -150,6 +245,12 @@ function App() {
             <Route path="results" element={<StudentResults />} />
             <Route path="payments" element={<StudentPayments />} />
           </Route>
+          
+          <Route path="/student/course/:enrollmentId" element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <CoursePlayer />
+            </ProtectedRoute>
+          } />
 
           {/* Lecturer Routes */}
           <Route path="/lecturer" element={
@@ -161,52 +262,25 @@ function App() {
             <Route path="courses" element={<LecturerCourses />} />
             <Route path="grades" element={<LecturerGrades />} />
           </Route>
+          
+          <Route path="/lecturer/course/:courseId/builder" element={
+            <ProtectedRoute allowedRoles={["lecturer", "admin"]}>
+              <CourseBuilder />
+            </ProtectedRoute>
+          } />
 
           {/* Admin Routes */}
           <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["admin", "registrar"]}>
               <DashboardLayout />
             </ProtectedRoute>
           }>
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="courses" element={<AdminCourses />} />
-          </Route>
-
-          {/* Admissions Officer Routes */}
-          <Route path="/admissions" element={
-            <ProtectedRoute allowedRoles={["admissions_officer"]}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route path="dashboard" element={<AdmissionsDashboard />} />
-          </Route>
-
-          {/* Finance Officer Routes */}
-          <Route path="/finance" element={
-            <ProtectedRoute allowedRoles={["finance_officer"]}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route path="dashboard" element={<FinanceDashboard />} />
-          </Route>
-
-          {/* Registrar Routes */}
-          <Route path="/registrar" element={
-            <ProtectedRoute allowedRoles={["registrar"]}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route path="dashboard" element={<RegistrarDashboard />} />
-          </Route>
-
-          {/* Support Routes */}
-          <Route path="/support" element={
-            <ProtectedRoute allowedRoles={["support"]}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route path="dashboard" element={<SupportDashboard />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="admissions" element={<AdminAdmissions />} />
+            <Route path="payments" element={<AdminPayments />} />
           </Route>
 
           {/* Default redirect */}
