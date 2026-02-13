@@ -1453,7 +1453,7 @@ async def send_admission_email(email: str, first_name: str, last_name: str, prog
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
-                <a href="https://lumina-redesign-wip.preview.emergentagent.com/login" 
+                <a href="https://lumina-school.preview.emergentagent.com/login" 
                    style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
                     Access Student Portal
                 </a>
