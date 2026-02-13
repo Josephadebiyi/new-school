@@ -876,11 +876,11 @@ const CourseDetailPage = () => {
 
             {/* Application Form */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl p-8 shadow-lg sticky top-28">
-                <div className="text-center mb-8">
-                  <span className="text-text-light text-sm">Application Fee</span>
-                  <div className="text-5xl font-bold text-primary-green">€50</div>
-                  <span className="text-text-light text-sm">One-time fee per program</span>
+              <div className="bg-white rounded-2xl p-5 md:p-8 shadow-lg lg:sticky lg:top-28">
+                <div className="text-center mb-6 md:mb-8">
+                  <span className="text-text-light text-xs md:text-sm">Application Fee</span>
+                  <div className="text-4xl md:text-5xl font-bold text-primary-green">€50</div>
+                  <span className="text-text-light text-xs md:text-sm">One-time fee per program</span>
                 </div>
 
                 <form onSubmit={handleApply} className="space-y-4">
