@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "../../components/ui/progress";
+import { formatAmount } from "../../utils/currency";
 
 const AdminDashboard = () => {
   const { token, user } = useAuth();
