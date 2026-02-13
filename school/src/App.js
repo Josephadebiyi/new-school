@@ -944,6 +944,87 @@ const CourseDetailPage = () => {
                     />
                   </div>
 
+                  {/* Document Upload Section */}
+                  <div className="pt-4 border-t border-gray-100">
+                    <h4 className="font-semibold text-text-dark mb-4 flex items-center gap-2">
+                      <FileCheck size={18} className="text-primary-green" />
+                      Required Documents
+                    </h4>
+                    
+                    {/* High School Certificate Upload */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-text-dark mb-2">
+                        High School Certificate *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.pdf"
+                          onChange={(e) => handleDocumentUpload(e, 'high_school_cert')}
+                          className="hidden"
+                          id="high_school_cert"
+                          data-testid="high-school-cert-input"
+                        />
+                        <label
+                          htmlFor="high_school_cert"
+                          className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                            docPreviews.high_school_cert 
+                              ? 'border-primary-green bg-green-50' 
+                              : 'border-gray-300 hover:border-primary-green hover:bg-gray-50'
+                          }`}
+                        >
+                          {uploadingDocs ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary-green border-t-transparent"></div>
+                          ) : docPreviews.high_school_cert ? (
+                            <FileCheck size={20} className="text-primary-green" />
+                          ) : (
+                            <Upload size={20} className="text-gray-400" />
+                          )}
+                          <span className={`text-sm ${docPreviews.high_school_cert ? 'text-primary-green font-medium' : 'text-gray-500'}`}>
+                            {docPreviews.high_school_cert || 'Upload certificate (JPG, PNG, PDF)'}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Identification Upload */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-text-dark mb-2">
+                        Means of Identification *
+                        <span className="text-xs text-gray-500 ml-1">(Passport or National ID)</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.pdf"
+                          onChange={(e) => handleDocumentUpload(e, 'identification')}
+                          className="hidden"
+                          id="identification"
+                          data-testid="identification-input"
+                        />
+                        <label
+                          htmlFor="identification"
+                          className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                            docPreviews.identification 
+                              ? 'border-primary-green bg-green-50' 
+                              : 'border-gray-300 hover:border-primary-green hover:bg-gray-50'
+                          }`}
+                        >
+                          {uploadingDocs ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary-green border-t-transparent"></div>
+                          ) : docPreviews.identification ? (
+                            <FileCheck size={20} className="text-primary-green" />
+                          ) : (
+                            <FileImage size={20} className="text-gray-400" />
+                          )}
+                          <span className={`text-sm ${docPreviews.identification ? 'text-primary-green font-medium' : 'text-gray-500'}`}>
+                            {docPreviews.identification || 'Upload ID document (JPG, PNG, PDF)'}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <button
                     type="submit"
                     disabled={applying}
