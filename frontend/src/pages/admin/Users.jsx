@@ -29,7 +29,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/dialog";
-import { Users, Plus, Search, Edit, Trash2, UserPlus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import { Users, Plus, Search, Edit, Trash2, UserPlus, Lock, Unlock, MoreVertical, CreditCard, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminUsers = () => {
@@ -93,6 +100,30 @@ const AdminUsers = () => {
     }
   };
 
+  const handleLockUser = async (userId) => {
+    try {
+      await axios.put(`${API}/users/${userId}/lock`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("User account locked");
+      fetchUsers();
+    } catch (error) {
+      toast.error("Failed to lock user");
+    }
+  };
+
+  const handleUnlockUser = async (userId) => {
+    try {
+      await axios.put(`${API}/users/${userId}/unlock`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("User account unlocked");
+      fetchUsers();
+    } catch (error) {
+      toast.error("Failed to unlock user");
+    }
+  };
+
   const handleDeleteUser = async (userId) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     
@@ -117,10 +148,7 @@ const AdminUsers = () => {
     { value: "student", label: "Student" },
     { value: "lecturer", label: "Lecturer" },
     { value: "admin", label: "Admin" },
-    { value: "registrar", label: "Registrar" },
-    { value: "finance_officer", label: "Finance Officer" },
-    { value: "admissions_officer", label: "Admissions Officer" },
-    { value: "support", label: "Support" }
+    { value: "registrar", label: "Registrar" }
   ];
 
   if (loading) {
@@ -296,7 +324,8 @@ const AdminUsers = () => {
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Email</TableHead>
                 <TableHead className="text-white font-medium">Role</TableHead>
-                <TableHead className="text-white font-medium">Status</TableHead>
+                <TableHead className="text-white font-medium">Account</TableHead>
+                <TableHead className="text-white font-medium">Payment</TableHead>
                 <TableHead className="text-white font-medium">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -307,7 +336,7 @@ const AdminUsers = () => {
                     <TableCell className="font-medium text-slate-900">
                       {user.first_name} {user.last_name}
                       {user.student_id && (
-                        <span className="block text-xs text-slate-500">{user.student_id}</span>
+                        <span className="block text-xs text-slate-500 font-mono">{user.student_id}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-slate-600">{user.email}</TableCell>
@@ -317,33 +346,68 @@ const AdminUsers = () => {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className={`px-3 py-1 rounded text-xs font-semibold ${
-                        user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      <span className={`px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 w-fit ${
+                        user.account_status === 'locked' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
                       }`}>
-                        {user.is_active ? 'Active' : 'Inactive'}
+                        {user.account_status === 'locked' ? <Lock size={12} /> : <Unlock size={12} />}
+                        {user.account_status === 'locked' ? 'Locked' : 'Active'}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                          <Edit size={14} />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteUser(user.id)}
-                          data-testid={`delete-user-${user.id}`}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
+                      {user.role === 'student' && (
+                        <span className={`px-3 py-1 rounded text-xs font-semibold ${
+                          user.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                          user.payment_status === 'partial' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {user.payment_status === 'paid' ? 'Paid' : 
+                           user.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                            <MoreVertical size={16} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit size={14} className="mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          
+                          {user.account_status === 'locked' ? (
+                            <DropdownMenuItem onClick={() => handleUnlockUser(user.id)} data-testid={`unlock-user-${user.id}`}>
+                              <Unlock size={14} className="mr-2" />
+                              Unlock Account
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => handleLockUser(user.id)} className="text-amber-600" data-testid={`lock-user-${user.id}`}>
+                              <Lock size={14} className="mr-2" />
+                              Lock Account
+                            </DropdownMenuItem>
+                          )}
+                          
+                          <DropdownMenuSeparator />
+                          
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteUser(user.id)} 
+                            className="text-red-600"
+                            data-testid={`delete-user-${user.id}`}
+                          >
+                            <Trash2 size={14} className="mr-2" />
+                            Delete User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                  <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                     No users found
                   </TableCell>
                 </TableRow>
