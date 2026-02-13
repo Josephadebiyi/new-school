@@ -39,6 +39,12 @@ const CoursePlayer = () => {
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  
+  // Quiz state
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizResult, setQuizResult] = useState(null);
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
 
   useEffect(() => {
     // Check payment status
