@@ -97,39 +97,39 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid with Enhanced Visuals */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="stat-card">
+        <div className="stat-card hover:shadow-lg transition-all duration-300 group">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
-              <Calendar size={20} className="text-violet-600" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Calendar size={20} className="text-white" />
             </div>
           </div>
           <div className="stat-card-value">{stats.total_courses || enrollments.length}</div>
           <div className="stat-card-label">Days</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card hover:shadow-lg transition-all duration-300 group">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <BookOpen size={20} className="text-blue-600" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <BookOpen size={20} className="text-white" />
             </div>
           </div>
           <div className="stat-card-value">{stats.total_lessons || 36}</div>
           <div className="stat-card-label">Lessons</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card hover:shadow-lg transition-all duration-300 group">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <Award size={20} className="text-emerald-600" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Award size={20} className="text-white" />
             </div>
           </div>
           <div className="stat-card-value">{stats.completed_courses || 18}</div>
           <div className="stat-card-label">Quizzes</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card hover:shadow-lg transition-all duration-300 group">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-              <Clock size={20} className="text-orange-600" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Clock size={20} className="text-white" />
             </div>
           </div>
           <div className="stat-card-value">231</div>
