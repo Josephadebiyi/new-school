@@ -413,7 +413,7 @@ const AdminUsers = () => {
             <TableBody>
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow key={user.id} className={user.account_status === 'expelled' ? 'bg-red-50' : ''}>
                     <TableCell className="font-medium text-slate-900">
                       {user.first_name} {user.last_name}
                       {user.student_id && (
@@ -428,10 +428,15 @@ const AdminUsers = () => {
                     </TableCell>
                     <TableCell>
                       <span className={`px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 w-fit ${
-                        user.account_status === 'locked' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                        user.account_status === 'expelled' ? 'bg-red-200 text-red-800' :
+                        user.account_status === 'locked' ? 'bg-amber-100 text-amber-700' : 
+                        'bg-emerald-100 text-emerald-700'
                       }`}>
-                        {user.account_status === 'locked' ? <Lock size={12} /> : <Unlock size={12} />}
-                        {user.account_status === 'locked' ? 'Locked' : 'Active'}
+                        {user.account_status === 'expelled' ? <Ban size={12} /> :
+                         user.account_status === 'locked' ? <Lock size={12} /> : 
+                         <Unlock size={12} />}
+                        {user.account_status === 'expelled' ? 'Expelled' :
+                         user.account_status === 'locked' ? 'Locked' : 'Active'}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -449,25 +454,41 @@ const AdminUsers = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid={`user-actions-${user.id}`}>
                             <MoreVertical size={16} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => openEditDialog(user)} data-testid={`edit-user-${user.id}`}>
                             <Edit size={14} className="mr-2" />
-                            Edit
+                            Edit User
                           </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator />
                           
                           {user.account_status === 'locked' ? (
                             <DropdownMenuItem onClick={() => handleUnlockUser(user.id)} data-testid={`unlock-user-${user.id}`}>
                               <Unlock size={14} className="mr-2" />
                               Unlock Account
                             </DropdownMenuItem>
-                          ) : (
+                          ) : user.account_status !== 'expelled' && (
                             <DropdownMenuItem onClick={() => handleLockUser(user.id)} className="text-amber-600" data-testid={`lock-user-${user.id}`}>
                               <Lock size={14} className="mr-2" />
                               Lock Account
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {user.role === 'student' && user.account_status !== 'expelled' && (
+                            <DropdownMenuItem onClick={() => openExpelDialog(user)} className="text-red-600" data-testid={`expel-user-${user.id}`}>
+                              <Ban size={14} className="mr-2" />
+                              Expel Student
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {user.role === 'student' && user.account_status === 'expelled' && (
+                            <DropdownMenuItem onClick={() => handleReinstateStudent(user.id)} className="text-emerald-600" data-testid={`reinstate-user-${user.id}`}>
+                              <UserCheck size={14} className="mr-2" />
+                              Reinstate Student
                             </DropdownMenuItem>
                           )}
                           
@@ -497,6 +518,127 @@ const AdminUsers = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user details for {selectedUser?.first_name} {selectedUser?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>First Name</Label>
+                <Input
+                  value={editFormData.first_name}
+                  onChange={(e) => setEditFormData({...editFormData, first_name: e.target.value})}
+                  data-testid="edit-first-name"
+                />
+              </div>
+              <div>
+                <Label>Last Name</Label>
+                <Input
+                  value={editFormData.last_name}
+                  onChange={(e) => setEditFormData({...editFormData, last_name: e.target.value})}
+                  data-testid="edit-last-name"
+                />
+              </div>
+            </div>
+            
+            {selectedUser?.role === 'student' && (
+              <>
+                <div>
+                  <Label>Department</Label>
+                  <Input
+                    value={editFormData.department}
+                    onChange={(e) => setEditFormData({...editFormData, department: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Program</Label>
+                  <Input
+                    value={editFormData.program}
+                    onChange={(e) => setEditFormData({...editFormData, program: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Level</Label>
+                    <Select 
+                      value={String(editFormData.level)} 
+                      onValueChange={(value) => setEditFormData({...editFormData, level: parseInt(value)})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="100">100 Level</SelectItem>
+                        <SelectItem value="200">200 Level</SelectItem>
+                        <SelectItem value="300">300 Level</SelectItem>
+                        <SelectItem value="400">400 Level</SelectItem>
+                        <SelectItem value="500">500 Level</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Payment Status</Label>
+                    <Select 
+                      value={editFormData.payment_status} 
+                      onValueChange={(value) => setEditFormData({...editFormData, payment_status: value})}
+                    >
+                      <SelectTrigger data-testid="edit-payment-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="partial">Partial</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditUser} className="bg-uni-navy hover:bg-uni-navy-light" data-testid="save-edit-btn">
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Expel Student Confirmation Dialog */}
+      <AlertDialog open={expelDialogOpen} onOpenChange={setExpelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle size={20} />
+              Expel Student
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to expel <strong>{selectedUser?.first_name} {selectedUser?.last_name}</strong>?
+              <br /><br />
+              This action will permanently block the student from accessing the system. 
+              The student can be reinstated later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleExpelStudent}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="confirm-expel-btn"
+            >
+              Yes, Expel Student
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
