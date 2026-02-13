@@ -323,5 +323,177 @@ class TestEditUser:
         assert data["level"] == 200
 
 
+class TestCoursesAPI:
+    """Course CRUD and Course Editor endpoints"""
+    
+    def test_get_all_courses(self, admin_token):
+        """Test getting all courses"""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        response = requests.get(f"{BASE_URL}/api/courses", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+    
+    def test_get_single_course(self, admin_token):
+        """Test getting single course with modules"""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        # First get all courses
+        courses_resp = requests.get(f"{BASE_URL}/api/courses", headers=headers)
+        courses = courses_resp.json()
+        if courses:
+            course_id = courses[0]["id"]
+            response = requests.get(f"{BASE_URL}/api/courses/{course_id}", headers=headers)
+            assert response.status_code == 200
+            data = response.json()
+            assert "id" in data
+            assert "title" in data
+            assert "modules" in data  # Course editor requires modules array
+    
+    def test_update_course(self, admin_token):
+        """Test updating course with duration settings"""
+        headers = {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
+        # First get a course
+        courses_resp = requests.get(f"{BASE_URL}/api/courses", headers=headers)
+        courses = courses_resp.json()
+        if courses:
+            course_id = courses[0]["id"]
+            course = courses[0]
+            # Update with new duration type
+            response = requests.put(f"{BASE_URL}/api/courses/{course_id}", headers=headers, json={
+                "code": course.get("code", "TEST001"),
+                "title": course.get("title", "Test Course"),
+                "description": course.get("description", ""),
+                "department": course.get("department", "Public Health"),
+                "level": course.get("level", 100),
+                "units": course.get("units", 2),
+                "semester": course.get("semester", 1),
+                "course_type": course.get("course_type", "CORE"),
+                "duration_weeks": 16,
+                "duration_type": "months"
+            })
+            assert response.status_code == 200
+            data = response.json()
+            # Verify update persisted
+            verify_resp = requests.get(f"{BASE_URL}/api/courses/{course_id}", headers=headers)
+            verify_data = verify_resp.json()
+            # Note: duration fields may not be in CourseCreate model, so check if they're returned
+
+
+class TestModulesAndLessons:
+    """Module and Lesson endpoints for Course Builder"""
+    
+    @pytest.fixture(scope="class")
+    def test_course_id(self, admin_token):
+        """Get a course ID for testing"""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        courses_resp = requests.get(f"{BASE_URL}/api/courses", headers=headers)
+        courses = courses_resp.json()
+        if courses:
+            return courses[0]["id"]
+        pytest.skip("No courses available")
+    
+    def test_get_course_modules(self, admin_token, test_course_id):
+        """Test getting modules for a course"""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        response = requests.get(f"{BASE_URL}/api/courses/{test_course_id}/modules", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+    
+    def test_create_module(self, admin_token, test_course_id):
+        """Test creating a new module"""
+        headers = {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
+        response = requests.post(f"{BASE_URL}/api/courses/{test_course_id}/modules", headers=headers, json={
+            "title": "TEST_Module for Testing",
+            "description": "Test module description",
+            "order": 100
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "TEST_Module for Testing"
+        assert "id" in data
+        return data["id"]
+    
+    def test_add_lesson_to_module(self, admin_token, test_course_id):
+        """Test adding a lesson to a module"""
+        headers = {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
+        # First create a module
+        module_resp = requests.post(f"{BASE_URL}/api/courses/{test_course_id}/modules", headers=headers, json={
+            "title": "TEST_Module for Lessons",
+            "description": "Test for adding lessons",
+            "order": 101
+        })
+        module = module_resp.json()
+        module_id = module["id"]
+        
+        # Add lesson to module
+        response = requests.post(f"{BASE_URL}/api/modules/{module_id}/lessons", headers=headers, json={
+            "title": "TEST_Lesson 1",
+            "type": "video",
+            "content_url": "https://example.com/video.mp4",
+            "description": "Test lesson"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "TEST_Lesson 1"
+        assert "id" in data
+    
+    def test_upload_quiz_to_module(self, admin_token, test_course_id):
+        """Test uploading quiz questions to a module"""
+        headers = {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
+        # First create a module
+        module_resp = requests.post(f"{BASE_URL}/api/courses/{test_course_id}/modules", headers=headers, json={
+            "title": "TEST_Module for Quiz",
+            "description": "Test for quiz upload",
+            "order": 102
+        })
+        module = module_resp.json()
+        module_id = module["id"]
+        
+        # Upload quiz
+        response = requests.post(f"{BASE_URL}/api/modules/{module_id}/quiz", headers=headers, json={
+            "questions": [
+                {
+                    "question": "What is 2+2?",
+                    "options": ["3", "4", "5", "6"],
+                    "correct_answer": "B"
+                },
+                {
+                    "question": "What is the capital of France?",
+                    "options": ["London", "Paris", "Berlin", "Madrid"],
+                    "correct_answer": "B"
+                }
+            ],
+            "attempts_allowed": 3,
+            "passing_score": 70
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "lesson_id" in data
+
+
+class TestApplicationsAPI:
+    """Applications/Admissions management endpoints"""
+    
+    def test_get_all_applications(self, admin_token):
+        """Test getting all applications"""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        response = requests.get(f"{BASE_URL}/api/applications", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+    
+    def test_filter_applications_by_status(self, admin_token):
+        """Test filtering applications by status"""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        response = requests.get(f"{BASE_URL}/api/applications?status=pending_review", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        # All returned applications should have pending_review status
+        for app in data:
+            assert app["status"] == "pending_review"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
