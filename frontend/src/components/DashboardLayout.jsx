@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-const DashboardLayout = ({ children }) => {
+const DashboardLayout = () => {
   const { user, logout } = useAuth();
   const { systemConfig } = useSystemConfig();
   const location = useLocation();
