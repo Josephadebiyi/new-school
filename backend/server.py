@@ -1286,6 +1286,275 @@ async def stripe_webhook(request_body: bytes = Depends(lambda r: r.body())):
     # In production, verify the webhook signature
     return {"received": True}
 
+# ============== APPLICATIONS MANAGEMENT ENDPOINTS ==============
+
+@api_router.get("/applications")
+async def get_all_applications(
+    status: str = None,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, "registrar"]))
+):
+    """Get all applications with optional status filter"""
+    query = {}
+    if status and status != "all":
+        query["status"] = status
+    
+    applications = await db.applications.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return applications
+
+@api_router.post("/applications/{application_id}/approve")
+async def approve_application(
+    application_id: str,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, "registrar"]))
+):
+    """Approve an application and create student account"""
+    application = await db.applications.find_one({"id": application_id}, {"_id": 0})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    if application.get("status") not in ["pending_review", "pending"]:
+        raise HTTPException(status_code=400, detail="Application cannot be approved in current status")
+    
+    # Generate student ID and temp password
+    student_id = f"STU{datetime.now().year}{str(uuid.uuid4())[:5].upper()}"
+    temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    
+    # Create user account
+    user = {
+        "id": str(uuid.uuid4()),
+        "email": application["email"],
+        "password_hash": bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+        "first_name": application["first_name"],
+        "last_name": application["last_name"],
+        "role": UserRole.STUDENT,
+        "student_id": student_id,
+        "phone": application.get("phone"),
+        "program": application.get("course_title", ""),
+        "department": "General Studies",
+        "level": 100,
+        "is_active": True,
+        "account_status": "active",
+        "payment_status": "paid",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(user)
+    
+    # Update application status
+    await db.applications.update_one(
+        {"id": application_id},
+        {"$set": {
+            "status": "approved",
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "approved_by": current_user["id"],
+            "student_id": student_id
+        }}
+    )
+    
+    # Send welcome email with admission details
+    email_sent = False
+    try:
+        await send_admission_email(
+            application["email"],
+            application["first_name"],
+            application["last_name"],
+            application.get("course_title", "Your Program"),
+            student_id,
+            temp_password
+        )
+        email_sent = True
+    except Exception as e:
+        logger.error(f"Failed to send admission email: {e}")
+    
+    return {
+        "message": "Application approved",
+        "student_id": student_id,
+        "email": application["email"],
+        "temp_password": temp_password,
+        "email_sent": email_sent
+    }
+
+async def send_admission_email(email: str, first_name: str, last_name: str, program: str, student_id: str, temp_password: str):
+    """Send admission email with login credentials"""
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
+        <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); color: white; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 28px;">GITB</h1>
+            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Global Institute of Tech and Business</p>
+        </div>
+        
+        <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <div style="width: 60px; height: 60px; background: #e8f5e9; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 30px;">🎓</span>
+                </div>
+            </div>
+            
+            <h2 style="color: #3d7a4a; text-align: center; margin-bottom: 20px;">Congratulations, {first_name}!</h2>
+            
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                We are pleased to inform you that your application to <strong>{program}</strong> has been approved!
+            </p>
+            
+            <div style="background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #3d7a4a;">
+                <h3 style="margin: 0 0 15px 0; color: #333;">Your Login Credentials</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 8px 0; color: #666;">Student ID:</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #333;">{student_id}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #666;">Email:</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #333;">{email}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #666;">Temporary Password:</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #e53935;">{temp_password}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #e65100; font-size: 14px;">
+                    <strong>Important:</strong> Please change your password after your first login.
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="https://lumina-redesign-wip.preview.emergentagent.com/login" 
+                   style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                    Access Student Portal
+                </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                If you have any questions, please contact us at support@gitb.lt
+            </p>
+            
+            <p style="color: #333; margin-top: 20px;">
+                Best regards,<br>
+                <strong>GITB Admissions Office</strong>
+            </p>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+            <p>© {datetime.now().year} Global Institute of Tech and Business. All rights reserved.</p>
+            <p>Vilnius, Lithuania | support@gitb.lt</p>
+        </div>
+    </div>
+    """
+    
+    params = {
+        "from": f"GITB Admissions <{ADMIN_EMAIL}>",
+        "to": [email],
+        "subject": f"🎓 Admission Granted - Welcome to GITB, {first_name}!",
+        "html": html_content
+    }
+    
+    resend.Emails.send(params)
+
+@api_router.post("/applications/{application_id}/reject")
+async def reject_application(
+    application_id: str,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, "registrar"]))
+):
+    """Reject an application"""
+    result = await db.applications.update_one(
+        {"id": application_id},
+        {"$set": {
+            "status": "rejected",
+            "rejected_at": datetime.now(timezone.utc).isoformat(),
+            "rejected_by": current_user["id"]
+        }}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    return {"message": "Application rejected"}
+
+@api_router.get("/applications/{application_id}/admission-letter")
+async def get_admission_letter(
+    application_id: str,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, "registrar"]))
+):
+    """Generate and return admission letter PDF"""
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from fastapi.responses import StreamingResponse
+    
+    application = await db.applications.find_one({"id": application_id}, {"_id": 0})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20, textColor=colors.HexColor('#3d7a4a'))
+    body_style = ParagraphStyle('CustomBody', parent=styles['Normal'], fontSize=11, leading=16)
+    
+    elements = []
+    
+    # Header
+    elements.append(Paragraph("<b>GLOBAL INSTITUTE OF TECH AND BUSINESS</b>", title_style))
+    elements.append(Paragraph("Vilnius, Lithuania | support@gitb.lt", body_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Date
+    elements.append(Paragraph(f"Date: {datetime.now().strftime('%B %d, %Y')}", body_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Reference
+    elements.append(Paragraph(f"<b>Ref:</b> GITB/ADM/{application.get('student_id', application_id[:8].upper())}", body_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Recipient
+    elements.append(Paragraph(f"<b>{application['first_name']} {application['last_name']}</b>", body_style))
+    elements.append(Paragraph(application['email'], body_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Subject
+    elements.append(Paragraph("<b>LETTER OF ADMISSION</b>", title_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Body
+    body_text = f"""
+    Dear {application['first_name']},<br/><br/>
+    
+    Following your application and the payment of the application fee, we are pleased to inform you that 
+    you have been offered admission to study <b>{application.get('course_title', 'your selected program')}</b> 
+    at the Global Institute of Tech and Business (GITB).<br/><br/>
+    
+    <b>Student ID:</b> {application.get('student_id', 'To be assigned')}<br/><br/>
+    
+    Please log in to the student portal to access your courses and begin your studies. Your temporary 
+    login credentials have been sent to your email address.<br/><br/>
+    
+    We look forward to supporting you on your educational journey.<br/><br/>
+    
+    Congratulations and welcome to GITB!<br/><br/>
+    
+    Yours sincerely,<br/><br/>
+    
+    <b>Dr. Jane Smith</b><br/>
+    Director of Admissions<br/>
+    Global Institute of Tech and Business
+    """
+    elements.append(Paragraph(body_text, body_style))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=admission_letter_{application_id}.pdf"}
+    )
+
 # ============== MODULE ENDPOINTS ==============
 
 @api_router.get("/courses/{course_id}/modules")
