@@ -418,6 +418,9 @@ def require_roles(allowed_roles: List[str]):
 
 def check_access(user: dict) -> dict:
     """Check user access level and return access info"""
+    if user.get("account_status") == AccountStatus.EXPELLED:
+        return {"allowed": False, "reason": "expelled", "message": "Your account has been expelled. Please contact the Administrator."}
+    
     if user.get("account_status") == AccountStatus.LOCKED:
         return {"allowed": False, "reason": "locked", "message": "Limited Access: Please contact the Administrator."}
     
