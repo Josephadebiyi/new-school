@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "../../App";
-import { Card, CardContent } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { Badge } from "../../components/ui/badge";
-import { Info, Play } from "lucide-react";
+import { Progress } from "../../components/ui/progress";
+import { Info, Play, Lock, Award } from "lucide-react";
 import { toast } from "sonner";
 
 const StudentCourses = () => {
-  const { user, token } = useAuth();
+  const { user, token, accessInfo } = useAuth();
+  const navigate = useNavigate();
   const [enrollments, setEnrollments] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("level");
 
   useEffect(() => {
     fetchData();
@@ -53,10 +54,19 @@ const StudentCourses = () => {
     }
   };
 
+  const goToCourse = (enrollment) => {
+    if (accessInfo?.reason === "unpaid") {
+      toast.error("Please complete your payment to access course content");
+      navigate("/billing");
+      return;
+    }
+    navigate(`/student/course/${enrollment.id}`);
+  };
+
   const enrolledCourseIds = new Set(enrollments.map(e => e.course_id));
-  const enrolledCourses = enrollments.filter(e => e.status === "enrolled");
   const completedCourses = enrollments.filter(e => e.status === "completed");
   const outstandingCourses = courses.filter(c => !enrolledCourseIds.has(c.id));
+  const isPaymentRequired = accessInfo?.reason === "unpaid";
 
   if (loading) {
     return (
@@ -69,6 +79,7 @@ const StudentCourses = () => {
   const CourseCard = ({ course, enrollment, showEnroll }) => {
     const isEnrolled = enrollment?.status === "enrolled";
     const isCompleted = enrollment?.status === "completed";
+    const progress = enrollment?.progress || 0;
 
     return (
       <Card className="course-card overflow-hidden bg-white border border-slate-200" data-testid={`course-card-${course.code}`}>
@@ -78,11 +89,16 @@ const StudentCourses = () => {
             alt={course.title}
             className="w-full h-full object-cover"
           />
-          {/* Slanted Badge */}
           <div className="absolute top-0 left-0 bg-uni-navy text-white px-4 py-2 text-xs font-semibold"
                style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)' }}>
             {course.level}lvl
           </div>
+          
+          {isCompleted && (
+            <div className="absolute top-2 right-2 bg-emerald-500 text-white p-2 rounded-full">
+              <Award size={16} />
+            </div>
+          )}
         </div>
         
         <CardContent className="p-4">
@@ -93,6 +109,17 @@ const StudentCourses = () => {
             <span>{course.code}</span>
             <span>{course.units} Units</span>
           </div>
+          
+          {/* Progress bar for enrolled courses */}
+          {enrollment && progress > 0 && !isCompleted && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <span>Progress</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-1.5" />
+            </div>
+          )}
           
           <div className="flex items-center gap-2 mb-3">
             <span className="badge-core px-3 py-1 rounded text-xs font-semibold">
@@ -110,7 +137,7 @@ const StudentCourses = () => {
             )}
             {!enrollment && (
               <span className="badge-warning px-3 py-1 rounded text-xs font-semibold">
-                Incomplete
+                Not Enrolled
               </span>
             )}
           </div>
@@ -125,13 +152,28 @@ const StudentCourses = () => {
             </Button>
           )}
           
-          {isEnrolled && (
+          {enrollment && (
             <Button 
-              className="w-full bg-uni-navy hover:bg-uni-navy-light text-white"
+              onClick={() => goToCourse(enrollment)}
+              className={`w-full ${isPaymentRequired ? 'bg-slate-400' : 'bg-uni-navy hover:bg-uni-navy-light'} text-white`}
               data-testid={`go-to-class-btn-${course.code}`}
             >
-              <Play size={16} className="mr-2" />
-              Go to Class
+              {isPaymentRequired ? (
+                <>
+                  <Lock size={16} className="mr-2" />
+                  Locked
+                </>
+              ) : isCompleted ? (
+                <>
+                  <Award size={16} className="mr-2" />
+                  View Certificate
+                </>
+              ) : (
+                <>
+                  <Play size={16} className="mr-2" />
+                  Continue Learning
+                </>
+              )}
             </Button>
           )}
         </CardContent>
@@ -141,52 +183,54 @@ const StudentCourses = () => {
 
   return (
     <div className="space-y-6" data-testid="student-courses">
-      <Tabs defaultValue="level" className="w-full" onValueChange={setActiveTab}>
+      {/* Payment Lock Notice */}
+      {isPaymentRequired && (
+        <Card className="bg-amber-50 border-amber-200">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Lock size={20} className="text-amber-600" />
+            <p className="text-amber-800 text-sm">
+              Course content is locked. <button onClick={() => navigate("/billing")} className="font-semibold underline">Complete your payment</button> to access lessons.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs defaultValue="enrolled" className="w-full">
         <TabsList className="bg-slate-100 p-1 rounded-lg">
           <TabsTrigger 
-            value="level" 
+            value="enrolled" 
             className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-6"
-            data-testid="tab-level"
+            data-testid="tab-enrolled"
           >
-            {user?.level || 300} LEVEL
+            My Courses ({enrollments.length})
           </TabsTrigger>
           <TabsTrigger 
             value="outstanding" 
             className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-6"
             data-testid="tab-outstanding"
           >
-            Outstanding Courses
+            Available Courses ({outstandingCourses.length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="level" className="mt-6">
+        <TabsContent value="enrolled" className="mt-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <h2 className="font-heading text-xl font-bold text-slate-900">
                 {user?.program || "BSc. Public Health"}
               </h2>
               <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-medium rounded">
-                Enrolled
+                Level {user?.level || 300}
               </span>
             </div>
             <button className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
               <Info size={16} />
-              See what each course status means
+              Course status guide
             </button>
           </div>
-
-          {/* First Semester */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading font-semibold text-lg text-slate-900">First Semester</h3>
-              {enrolledCourses.length > 0 && (
-                <Button variant="outline" className="bg-uni-navy text-white hover:bg-uni-navy-light" data-testid="go-to-class-main">
-                  Go to Class
-                </Button>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {enrollments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {enrollments.map((enrollment) => (
                 <CourseCard 
                   key={enrollment.id} 
@@ -196,38 +240,40 @@ const StudentCourses = () => {
                 />
               ))}
             </div>
-          </div>
+          ) : (
+            <Card className="bg-white border border-slate-200">
+              <CardContent className="p-12 text-center">
+                <p className="text-slate-500">No courses enrolled yet. Check available courses to get started.</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="outstanding" className="mt-6">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <h2 className="font-heading text-xl font-bold text-slate-900">
-                {user?.program || "BSc. Public Health"}
-              </h2>
-            </div>
-            <button className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
-              <Info size={16} />
-              See what each course status means
-            </button>
+            <h2 className="font-heading text-xl font-bold text-slate-900">
+              Available Courses
+            </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {outstandingCourses.length > 0 ? (
-              outstandingCourses.map((course) => (
+          {outstandingCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {outstandingCourses.map((course) => (
                 <CourseCard 
                   key={course.id} 
                   course={course} 
                   enrollment={null}
                   showEnroll={true}
                 />
-              ))
-            ) : (
-              <div className="col-span-4 text-center py-12 text-slate-500">
-                No outstanding courses. You're all caught up!
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <Card className="bg-white border border-slate-200">
+              <CardContent className="p-12 text-center">
+                <p className="text-slate-500">No additional courses available. You're all caught up!</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
