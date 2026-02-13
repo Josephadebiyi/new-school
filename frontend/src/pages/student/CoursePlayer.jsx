@@ -222,6 +222,66 @@ const CoursePlayer = () => {
     }
   };
 
+  // Quiz functions
+  const handleQuizSubmit = async () => {
+    if (!currentLesson?.quiz_data?.questions) return;
+    
+    const questions = currentLesson.quiz_data.questions;
+    const answeredCount = Object.keys(quizAnswers).length;
+    
+    if (answeredCount < questions.length) {
+      toast.error("Please answer all questions before submitting");
+      return;
+    }
+    
+    setSubmittingQuiz(true);
+    
+    // Calculate score locally
+    let correct = 0;
+    questions.forEach((q, idx) => {
+      if (quizAnswers[idx] === q.answer) {
+        correct++;
+      }
+    });
+    
+    const score = (correct / questions.length) * 100;
+    const passingScore = currentLesson.quiz_passing_score || 60;
+    const passed = score >= passingScore;
+    
+    setQuizResult({
+      score,
+      correct,
+      total: questions.length,
+      passed,
+      passingScore
+    });
+    setQuizSubmitted(true);
+    setSubmittingQuiz(false);
+    
+    if (passed) {
+      toast.success(`Quiz passed! Score: ${score.toFixed(0)}%`);
+      // Auto-complete if passed
+      await completeLesson();
+    } else {
+      toast.error(`Quiz failed. Score: ${score.toFixed(0)}%. You need ${passingScore}% to pass.`);
+    }
+  };
+  
+  const handleQuizRetry = () => {
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizResult(null);
+  };
+  
+  // Reset quiz state when lesson changes
+  useEffect(() => {
+    if (currentLesson?.content_type === 'quiz') {
+      setQuizAnswers({});
+      setQuizSubmitted(false);
+      setQuizResult(null);
+    }
+  }, [currentLesson?.id]);
+
   const getLessonIcon = (type) => {
     switch (type) {
       case 'video': return <Play size={16} />;
@@ -230,6 +290,137 @@ const CoursePlayer = () => {
       case 'reading': return <BookOpen size={16} />;
       default: return <FileText size={16} />;
     }
+  };
+
+  // Quiz Component
+  const QuizComponent = ({ lesson, quizAnswers, setQuizAnswers, quizSubmitted, quizResult, submittingQuiz, onSubmit, onRetry, isCompleted }) => {
+    const questions = lesson?.quiz_data?.questions || [];
+    
+    if (questions.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <HelpCircle size={48} className="mx-auto mb-4 text-slate-400" />
+          <p className="text-slate-300 mb-4">No questions available for this quiz</p>
+        </div>
+      );
+    }
+    
+    // Show result screen
+    if (quizSubmitted && quizResult) {
+      return (
+        <div className="space-y-6" data-testid="quiz-result">
+          <div className={`p-6 rounded-lg text-center ${quizResult.passed ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+            {quizResult.passed ? (
+              <CheckCircle2 size={48} className="mx-auto mb-4 text-emerald-400" />
+            ) : (
+              <XCircle size={48} className="mx-auto mb-4 text-red-400" />
+            )}
+            <h3 className="text-xl font-bold text-white mb-2">
+              {quizResult.passed ? 'Quiz Passed!' : 'Quiz Failed'}
+            </h3>
+            <p className="text-slate-300">
+              You scored <strong>{quizResult.score.toFixed(0)}%</strong> ({quizResult.correct}/{quizResult.total} correct)
+            </p>
+            <p className="text-slate-400 text-sm mt-1">
+              Passing score: {quizResult.passingScore}%
+            </p>
+          </div>
+          
+          {/* Show answers review */}
+          <div className="space-y-4">
+            {questions.map((q, qIdx) => {
+              const userAnswer = quizAnswers[qIdx];
+              const isCorrect = userAnswer === q.answer;
+              
+              return (
+                <div key={qIdx} className={`p-4 rounded-lg border ${isCorrect ? 'border-emerald-600 bg-emerald-900/20' : 'border-red-600 bg-red-900/20'}`}>
+                  <div className="flex items-start gap-2 mb-3">
+                    {isCorrect ? (
+                      <CheckCircle2 size={18} className="text-emerald-400 mt-1" />
+                    ) : (
+                      <XCircle size={18} className="text-red-400 mt-1" />
+                    )}
+                    <p className="text-white font-medium">{q.q}</p>
+                  </div>
+                  <div className="pl-6 space-y-1">
+                    {(q.options || []).map((opt, oIdx) => (
+                      <p key={oIdx} className={`text-sm ${
+                        oIdx === q.answer ? 'text-emerald-400 font-medium' : 
+                        oIdx === userAnswer && !isCorrect ? 'text-red-400 line-through' : 
+                        'text-slate-400'
+                      }`}>
+                        {String.fromCharCode(65 + oIdx)}. {opt}
+                        {oIdx === q.answer && ' ✓'}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {!quizResult.passed && !isCompleted && (
+            <Button onClick={onRetry} className="w-full bg-blue-600 hover:bg-blue-700" data-testid="retry-quiz-btn">
+              Try Again
+            </Button>
+          )}
+        </div>
+      );
+    }
+    
+    // Show quiz questions
+    return (
+      <div className="space-y-6" data-testid="quiz-questions">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-medium">Assessment</h3>
+            <p className="text-slate-400 text-sm">
+              {questions.length} questions • Passing score: {lesson.quiz_passing_score || 60}%
+            </p>
+          </div>
+          {lesson.quiz_attempts_allowed && (
+            <span className="text-slate-400 text-sm">
+              Attempts: {lesson.quiz_attempts_allowed}
+            </span>
+          )}
+        </div>
+        
+        {questions.map((q, qIdx) => (
+          <div key={qIdx} className="p-4 bg-slate-700/50 rounded-lg space-y-3">
+            <p className="text-white font-medium">
+              {qIdx + 1}. {q.q}
+            </p>
+            <RadioGroup 
+              value={String(quizAnswers[qIdx] ?? '')} 
+              onValueChange={(value) => setQuizAnswers({...quizAnswers, [qIdx]: parseInt(value)})}
+            >
+              {(q.options || []).map((opt, oIdx) => (
+                <div key={oIdx} className="flex items-center space-x-3 p-2 rounded hover:bg-slate-600/50">
+                  <RadioGroupItem value={String(oIdx)} id={`q${qIdx}-o${oIdx}`} />
+                  <Label htmlFor={`q${qIdx}-o${oIdx}`} className="text-slate-300 cursor-pointer flex-1">
+                    {opt}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+        ))}
+        
+        <Button 
+          onClick={onSubmit} 
+          disabled={submittingQuiz}
+          className="w-full bg-emerald-600 hover:bg-emerald-700"
+          data-testid="submit-quiz-btn"
+        >
+          {submittingQuiz ? (
+            <div className="spinner w-4 h-4 mr-2"></div>
+          ) : (
+            <Check size={18} className="mr-2" />
+          )}
+          Submit Quiz
+        </Button>
+      </div>
+    );
   };
 
   if (loading) {
