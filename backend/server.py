@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, Response, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -16,6 +16,7 @@ import bcrypt
 import secrets
 import string
 import io
+import base64
 
 # Email with Resend
 import resend
