@@ -1050,6 +1050,242 @@ async def update_course(
     course = await db.courses.find_one({"id": course_id}, {"_id": 0})
     return course
 
+# ============== PUBLIC COURSE ENDPOINTS (No Auth) ==============
+
+@api_router.get("/courses/public")
+async def get_public_courses():
+    """Get all active courses for public display (no authentication required)"""
+    courses = await db.courses.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    for course in courses:
+        modules = await db.modules.find({"course_id": course["id"], "is_active": True}, {"_id": 0}).sort("order", 1).to_list(100)
+        course["modules"] = modules
+    return courses
+
+@api_router.get("/courses/public/{course_id}")
+async def get_public_course(course_id: str):
+    """Get a single course for public display (no authentication required)"""
+    course = await db.courses.find_one({"id": course_id}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    modules = await db.modules.find({"course_id": course_id, "is_active": True}, {"_id": 0}).sort("order", 1).to_list(100)
+    course["modules"] = modules
+    return course
+
+# ============== STRIPE APPLICATION ENDPOINTS ==============
+
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+
+APPLICATION_FEE_EUR = float(os.environ.get('APPLICATION_FEE_EUR', '50.00'))
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+
+class ApplicationCreate(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    phone: str
+    course_id: str
+    origin_url: str
+
+@api_router.post("/applications/create")
+async def create_application(app_data: ApplicationCreate):
+    """Create a new application and initiate Stripe payment"""
+    
+    # Check if course exists
+    course = await db.courses.find_one({"id": app_data.course_id}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Check if user already has a pending/active enrollment
+    existing_app = await db.applications.find_one({
+        "email": app_data.email,
+        "status": {"$in": ["pending", "approved", "enrolled"]}
+    })
+    if existing_app:
+        raise HTTPException(status_code=400, detail="You already have an active application or enrollment. Complete your current program before applying to another.")
+    
+    # Create application record
+    application_id = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
+    
+    application = {
+        "id": application_id,
+        "first_name": app_data.first_name,
+        "last_name": app_data.last_name,
+        "email": app_data.email,
+        "phone": app_data.phone,
+        "course_id": app_data.course_id,
+        "course_title": course.get("title", ""),
+        "status": "pending_payment",
+        "payment_status": "pending",
+        "amount": APPLICATION_FEE_EUR,
+        "currency": "EUR",
+        "session_id": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Create Stripe checkout session
+    try:
+        stripe_checkout = StripeCheckout(
+            api_key=STRIPE_SECRET_KEY,
+            webhook_url=f"{app_data.origin_url}/api/webhook/stripe"
+        )
+        
+        success_url = f"{app_data.origin_url}/application/success?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{app_data.origin_url}/course/{app_data.course_id}"
+        
+        checkout_request = CheckoutSessionRequest(
+            amount=APPLICATION_FEE_EUR,
+            currency="eur",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "application_id": application_id,
+                "email": app_data.email,
+                "course_id": app_data.course_id,
+                "type": "application_fee"
+            }
+        )
+        
+        session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Update application with session ID
+        application["session_id"] = session.session_id
+        
+        # Save to database
+        await db.applications.insert_one(application)
+        
+        # Also save to payment_transactions
+        payment_transaction = {
+            "id": str(uuid.uuid4()),
+            "session_id": session.session_id,
+            "application_id": application_id,
+            "email": app_data.email,
+            "amount": APPLICATION_FEE_EUR,
+            "currency": "EUR",
+            "payment_status": "pending",
+            "type": "application_fee",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payment_transactions.insert_one(payment_transaction)
+        
+        return {"checkout_url": session.url, "session_id": session.session_id}
+        
+    except Exception as e:
+        logger.error(f"Stripe checkout error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
+
+@api_router.get("/applications/status/{session_id}")
+async def get_application_status(session_id: str):
+    """Get the status of an application by Stripe session ID"""
+    
+    # First check our database
+    application = await db.applications.find_one({"session_id": session_id}, {"_id": 0})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # If already processed, return cached status
+    if application.get("payment_status") == "paid":
+        return {
+            "status": application.get("status"),
+            "payment_status": "paid"
+        }
+    
+    # Check with Stripe
+    try:
+        stripe_checkout = StripeCheckout(api_key=STRIPE_SECRET_KEY, webhook_url="")
+        checkout_status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+        
+        # Update application if payment completed
+        if checkout_status.payment_status == "paid":
+            await db.applications.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "payment_status": "paid",
+                    "status": "pending_review",
+                    "paid_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Update payment transaction
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {"payment_status": "paid"}}
+            )
+            
+            # Send confirmation email
+            try:
+                await send_application_received_email(
+                    application["email"],
+                    application["first_name"],
+                    application["course_title"]
+                )
+            except Exception as e:
+                logger.error(f"Failed to send confirmation email: {e}")
+        
+        return {
+            "status": checkout_status.status,
+            "payment_status": checkout_status.payment_status
+        }
+        
+    except Exception as e:
+        logger.error(f"Stripe status check error: {str(e)}")
+        return {
+            "status": application.get("status"),
+            "payment_status": application.get("payment_status")
+        }
+
+async def send_application_received_email(email: str, first_name: str, course_title: str):
+    """Send confirmation email when application is received"""
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); color: white; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0;">GITB</h1>
+            <p style="margin: 5px 0 0 0; font-size: 12px;">Global Institute of Tech and Business</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #3d7a4a;">Application Received!</h2>
+            
+            <p>Dear {first_name},</p>
+            
+            <p>Thank you for applying to <strong>{course_title}</strong> at GITB!</p>
+            
+            <p>Your application has been received and your payment of <strong>€50.00</strong> has been confirmed.</p>
+            
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p style="margin: 0; color: #2e7d32;"><strong>What happens next?</strong></p>
+                <p style="margin: 10px 0 0 0;">Our admissions team will review your application. You will receive another email within 3-5 business days with your admission decision.</p>
+            </div>
+            
+            <p>If you have any questions, please contact us at support@gitb.lt</p>
+            
+            <p>Best regards,<br><strong>GITB Admissions Team</strong></p>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+            <p>© {datetime.now().year} Global Institute of Tech and Business. All rights reserved.</p>
+            <p>Vilnius, Lithuania | support@gitb.lt</p>
+        </div>
+    </div>
+    """
+    
+    params = {
+        "from": f"GITB Admissions <{ADMIN_EMAIL}>",
+        "to": [email],
+        "subject": f"Application Received - {course_title}",
+        "html": html_content
+    }
+    
+    resend.Emails.send(params)
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request_body: bytes = Depends(lambda r: r.body())):
+    """Handle Stripe webhooks"""
+    # This is a simplified webhook handler
+    # In production, verify the webhook signature
+    return {"received": True}
+
 # ============== MODULE ENDPOINTS ==============
 
 @api_router.get("/courses/{course_id}/modules")
