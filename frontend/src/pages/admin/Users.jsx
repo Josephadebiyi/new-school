@@ -280,19 +280,30 @@ const AdminUsers = () => {
 
   return (
     <div className="space-y-6" data-testid="admin-users">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">User Management</h2>
           <p className="text-gray-500 text-sm mt-1">Manage all users, lock accounts, and handle student expulsions</p>
         </div>
         
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <button className="btn-modern btn-modern-dark" data-testid="add-user-btn">
-              <UserPlus size={18} className="mr-2" />
-              Add User
-            </button>
-          </DialogTrigger>
+        <div className="flex gap-3">
+          <button 
+            onClick={exportStudentsToExcel}
+            className="btn-modern flex items-center bg-emerald-600 hover:bg-emerald-700 text-white"
+            data-testid="export-students-btn"
+          >
+            <Download size={18} className="mr-2" />
+            Export Students ({studentCount})
+          </button>
+          
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <button className="btn-modern btn-modern-dark" data-testid="add-user-btn">
+                <UserPlus size={18} className="mr-2" />
+                Add User
+              </button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create New User</DialogTitle>
