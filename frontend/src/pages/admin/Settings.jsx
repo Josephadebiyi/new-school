@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
 import { Separator } from "../../components/ui/separator";
-import { Settings, Upload, Palette, Save, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Settings, Upload, Palette, Save, RefreshCw, Building, Image, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminSettings = () => {
@@ -20,7 +22,17 @@ const AdminSettings = () => {
     primary_color: "#0F172A",
     secondary_color: "#D32F2F",
     support_email: "",
-    support_phone: ""
+    support_phone: "",
+    // Bank Details
+    bank_name: "",
+    account_name: "",
+    account_number: "",
+    iban: "",
+    swift_code: "",
+    // Login Page Customization
+    login_image_url: "",
+    login_headline: "",
+    login_subtext: ""
   });
 
   useEffect(() => {
@@ -32,7 +44,17 @@ const AdminSettings = () => {
         primary_color: systemConfig.primary_color || "#0F172A",
         secondary_color: systemConfig.secondary_color || "#D32F2F",
         support_email: systemConfig.support_email || "",
-        support_phone: systemConfig.support_phone || ""
+        support_phone: systemConfig.support_phone || "",
+        // Bank Details
+        bank_name: systemConfig.bank_name || "",
+        account_name: systemConfig.account_name || "",
+        account_number: systemConfig.account_number || "",
+        iban: systemConfig.iban || "",
+        swift_code: systemConfig.swift_code || "",
+        // Login Page Customization
+        login_image_url: systemConfig.login_image_url || "",
+        login_headline: systemConfig.login_headline || "Learn with",
+        login_subtext: systemConfig.login_subtext || "Affordable higher education you can take wherever life takes you."
       });
     }
   }, [systemConfig]);
