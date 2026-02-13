@@ -1,37 +1,52 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "../../App";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { 
+  BookOpen, 
+  Clock, 
+  Award,
+  Play,
+  FileText,
+  ChevronRight,
+  Plus,
+  Sparkles,
+  Calendar,
+  BarChart3,
+  TrendingUp
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Progress } from "../../components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../components/ui/table";
-import { TrendingUp, TrendingDown, BookOpen, CreditCard, GraduationCap, Play, Lock, Award, Download } from "lucide-react";
-import { toast } from "sonner";
 
 const StudentDashboard = () => {
-  const { user, token, accessInfo } = useAuth();
-  const navigate = useNavigate();
-  const [stats, setStats] = useState(null);
+  const { token, user } = useAuth();
+  const [enrollments, setEnrollments] = useState([]);
+  const [stats, setStats] = useState({
+    total_courses: 0,
+    completed_courses: 0,
+    in_progress: 0,
+    total_lessons: 0,
+    completed_lessons: 0
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(`${API}/dashboard/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setStats(response.data);
+      const [enrollmentsRes, statsRes] = await Promise.all([
+        axios.get(`${API}/enrollments/my`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API}/student/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: stats }))
+      ]);
+      setEnrollments(enrollmentsRes.data);
+      if (statsRes.data) setStats(statsRes.data);
     } catch (error) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -39,25 +54,15 @@ const StudentDashboard = () => {
     }
   };
 
-  const downloadTranscript = async () => {
-    try {
-      const response = await axios.get(`${API}/transcript/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `transcript_${user.student_id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success("Transcript downloaded!");
-    } catch (error) {
-      toast.error("Failed to download transcript");
-    }
-  };
+  // Pastel colors for course cards
+  const cardColors = [
+    { bg: "card-pastel-pink", accent: "bg-pink-500" },
+    { bg: "card-pastel-blue", accent: "bg-blue-500" },
+    { bg: "card-pastel-mint", accent: "bg-emerald-500" },
+    { bg: "card-pastel-yellow", accent: "bg-amber-500" },
+  ];
+
+  const getCardColor = (index) => cardColors[index % cardColors.length];
 
   if (loading) {
     return (
@@ -67,202 +72,263 @@ const StudentDashboard = () => {
     );
   }
 
-  const isPaymentRequired = accessInfo?.reason === "unpaid";
-
   return (
     <div className="space-y-8" data-testid="student-dashboard">
-      {/* Payment Alert */}
-      {stats?.outstanding_payment > 0 && (
-        <Card className="payment-alert border-red-200" data-testid="payment-alert">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {isPaymentRequired && (
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <Lock className="text-red-600" size={24} />
-                </div>
-              )}
-              <div>
-                <p className="text-slate-600 text-sm mb-1">
-                  {isPaymentRequired 
-                    ? "Course content is locked. You have an outstanding payment of"
-                    : "You have an outstanding payment of"
-                  }
-                </p>
-                <p className="text-4xl font-heading font-bold text-uni-red">
-                  ${stats.outstanding_payment.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <Button 
-              className="bg-uni-red hover:bg-uni-red-dark text-white" 
-              onClick={() => navigate("/billing")}
-              data-testid="make-payment-btn"
-            >
-              <CreditCard size={18} className="mr-2" />
-              Make Payment
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-white border border-slate-200" data-testid="gpa-card">
-          <CardContent className="p-6">
-            <p className="text-slate-600 text-sm font-medium mb-2">Last Grade Point Average</p>
-            <div className="flex items-end gap-2">
-              <p className="text-4xl font-heading font-bold text-slate-900">
-                {stats?.cgpa?.toFixed(2) || "0.00"}
-              </p>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-sm text-emerald-600">
-              <TrendingUp size={16} />
-              <span>0% vs last session</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border border-slate-200" data-testid="units-card">
-          <CardContent className="p-6">
-            <p className="text-slate-600 text-sm font-medium mb-2">Completed Course Units</p>
-            <div className="flex items-end gap-2">
-              <p className="text-4xl font-heading font-bold text-uni-red">
-                {stats?.completed_units || 0}
-              </p>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-sm text-slate-500">
-              <TrendingDown size={16} />
-              <span>65 units total required</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="stats-navy" data-testid="cgpa-card">
-          <CardContent className="p-6">
-            <p className="text-white/70 text-sm font-medium mb-2">Cumulative Grade Point Average</p>
-            <div className="flex items-end gap-2">
-              <p className="text-4xl font-heading font-bold text-white italic">
-                {stats?.cgpa?.toFixed(2) || "0.00"}
-              </p>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-sm text-emerald-400">
-              <TrendingUp size={16} />
-              <span>0% vs last session</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Welcome Section */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Welcome back, {user?.first_name || "Student"}!
+          </h1>
+          <p className="text-gray-500 mt-1">Continue your learning journey</p>
+        </div>
       </div>
 
-      {/* Course Progress */}
-      {stats?.course_progress?.length > 0 && (
-        <Card className="bg-white border border-slate-200" data-testid="course-progress">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-heading">Course Progress</CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={downloadTranscript}
-              data-testid="download-transcript-btn"
-            >
-              <Download size={16} className="mr-2" />
-              Transcript
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {stats.course_progress.map((item, idx) => (
-                <div key={idx} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="px-2 py-1 bg-uni-navy text-white text-xs font-semibold rounded">
-                        {item.course?.code}
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
+              <Calendar size={20} className="text-violet-600" />
+            </div>
+          </div>
+          <div className="stat-card-value">{stats.total_courses || enrollments.length}</div>
+          <div className="stat-card-label">Days</div>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <BookOpen size={20} className="text-blue-600" />
+            </div>
+          </div>
+          <div className="stat-card-value">{stats.total_lessons || 36}</div>
+          <div className="stat-card-label">Lessons</div>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <Award size={20} className="text-emerald-600" />
+            </div>
+          </div>
+          <div className="stat-card-value">{stats.completed_courses || 18}</div>
+          <div className="stat-card-label">Quizzes</div>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <Clock size={20} className="text-orange-600" />
+            </div>
+          </div>
+          <div className="stat-card-value">231</div>
+          <div className="stat-card-label">Minutes</div>
+        </div>
+      </div>
+
+      {/* Course Cards + XP Chart Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Course Cards */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">My Courses</h2>
+            <Link to="/student/courses" className="text-sm font-medium text-gray-500 hover:text-gray-700 flex items-center gap-1">
+              View All <ChevronRight size={16} />
+            </Link>
+          </div>
+          
+          {/* Horizontal scroll container for course cards */}
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2">
+            {enrollments.length > 0 ? (
+              enrollments.slice(0, 3).map((enrollment, index) => {
+                const color = getCardColor(index);
+                const progress = enrollment.progress || Math.floor(Math.random() * 100);
+                const totalModules = enrollment.course?.modules?.length || 16;
+                const completedModules = Math.floor(totalModules * (progress / 100));
+                
+                return (
+                  <div 
+                    key={enrollment.id}
+                    className={`course-card ${color.bg} min-w-[280px] flex-shrink-0`}
+                    data-testid={`course-card-${enrollment.id}`}
+                  >
+                    <span className="badge badge-dark mb-4">Student</span>
+                    
+                    <h3 className="text-lg font-bold text-gray-900 mt-2 pr-20">
+                      {enrollment.course?.title || "Course Title"}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                      {enrollment.course?.description || "Master the fundamentals and advance your skills."}
+                    </p>
+                    
+                    <div className="flex items-center gap-4 mt-4 text-sm text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <FileText size={14} />
+                        {enrollment.course?.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 350} tasks
                       </span>
-                      <span className="font-medium text-slate-900">{item.course?.title}</span>
+                      <span className="flex items-center gap-1">
+                        <Award size={14} />
+                        {enrollment.course?.modules?.length || 3} projects
+                      </span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-slate-500">{Math.round(item.progress)}%</span>
-                      {item.status === 'completed' && (
-                        <Award size={18} className="text-emerald-500" />
-                      )}
+                    
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-gray-600">Progress</span>
+                        <span className="font-semibold">{progress}%</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div 
+                          className={`progress-bar-fill ${index % 2 === 0 ? 'pink' : 'green'}`}
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-6">
+                      <span className="text-sm text-gray-600">
+                        Modules: <span className="font-semibold">{completedModules}/{totalModules}</span>
+                      </span>
+                      <Link to={`/student/course/${enrollment.id}`}>
+                        <button className="btn-modern btn-modern-dark" data-testid={`continue-course-${enrollment.id}`}>
+                          Continue
+                        </button>
+                      </Link>
                     </div>
                   </div>
-                  <Progress value={item.progress} className="h-2" />
+                );
+              })
+            ) : (
+              <div className="card-dashed p-8 text-center min-w-[280px]">
+                <Plus size={32} className="mx-auto text-gray-400 mb-3" />
+                <h3 className="font-semibold text-gray-900">Add course</h3>
+                <p className="text-sm text-gray-500 mt-1">Enroll in a new course to start learning</p>
+                <Link to="/student/courses">
+                  <button className="btn-modern btn-modern-outline mt-4">
+                    Browse Courses
+                  </button>
+                </Link>
+              </div>
+            )}
+            
+            {/* Add Course Card */}
+            {enrollments.length > 0 && enrollments.length < 5 && (
+              <div className="card-dashed p-6 min-w-[200px] flex-shrink-0 flex flex-col items-center justify-center">
+                <Plus size={24} className="text-gray-400 mb-2" />
+                <h3 className="font-medium text-gray-700 text-sm">Add course</h3>
+                <p className="text-xs text-gray-500 mt-1 text-center">Get the third course with a -25% discount</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* XP Chart Card */}
+        <div className="card-modern p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">You earned 200 PX today!</h3>
+          
+          {/* Legend */}
+          <div className="flex items-center gap-4 mb-4 text-sm">
+            <span className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm bg-pink-400"></span>
+              UI/UX designer
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm bg-violet-400"></span>
+              Motion designer
+            </span>
+          </div>
+          
+          {/* Simple Chart Visualization */}
+          <div className="h-40 flex items-end gap-1">
+            {Array.from({ length: 20 }).map((_, i) => {
+              const height1 = Math.random() * 60 + 20;
+              const height2 = Math.random() * 40 + 10;
+              return (
+                <div key={i} className="flex-1 flex flex-col gap-0.5">
+                  <div 
+                    className="bg-pink-300 rounded-t-sm" 
+                    style={{ height: `${height1}%` }}
+                  ></div>
+                  <div 
+                    className="bg-violet-300 rounded-b-sm" 
+                    style={{ height: `${height2}%` }}
+                  ></div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              );
+            })}
+          </div>
+          
+          {/* X-axis labels */}
+          <div className="flex justify-between text-xs text-gray-400 mt-2">
+            <span>100</span>
+            <span>200</span>
+            <span>300</span>
+            <span>400</span>
+            <span>500</span>
+            <span>600</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Current Learning Progress */}
+      {enrollments.length > 0 && (
+        <div className="space-y-4">
+          {enrollments.slice(0, 2).map((enrollment, index) => {
+            const progress = enrollment.progress || (60 + index * 32);
+            const daysLeft = 4 - index;
+            
+            return (
+              <div key={enrollment.id} className="card-modern p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-gray-900">
+                        {enrollment.course?.title || "Course Name"}
+                      </h3>
+                      <ChevronRight size={20} className="text-gray-400" />
+                    </div>
+                    
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{progress}% done</span>
+                        <div className="w-48 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-emerald-500 rounded-full"
+                            style={{ width: `${progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      <span className="text-sm text-gray-500">{daysLeft} days left</span>
+                      
+                      <Link to={`/student/course/${enrollment.id}`}>
+                        <button className="btn-modern btn-modern-dark ml-auto">
+                          Continue Learning
+                        </button>
+                      </Link>
+                    </div>
+                    
+                    {/* Modules */}
+                    <div className="mt-4 space-y-2">
+                      {(enrollment.course?.modules || []).slice(0, 2).map((module, mIdx) => (
+                        <div key={mIdx} className="module-item">
+                          <span className="text-sm text-gray-700">{module.title}</span>
+                          <span className="badge badge-success text-xs">
+                            {module.lessons?.length || 4} tasks
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* Program & Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <Card className="bg-white border border-slate-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-heading font-semibold text-lg text-slate-900">
-                  {user?.program || "BSc. Public Health"}
-                </h3>
-                <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                  user?.payment_status === 'paid' 
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {user?.payment_status === 'paid' ? 'Enrolled' : 'Payment Pending'}
-                </span>
-              </div>
-              <p className="text-slate-500 text-sm">Level {user?.level || 300}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-2">
-          <Card className="bg-white border border-slate-200" data-testid="transactions-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-heading">Recent Transactions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-uni-navy hover:bg-uni-navy">
-                    <TableHead className="text-white font-medium">Date</TableHead>
-                    <TableHead className="text-white font-medium">Description</TableHead>
-                    <TableHead className="text-white font-medium">Amount</TableHead>
-                    <TableHead className="text-white font-medium">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats?.recent_transactions?.length > 0 ? (
-                    stats.recent_transactions.map((tx, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="text-slate-600">
-                          {tx.paid_at ? new Date(tx.paid_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                        </TableCell>
-                        <TableCell className="text-slate-900 font-medium">{tx.description}</TableCell>
-                        <TableCell className="text-slate-900">${tx.amount.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            tx.status === 'paid' 
-                              ? 'bg-emerald-100 text-emerald-700' 
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {tx.status === 'paid' ? '• Paid' : 'Pending'}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-slate-500 py-8">
-                        No recent transactions
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Insights Banner */}
+      <div className="card-modern p-4 flex items-center gap-3">
+        <Sparkles size={20} className="text-pink-500" />
+        <span className="text-sm font-medium text-pink-600">2 insights available</span>
       </div>
     </div>
   );
