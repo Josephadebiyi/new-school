@@ -57,7 +57,10 @@ const CourseBuilder = () => {
     content_type: "video",
     url: "",
     description: "",
-    order: 0
+    order: 0,
+    quiz_attempts_allowed: 3,
+    quiz_passing_score: 60,
+    quiz_data: { questions: [] }
   });
 
   useEffect(() => {
