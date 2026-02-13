@@ -195,55 +195,55 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Quick Actions */}
-        <div className="lg:col-span-2 card-modern p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <Link to="/admin/users" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+        <div className="lg:col-span-2 card-modern p-4 md:p-6">
+          <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+            <Link to="/admin/users" className="module-item border rounded-xl p-3 md:p-4 hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Users size={20} className="text-blue-600" />
+                <div className="w-9 md:w-10 h-9 md:h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Users size={18} className="text-blue-600" />
                 </div>
                 <div>
-                  <div className="font-medium text-gray-900">Manage Users</div>
-                  <div className="text-sm text-gray-500">Lock/unlock accounts</div>
+                  <div className="font-medium text-gray-900 text-sm md:text-base">Manage Users</div>
+                  <div className="text-xs md:text-sm text-gray-500">Lock/unlock accounts</div>
                 </div>
               </div>
             </Link>
             
-            <Link to="/admin/courses" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+            <Link to="/admin/courses" className="module-item border rounded-xl p-3 md:p-4 hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
-                  <BookOpen size={20} className="text-violet-600" />
+                <div className="w-9 md:w-10 h-9 md:h-10 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <BookOpen size={18} className="text-violet-600" />
                 </div>
                 <div>
-                  <div className="font-medium text-gray-900">Manage Courses</div>
-                  <div className="text-sm text-gray-500">Add/edit courses</div>
+                  <div className="font-medium text-gray-900 text-sm md:text-base">Manage Courses</div>
+                  <div className="text-xs md:text-sm text-gray-500">Add/edit courses</div>
                 </div>
               </div>
             </Link>
             
-            <Link to="/admin/admissions" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+            <Link to="/admin/admissions" className="module-item border rounded-xl p-3 md:p-4 hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <GraduationCap size={20} className="text-emerald-600" />
+                <div className="w-9 md:w-10 h-9 md:h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <GraduationCap size={18} className="text-emerald-600" />
                 </div>
                 <div>
-                  <div className="font-medium text-gray-900">Admissions</div>
-                  <div className="text-sm text-gray-500">Grant/decline applications</div>
+                  <div className="font-medium text-gray-900 text-sm md:text-base">Admissions</div>
+                  <div className="text-xs md:text-sm text-gray-500">Grant/decline applications</div>
                 </div>
               </div>
             </Link>
             
-            <Link to="/admin/payments" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+            <Link to="/admin/payments" className="module-item border rounded-xl p-3 md:p-4 hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <CreditCard size={20} className="text-amber-600" />
+                <div className="w-9 md:w-10 h-9 md:h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <CreditCard size={18} className="text-amber-600" />
                 </div>
                 <div>
-                  <div className="font-medium text-gray-900">Payments</div>
-                  <div className="text-sm text-gray-500">Confirm payments</div>
+                  <div className="font-medium text-gray-900 text-sm md:text-base">Payments</div>
+                  <div className="text-xs md:text-sm text-gray-500">Confirm payments</div>
                 </div>
               </div>
             </Link>
