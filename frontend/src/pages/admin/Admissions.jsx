@@ -26,42 +26,45 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
-import { FileText, Clock, CheckCircle, XCircle, UserPlus, Mail, Copy } from "lucide-react";
+import { 
+  FileText, Clock, CheckCircle, XCircle, UserPlus, Mail, Copy, 
+  Download, CreditCard, GraduationCap, Euro
+} from "lucide-react";
 import { toast } from "sonner";
 
 const AdminAdmissions = () => {
   const { token } = useAuth();
-  const [admissions, setAdmissions] = useState([]);
+  const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [grantDialog, setGrantDialog] = useState({ open: false, data: null });
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    fetchAdmissions();
+    fetchApplications();
   }, [statusFilter]);
 
-  const fetchAdmissions = async () => {
+  const fetchApplications = async () => {
     try {
       const url = statusFilter === "all" 
-        ? `${API}/admissions` 
-        : `${API}/admissions?status=${statusFilter}`;
+        ? `${API}/applications` 
+        : `${API}/applications?status=${statusFilter}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setAdmissions(response.data);
+      setApplications(response.data);
     } catch (error) {
-      toast.error("Failed to load admissions");
+      toast.error("Failed to load applications");
     } finally {
       setLoading(false);
     }
   };
 
-  const grantAdmission = async (admissionId) => {
+  const approveApplication = async (applicationId) => {
     setProcessing(true);
     try {
-      const response = await axios.put(
-        `${API}/admissions/${admissionId}/grant`,
+      const response = await axios.post(
+        `${API}/applications/${applicationId}/approve`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -72,29 +75,31 @@ const AdminAdmissions = () => {
           studentId: response.data.student_id,
           email: response.data.email,
           tempPassword: response.data.temp_password,
-          emailSent: response.data.email_sent
+          emailSent: response.data.email_sent,
+          admissionLetterUrl: response.data.admission_letter_url
         }
       });
       
-      fetchAdmissions();
+      fetchApplications();
+      toast.success("Application approved!");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to grant admission");
+      toast.error(error.response?.data?.detail || "Failed to approve application");
     } finally {
       setProcessing(false);
     }
   };
 
-  const declineAdmission = async (admissionId) => {
+  const rejectApplication = async (applicationId) => {
     try {
-      await axios.put(
-        `${API}/admissions/${admissionId}/decline`,
+      await axios.post(
+        `${API}/applications/${applicationId}/reject`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success("Application declined");
-      fetchAdmissions();
+      toast.success("Application rejected");
+      fetchApplications();
     } catch (error) {
-      toast.error("Failed to decline application");
+      toast.error("Failed to reject application");
     }
   };
 
@@ -103,16 +108,41 @@ const AdminAdmissions = () => {
     toast.success("Copied to clipboard!");
   };
 
+  const downloadAdmissionLetter = async (applicationId) => {
+    try {
+      const response = await axios.get(
+        `${API}/applications/${applicationId}/admission-letter`,
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        }
+      );
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `admission_letter_${applicationId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Admission letter downloaded");
+    } catch (error) {
+      toast.error("Failed to download admission letter");
+    }
+  };
+
   const stats = {
-    pending: admissions.filter(a => a.status === 'pending').length,
-    accepted: admissions.filter(a => a.status === 'accepted').length,
-    declined: admissions.filter(a => a.status === 'declined').length
+    pending_payment: applications.filter(a => a.status === 'pending_payment').length,
+    pending_review: applications.filter(a => a.status === 'pending_review').length,
+    approved: applications.filter(a => a.status === 'approved').length,
+    rejected: applications.filter(a => a.status === 'rejected').length,
+    total_revenue: applications.filter(a => a.payment_status === 'paid').reduce((sum, a) => sum + (a.amount || 50), 0)
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="spinner"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }
@@ -120,131 +150,203 @@ const AdminAdmissions = () => {
   return (
     <div className="space-y-6" data-testid="admin-admissions">
       <div className="flex items-center justify-between">
-        <h2 className="font-heading text-xl font-bold text-slate-900">Admissions Management</h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Applications & Admissions</h2>
+          <p className="text-gray-500 text-sm mt-1">Review and approve student applications</p>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-white border border-slate-200">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-              <Clock className="text-amber-600" size={24} />
-            </div>
-            <div>
-              <p className="text-slate-600 text-sm">Pending</p>
-              <p className="text-2xl font-heading font-bold text-slate-900">{stats.pending}</p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white border border-slate-200">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="text-emerald-600" size={24} />
-            </div>
-            <div>
-              <p className="text-slate-600 text-sm">Accepted</p>
-              <p className="text-2xl font-heading font-bold text-slate-900">{stats.accepted}</p>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center">
+                <CreditCard className="text-white" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-amber-700">{stats.pending_payment}</p>
+                <p className="text-xs text-amber-600">Pending Payment</p>
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-white border border-slate-200">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <XCircle className="text-red-600" size={24} />
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                <Clock className="text-white" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-blue-700">{stats.pending_review}</p>
+                <p className="text-xs text-blue-600">Pending Review</p>
+              </div>
             </div>
-            <div>
-              <p className="text-slate-600 text-sm">Declined</p>
-              <p className="text-2xl font-heading font-bold text-slate-900">{stats.declined}</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
+                <CheckCircle className="text-white" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-emerald-700">{stats.approved}</p>
+                <p className="text-xs text-emerald-600">Approved</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center">
+                <XCircle className="text-white" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-red-700">{stats.rejected}</p>
+                <p className="text-xs text-red-600">Rejected</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                <Euro className="text-white" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-purple-700">€{stats.total_revenue}</p>
+                <p className="text-xs text-purple-600">Total Revenue</p>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filter */}
-      <Card className="bg-white border border-slate-200">
+      <Card>
         <CardContent className="p-4">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48" data-testid="status-filter">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Applications</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="accepted">Accepted</SelectItem>
-              <SelectItem value="declined">Declined</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-4">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-48" data-testid="status-filter">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Applications</SelectItem>
+                <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                <SelectItem value="pending_review">Pending Review</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-gray-500">
+              Showing {applications.length} applications
+            </span>
+          </div>
         </CardContent>
       </Card>
 
       {/* Applications Table */}
-      <Card className="bg-white border border-slate-200">
+      <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-uni-navy hover:bg-uni-navy">
-                <TableHead className="text-white font-medium">Name</TableHead>
-                <TableHead className="text-white font-medium">Email</TableHead>
-                <TableHead className="text-white font-medium">Program</TableHead>
-                <TableHead className="text-white font-medium">Applied</TableHead>
-                <TableHead className="text-white font-medium">Status</TableHead>
-                <TableHead className="text-white font-medium">Actions</TableHead>
+              <TableRow className="bg-gray-50">
+                <TableHead className="font-semibold">Applicant</TableHead>
+                <TableHead className="font-semibold">Course</TableHead>
+                <TableHead className="font-semibold">Payment</TableHead>
+                <TableHead className="font-semibold">Applied</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {admissions.length > 0 ? (
-                admissions.map((admission) => (
-                  <TableRow key={admission.id}>
-                    <TableCell className="font-medium text-slate-900">
-                      {admission.first_name} {admission.last_name}
+              {applications.length > 0 ? (
+                applications.map((app) => (
+                  <TableRow key={app.id} className="hover:bg-gray-50">
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-gray-900">{app.first_name} {app.last_name}</p>
+                        <p className="text-xs text-gray-500">{app.email}</p>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-slate-600">{admission.email}</TableCell>
-                    <TableCell className="text-slate-600">{admission.program}</TableCell>
-                    <TableCell className="text-slate-600">
-                      {admission.created_at ? new Date(admission.created_at).toLocaleDateString() : '-'}
+                    <TableCell>
+                      <p className="text-gray-700">{app.course_title || 'N/A'}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          app.payment_status === 'paid' 
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {app.payment_status === 'paid' ? '€50 Paid' : 'Pending'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-600 text-sm">
+                      {app.created_at ? new Date(app.created_at).toLocaleDateString() : '-'}
                     </TableCell>
                     <TableCell>
                       <span className={`px-3 py-1 rounded text-xs font-semibold ${
-                        admission.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
-                        admission.status === 'declined' ? 'bg-red-100 text-red-700' :
+                        app.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                        app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        app.status === 'pending_review' ? 'bg-blue-100 text-blue-700' :
                         'bg-amber-100 text-amber-700'
                       }`}>
-                        {admission.status}
+                        {app.status?.replace('_', ' ') || 'pending'}
                       </span>
                     </TableCell>
                     <TableCell>
-                      {admission.status === 'pending' && (
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => grantAdmission(admission.id)}
-                            disabled={processing}
-                            data-testid={`grant-btn-${admission.id}`}
-                          >
-                            <UserPlus size={14} className="mr-1" />
-                            Grant Admission
-                          </Button>
+                      <div className="flex items-center gap-2">
+                        {app.status === 'pending_review' && (
+                          <>
+                            <Button 
+                              size="sm" 
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => approveApplication(app.id)}
+                              disabled={processing}
+                              data-testid={`approve-btn-${app.id}`}
+                            >
+                              <CheckCircle size={14} className="mr-1" />
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => rejectApplication(app.id)}
+                              data-testid={`reject-btn-${app.id}`}
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                        {app.status === 'approved' && (
                           <Button 
                             size="sm" 
                             variant="outline"
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                            onClick={() => declineAdmission(admission.id)}
-                            data-testid={`decline-btn-${admission.id}`}
+                            onClick={() => downloadAdmissionLetter(app.id)}
                           >
-                            Decline
+                            <Download size={14} className="mr-1" />
+                            Admission Letter
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-slate-500 py-8">
-                    No applications found
+                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    <GraduationCap size={40} className="mx-auto mb-2 opacity-40" />
+                    <p>No applications found</p>
                   </TableCell>
                 </TableRow>
               )}
@@ -253,24 +355,24 @@ const AdminAdmissions = () => {
         </CardContent>
       </Card>
 
-      {/* Grant Success Dialog */}
+      {/* Approval Success Dialog */}
       <Dialog open={grantDialog.open} onOpenChange={(open) => setGrantDialog({ open, data: null })}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-emerald-600">
               <CheckCircle size={24} />
-              Admission Granted Successfully
+              Application Approved!
             </DialogTitle>
             <DialogDescription>
-              The student account has been created. Below are the login credentials.
+              Student account created. Login credentials below.
             </DialogDescription>
           </DialogHeader>
           
           {grantDialog.data && (
             <div className="space-y-4 py-4">
-              <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600">Student ID:</span>
+                  <span className="text-gray-600">Student ID:</span>
                   <div className="flex items-center gap-2">
                     <code className="bg-white px-2 py-1 rounded font-mono text-sm">
                       {grantDialog.data.studentId}
@@ -286,7 +388,7 @@ const AdminAdmissions = () => {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600">Email:</span>
+                  <span className="text-gray-600">Email:</span>
                   <div className="flex items-center gap-2">
                     <code className="bg-white px-2 py-1 rounded font-mono text-sm">
                       {grantDialog.data.email}
@@ -302,7 +404,7 @@ const AdminAdmissions = () => {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600">Temp Password:</span>
+                  <span className="text-gray-600">Temp Password:</span>
                   <div className="flex items-center gap-2">
                     <code className="bg-white px-2 py-1 rounded font-mono text-sm text-red-600">
                       {grantDialog.data.tempPassword}
@@ -322,7 +424,7 @@ const AdminAdmissions = () => {
                 <Mail size={16} className={grantDialog.data.emailSent ? 'text-emerald-600' : 'text-amber-600'} />
                 <span className={grantDialog.data.emailSent ? 'text-emerald-600' : 'text-amber-600'}>
                   {grantDialog.data.emailSent 
-                    ? 'Welcome email sent to student' 
+                    ? 'Welcome email with admission letter sent' 
                     : 'Email notification pending'}
                 </span>
               </div>
