@@ -1097,6 +1097,8 @@ class ApplicationCreate(BaseModel):
     phone: str
     course_id: str
     origin_url: str
+    high_school_cert_url: Optional[str] = None
+    identification_url: Optional[str] = None
 
 @api_router.post("/applications/create")
 async def create_application(app_data: ApplicationCreate):
