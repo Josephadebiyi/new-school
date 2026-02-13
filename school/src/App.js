@@ -6,7 +6,8 @@ import {
   GraduationCap, BookOpen, Users, Award, Clock, ChevronRight, 
   Mail, Phone, MapPin, Globe, Check, Menu, X, ArrowRight, 
   Euro, Cog, Brain, Palette, Languages, Calculator, FlaskConical,
-  ChevronLeft, Facebook, Instagram, Twitter, Linkedin, Quote
+  ChevronLeft, Facebook, Instagram, Twitter, Linkedin, Quote,
+  Upload, FileCheck, FileImage
 } from 'lucide-react';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
