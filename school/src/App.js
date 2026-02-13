@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useParams } from 'react-router-dom';
 import axios from 'axios';
 import './index.css';
-import { GraduationCap, BookOpen, Users, Award, Clock, ChevronRight, Mail, Phone, MapPin, Globe, Check, Menu, X, Play, Star, ArrowRight, Calendar, DollarSign } from 'lucide-react';
+import { GraduationCap, BookOpen, Users, Award, Clock, ChevronRight, Mail, Phone, MapPin, Globe, Check, Menu, X, ArrowRight, Euro } from 'lucide-react';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
 
