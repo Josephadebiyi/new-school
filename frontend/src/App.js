@@ -282,6 +282,7 @@ function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="courses" element={<AdminCourses />} />
+            <Route path="courses/:courseId/edit" element={<CourseEditor />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="admissions" element={<AdminAdmissions />} />
             <Route path="payments" element={<AdminPayments />} />
