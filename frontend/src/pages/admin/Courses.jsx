@@ -29,11 +29,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/dialog";
-import { BookOpen, Plus, Search, Edit, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Search, Edit, Trash2, Clock, Users } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const AdminCourses = () => {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [loading, setLoading] = useState(true);
