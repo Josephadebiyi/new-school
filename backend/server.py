@@ -70,6 +70,7 @@ class PaymentStatus:
 class AccountStatus:
     ACTIVE = "active"
     LOCKED = "locked"
+    EXPELLED = "expelled"
 
 # System Config Model
 class SystemConfigUpdate(BaseModel):
@@ -80,6 +81,16 @@ class SystemConfigUpdate(BaseModel):
     secondary_color: Optional[str] = None
     support_email: Optional[str] = None
     support_phone: Optional[str] = None
+    # Bank Details
+    bank_name: Optional[str] = None
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
+    iban: Optional[str] = None
+    swift_code: Optional[str] = None
+    # Login Page Customization
+    login_image_url: Optional[str] = None
+    login_headline: Optional[str] = None
+    login_subtext: Optional[str] = None
 
 class SystemConfig(BaseModel):
     university_name: str = "LuminaLMS University"
@@ -89,6 +100,16 @@ class SystemConfig(BaseModel):
     secondary_color: str = "#D32F2F"
     support_email: str = ""
     support_phone: str = ""
+    # Bank Details
+    bank_name: str = ""
+    account_name: str = ""
+    account_number: str = ""
+    iban: str = ""
+    swift_code: str = ""
+    # Login Page Customization
+    login_image_url: str = ""
+    login_headline: str = "Learn with"
+    login_subtext: str = "Affordable higher education you can take wherever life takes you."
 
 # User Models
 class UserBase(BaseModel):
