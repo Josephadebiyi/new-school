@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth, useSystemConfig } from "../App";
 import { 
   Home, 
@@ -240,7 +240,7 @@ const DashboardLayout = ({ children }) => {
 
         {/* Page Content */}
         <div className="px-8 py-6 max-w-[1600px] mx-auto animate-fade-in">
-          {children}
+          <Outlet />
         </div>
       </main>
     </div>
