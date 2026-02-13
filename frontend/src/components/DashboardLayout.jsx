@@ -67,7 +67,7 @@ const DashboardLayout = () => {
       return [
         { path: "/student", label: "Home", icon: Home },
         { path: "/student/courses", label: "Courses", icon: BookOpen },
-        { path: "/student/billing", label: "Billing", icon: CreditCard },
+        { path: "/student/payments", label: "Billing", icon: CreditCard },
       ];
     }
     
