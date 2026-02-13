@@ -133,14 +133,14 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-8" data-testid="admin-dashboard">
       {/* Welcome Banner with Gradient */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 rounded-2xl p-6 text-white">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+      <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
+        <div className="absolute top-0 right-0 w-32 md:w-64 h-32 md:h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-16 md:w-32 h-16 md:h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
         <div className="relative z-10">
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-xl md:text-2xl font-bold">
             Welcome back, {user?.first_name || "Admin"}! 👋
           </h1>
-          <p className="text-white/80 mt-1">Here's what's happening in your university today.</p>
+          <p className="text-white/80 mt-1 text-sm md:text-base">Here's what's happening in your university today.</p>
         </div>
       </div>
 
