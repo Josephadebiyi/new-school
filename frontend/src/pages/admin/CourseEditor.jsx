@@ -625,12 +625,55 @@ const CourseEditor = () => {
               </div>
               
               <div>
-                <Label>Cover Image URL</Label>
-                <Input
-                  value={course.image_url}
-                  onChange={(e) => setCourse({...course, image_url: e.target.value})}
-                  placeholder="https://..."
-                />
+                <Label>Course Image</Label>
+                <div className="mt-2">
+                  {course.image_url ? (
+                    <div className="relative group">
+                      <img 
+                        src={course.image_url.startsWith('/api') ? `${API.replace('/api', '')}${course.image_url}` : course.image_url}
+                        alt="Course cover"
+                        className="w-full h-40 object-cover rounded-lg border"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                        <label className="cursor-pointer p-2 bg-white rounded-full hover:bg-gray-100">
+                          <Edit size={16} className="text-gray-700" />
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            data-testid="course-image-input"
+                          />
+                        </label>
+                        <button 
+                          onClick={() => setCourse({...course, image_url: ''})}
+                          className="p-2 bg-white rounded-full hover:bg-gray-100"
+                        >
+                          <X size={16} className="text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/50 transition-all">
+                      {uploadingImage ? (
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                      ) : (
+                        <>
+                          <Image size={32} className="text-gray-400 mb-2" />
+                          <span className="text-sm text-gray-500">Click to upload image</span>
+                          <span className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP (max 5MB)</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        data-testid="course-image-input"
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
