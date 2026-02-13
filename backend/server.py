@@ -1351,6 +1351,88 @@ async def delete_module(
         raise HTTPException(status_code=404, detail="Module not found")
     return {"message": "Module deleted"}
 
+# ============== LESSON ENDPOINTS ==============
+
+class LessonCreate(BaseModel):
+    title: str
+    type: str = "video"  # video, pdf, text, quiz
+    content_url: str = ""
+    description: str = ""
+    order: int = 1
+
+@api_router.post("/modules/{module_id}/lessons")
+async def add_lesson_to_module(
+    module_id: str,
+    lesson_data: LessonCreate,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.LECTURER]))
+):
+    """Add a lesson to a module"""
+    module = await db.modules.find_one({"id": module_id})
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    
+    lesson = {
+        "id": str(uuid.uuid4()),
+        "title": lesson_data.title,
+        "content_type": lesson_data.type,
+        "content_url": lesson_data.content_url,
+        "description": lesson_data.description,
+        "order": lesson_data.order
+    }
+    
+    lessons = module.get("lessons", [])
+    lessons.append(lesson)
+    
+    await db.modules.update_one(
+        {"id": module_id},
+        {"$set": {"lessons": lessons}}
+    )
+    
+    # Update course total lessons
+    course_id = module.get("course_id")
+    all_modules = await db.modules.find({"course_id": course_id}, {"_id": 0}).to_list(100)
+    total_lessons = sum(len(m.get("lessons", [])) for m in all_modules)
+    await db.courses.update_one({"id": course_id}, {"$set": {"total_lessons": total_lessons}})
+    
+    return lesson
+
+class QuizUpload(BaseModel):
+    questions: List[Dict[str, Any]]
+    attempts_allowed: int = 3
+    passing_score: float = 70.0
+
+@api_router.post("/modules/{module_id}/quiz")
+async def upload_quiz_to_module(
+    module_id: str,
+    quiz_data: QuizUpload,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.LECTURER]))
+):
+    """Upload a quiz (from Excel) to a module"""
+    module = await db.modules.find_one({"id": module_id})
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    
+    # Create quiz as a lesson
+    quiz_lesson = {
+        "id": str(uuid.uuid4()),
+        "title": f"{module.get('title', 'Module')} Quiz",
+        "content_type": "quiz",
+        "quiz_data": {"questions": quiz_data.questions},
+        "quiz_attempts_allowed": quiz_data.attempts_allowed,
+        "quiz_passing_score": quiz_data.passing_score,
+        "order": len(module.get("lessons", [])) + 1
+    }
+    
+    lessons = module.get("lessons", [])
+    lessons.append(quiz_lesson)
+    
+    await db.modules.update_one(
+        {"id": module_id},
+        {"$set": {"lessons": lessons}}
+    )
+    
+    return {"message": f"Quiz with {len(quiz_data.questions)} questions uploaded", "lesson_id": quiz_lesson["id"]}
+
 # ============== QUIZ ENDPOINTS ==============
 
 class QuizSubmission(BaseModel):
