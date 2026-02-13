@@ -121,6 +121,34 @@ const AdminUsers = () => {
     }
   };
 
+  const openEditDialog = (user) => {
+    setSelectedUser(user);
+    setEditFormData({
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      department: user.department || "",
+      program: user.program || "",
+      level: user.level || 100,
+      payment_status: user.payment_status || "unpaid"
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditUser = async () => {
+    if (!selectedUser) return;
+    try {
+      await axios.put(`${API}/users/${selectedUser.id}`, editFormData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("User updated successfully");
+      setEditDialogOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update user");
+    }
+  };
+
   const handleLockUser = async (userId) => {
     try {
       await axios.put(`${API}/users/${userId}/lock`, {}, {
@@ -142,6 +170,38 @@ const AdminUsers = () => {
       fetchUsers();
     } catch (error) {
       toast.error("Failed to unlock user");
+    }
+  };
+
+  const openExpelDialog = (user) => {
+    setSelectedUser(user);
+    setExpelDialogOpen(true);
+  };
+
+  const handleExpelStudent = async () => {
+    if (!selectedUser) return;
+    try {
+      await axios.put(`${API}/users/${selectedUser.id}/expel`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Student has been expelled");
+      setExpelDialogOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to expel student");
+    }
+  };
+
+  const handleReinstateStudent = async (userId) => {
+    try {
+      await axios.put(`${API}/users/${userId}/reinstate`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Student has been reinstated");
+      fetchUsers();
+    } catch (error) {
+      toast.error("Failed to reinstate student");
     }
   };
 
