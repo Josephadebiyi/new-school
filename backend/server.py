@@ -91,6 +91,11 @@ class SystemConfigUpdate(BaseModel):
     login_image_url: Optional[str] = None
     login_headline: Optional[str] = None
     login_subtext: Optional[str] = None
+    # Fees & Currency
+    default_currency: Optional[str] = None
+    application_fee: Optional[float] = None
+    tuition_fee: Optional[float] = None
+    tuition_fee_per: Optional[str] = None
 
 class SystemConfig(BaseModel):
     university_name: str = "LuminaLMS University"
@@ -110,6 +115,11 @@ class SystemConfig(BaseModel):
     login_image_url: str = ""
     login_headline: str = "Learn with"
     login_subtext: str = "Affordable higher education you can take wherever life takes you."
+    # Fees & Currency
+    default_currency: str = "EUR"
+    application_fee: float = 50.0
+    tuition_fee: float = 2500.0
+    tuition_fee_per: str = "semester"
 
 # User Models
 class UserBase(BaseModel):
