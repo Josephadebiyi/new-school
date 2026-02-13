@@ -69,6 +69,7 @@ const CourseEditor = () => {
   const [newModule, setNewModule] = useState({ title: "", description: "" });
   const [newLesson, setNewLesson] = useState({ title: "", type: "video", content_url: "", description: "" });
   const [quizQuestions, setQuizQuestions] = useState([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     fetchData();
