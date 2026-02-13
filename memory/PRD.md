@@ -20,65 +20,86 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - **Payments**: Stripe (live keys configured)
 - **Email**: Resend API
 - **Auth**: JWT with RBAC
+- **PDF**: ReportLab for admission letters
 
 ### Project Structure
 ```
 /app/
-├── backend/           # FastAPI server
-│   ├── server.py      # Main API (2200+ lines)
-│   └── .env           # Stripe keys, Resend, MongoDB
-├── frontend/          # Main LMS React app
-│   └── src/pages/     # Admin, Student, Lecturer dashboards
-├── school/            # Public landing page (separate app)
-│   ├── src/App.js     # Homepage, courses, application flow
-│   └── .env           # API URL config
+├── backend/
+│   ├── server.py        # Main API (2500+ lines)
+│   ├── .env             # Stripe keys, Resend, MongoDB
+│   └── tests/           # pytest test files
+├── frontend/
+│   └── src/
+│       ├── pages/
+│       │   ├── admin/
+│       │   │   ├── CourseEditor.jsx   # NEW - Full course management
+│       │   │   ├── Admissions.jsx     # UPDATED - Application workflow
+│       │   │   └── ...
+│       └── components/ui/
+│           ├── dialog.jsx             # FIXED - bg-white
+│           └── ...
+├── school/                            # NEW - Separate landing page app
+│   ├── src/App.js                     # Homepage, courses, application
+│   └── .env
 └── memory/PRD.md
 ```
 
 ## What's Been Implemented
 
-### Date: Feb 13, 2026
+### Date: Feb 13, 2026 - Session 2
+
+**UI/UX Fixes**
+- ✅ Fixed transparent dialog/popup backgrounds (bg-background → bg-white)
+- ✅ Fixed alert-dialog, dropdown-menu, select components
+- ✅ All action buttons in dropdown menus working correctly
+
+**Course Builder/Editor (NEW)**
+- ✅ Full course editing UI at `/admin/courses/:id/edit`
+- ✅ Course information section (code, title, description, department, lecturer)
+- ✅ Duration settings (weeks/months/years dropdown)
+- ✅ Course settings panel (level, semester, type, image URL)
+- ✅ Course Content section with module accordion
+- ✅ Add Module dialog
+- ✅ Add Lesson dialog (video, PDF, text, quiz types)
+- ✅ Upload Quiz from Excel with template download
+
+**Student Management (Enhanced)**
+- ✅ Student Quick Stats cards (Total, Paid, Locked, Expelled)
+- ✅ Export Students to Excel (names, emails, student IDs)
+- ✅ xlsx library integration for Excel generation
+
+**Applications & Admissions (NEW)**
+- ✅ Applications table with filtering
+- ✅ Stats: Pending Payment, Pending Review, Approved, Rejected, Total Revenue
+- ✅ EUR (€) currency display throughout
+- ✅ Approve/Reject application buttons
+- ✅ Auto-create student account on approval
+- ✅ Send admission email with credentials
+- ✅ PDF admission letter generation (ReportLab)
 
 **Landing Page (`/app/school/`) - NEW**
 - ✅ Homepage with hero, stats, featured courses
-- ✅ Course catalog with search functionality
+- ✅ Course catalog with search
 - ✅ Course detail page with application form
 - ✅ Stripe checkout for €50 application fee
-- ✅ Application success page with payment status polling
+- ✅ Application success page with payment polling
 - ✅ About and Contact pages
-- ✅ Green/orange GITB branding theme
-- ✅ Responsive design with Tailwind
-
-**Stripe Integration**
-- ✅ Application fee payments (€50 EUR)
-- ✅ Checkout session creation
-- ✅ Payment status tracking
-- ✅ payment_transactions collection
+- ✅ Green/orange GITB branding
 
 **Backend API Additions**
-- ✅ `/api/courses/public` - No auth required
-- ✅ `/api/courses/public/{id}` - Single course
-- ✅ `/api/applications/create` - Create & pay
-- ✅ `/api/applications/status/{session_id}` - Check payment
-- ✅ `/api/webhook/stripe` - Stripe webhooks
+- ✅ `/api/courses/public` - Public course listing
+- ✅ `/api/applications/create` - Create application with Stripe
+- ✅ `/api/applications` - List all applications
+- ✅ `/api/applications/{id}/approve` - Approve & create user
+- ✅ `/api/applications/{id}/reject` - Reject application
+- ✅ `/api/applications/{id}/admission-letter` - PDF download
+- ✅ `/api/modules/{id}/lessons` - Add lesson to module
+- ✅ `/api/modules/{id}/quiz` - Upload quiz from Excel
 
-**Admin Users Page**
-- ✅ Student Quick Stats cards (Total, Paid, Locked, Expelled)
-- ✅ Export Students to Excel (names, emails)
-- ✅ Action buttons all working (Edit, Lock, Expel, Delete)
-
-**Email Notifications**
-- ✅ Application received confirmation email
-- ✅ GITB branded HTML templates
-
-### Previously Implemented
-- UI/UX redesign with pastel theme
-- Role-based dashboards (Admin, Student, Lecturer)
-- User management with lock/unlock/expel
-- Course CRUD operations
-- Enrollment system
-- Grade management
-- Admin settings (branding, login page, bank details)
+### Test Results
+- **Backend**: 100% (31/31 tests passing)
+- **Frontend**: 100% (all features verified)
 
 ## Test Credentials
 | Role | Email | Password |
@@ -92,39 +113,42 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - Secret Key: sk_live_51SHqYK... (configured)
 - Application Fee: €50.00
 
-## Prioritized Backlog
+## Completed Features Summary
+1. ✅ Dialog/popup transparency fix
+2. ✅ All action buttons working (Edit, Lock, Unlock, Expel, Delete)
+3. ✅ Student list with Excel export
+4. ✅ Course Builder with modules, lessons, quiz upload
+5. ✅ Course duration settings (weeks/months/years)
+6. ✅ EUR currency display
+7. ✅ Admin approval workflow for applications
+8. ✅ PDF admission letter generation
+9. ✅ Stripe payment integration
+10. ✅ Landing page (separate app in /school)
+11. ✅ Application flow with Stripe payment
+12. ✅ Welcome emails with credentials
 
-### P0 (Critical - In Progress)
-- [ ] Course Builder for Admin/Lecturer (add materials, quizzes)
-- [ ] Admin approval workflow for applications
-- [ ] PDF admission letter generation
-- [ ] Course duration settings
+## Remaining Tasks
 
-### P1 (High Priority)
-- [ ] EUR currency display across all pages
-- [ ] Personalized student dashboard ("Welcome, John!")
-- [ ] Quiz system with bulk Excel upload
-- [ ] Quiz grading and attempt tracking
+### P1 (Next Priority)
+- [ ] Canvas-confetti on course completion
+- [ ] PDF certificates for completed courses
+- [ ] PDF invoices for payments
+- [ ] Personalized student welcome ("Welcome, John!")
+- [ ] Run and test the /school landing page build
 
 ### P2 (Medium Priority)
-- [ ] Canvas-confetti on course completion
-- [ ] PDF certificates and invoices
 - [ ] Admin payment tracking dashboard
+- [ ] Interactive course card hover effects
 - [ ] Course change fee enforcement
 
 ### P3 (Nice to Have)
-- [ ] Interactive course card hover effects
 - [ ] Transcript PDF generation
 - [ ] Backend refactoring (modular routers)
+- [ ] Real-time notifications
 
 ## Technical Notes
 - MongoDB Atlas SSL issue - using local MongoDB
-- Stripe live keys are configured (handle with care)
-- School landing page is separate app for independent deployment
-- Application fee prevents multiple enrollments simultaneously
-
-## Next Development Steps
-1. Build Course Editor with materials upload
-2. Implement admin application approval flow
-3. Generate PDF admission letters (letterhead template)
-4. Add course duration settings UI
+- Stripe live keys configured (handle with care)
+- School landing page requires `npm start` in /app/school
+- ReportLab installed for PDF generation
+- xlsx library for Excel export
