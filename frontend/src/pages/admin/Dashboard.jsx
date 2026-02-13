@@ -149,14 +149,18 @@ const AdminDashboard = () => {
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="card-modern p-5" data-testid={`stat-${stat.label.toLowerCase().replace(/\s/g, '-')}`}>
+            <div 
+              key={index} 
+              className="card-modern p-5 hover:shadow-lg transition-all duration-300 group" 
+              data-testid={`stat-${stat.label.toLowerCase().replace(/\s/g, '-')}`}
+            >
               <div className="flex items-start justify-between">
-                <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}>
+                <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
                   <Icon size={24} className={stat.iconColor} />
                 </div>
                 {stat.trendUp !== null && (
-                  <span className={`flex items-center gap-1 text-sm font-medium ${
-                    stat.trendUp ? 'text-emerald-600' : 'text-red-600'
+                  <span className={`flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-full ${
+                    stat.trendUp ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
                   }`}>
                     {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     {stat.trend}
