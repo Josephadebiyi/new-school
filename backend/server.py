@@ -1360,6 +1360,13 @@ async def approve_application(
         }}
     )
     
+    # Get system config for tuition fee
+    system_config = await db.system_config.find_one({}, {"_id": 0}) or {}
+    tuition_fee = system_config.get("tuition_fee", 2500)
+    tuition_fee_per = system_config.get("tuition_fee_per", "semester")
+    currency = system_config.get("default_currency", "EUR")
+    currency_symbol = {"EUR": "€", "USD": "$", "GBP": "£", "NGN": "₦"}.get(currency, "€")
+    
     # Send welcome email with admission details
     email_sent = False
     try:
@@ -1369,7 +1376,10 @@ async def approve_application(
             application["last_name"],
             application.get("course_title", "Your Program"),
             student_id,
-            temp_password
+            temp_password,
+            tuition_fee,
+            tuition_fee_per,
+            currency_symbol
         )
         email_sent = True
     except Exception as e:
@@ -1383,8 +1393,8 @@ async def approve_application(
         "email_sent": email_sent
     }
 
-async def send_admission_email(email: str, first_name: str, last_name: str, program: str, student_id: str, temp_password: str):
-    """Send admission email with login credentials"""
+async def send_admission_email(email: str, first_name: str, last_name: str, program: str, student_id: str, temp_password: str, tuition_fee: float = 2500, tuition_fee_per: str = "semester", currency_symbol: str = "€"):
+    """Send admission email with login credentials and tuition information"""
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
         <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); color: white; border-radius: 10px 10px 0 0;">
