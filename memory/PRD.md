@@ -1,98 +1,84 @@
 # LuminaLMS - Product Requirements Document
 
 ## Original Problem Statement
-Build a University LMS (LuminaLMS) with comprehensive features including:
-- Dynamic white-labeling (admin can customize branding, colors, login page)
-- Rigid access control with role-based permissions
-- Advanced course content engine with video, PDF, and quizzes
-- Graduation and student services (certificates, transcripts)
-- Automated onboarding with email notifications
-- Student management (enrollment, expulsion, reinstatement)
-- Financial management with bank details for invoices
+Build a comprehensive University LMS (LuminaLMS/GITB) with:
+- Dynamic white-labeling and branding
+- Role-based access control (Admin, Lecturer, Student)
+- Course management with materials and quizzes
+- Stripe payment integration for €50 application fees
+- Separate landing page for public course catalog
+- Application workflow with email notifications
+- PDF admission letters and certificates
 
 ## Architecture
 
 ### Tech Stack
-- **Frontend**: React 19 + Tailwind CSS + Shadcn/UI
-- **Backend**: FastAPI (Python)
+- **Main LMS App**: React 19 + Tailwind CSS + Shadcn/UI (port 3000)
+- **Landing Page**: Separate React app in `/app/school` (GITB branding)
+- **Backend**: FastAPI (Python) on port 8001
 - **Database**: MongoDB (local instance)
-- **Auth**: JWT-based authentication with RBAC
-- **Email**: Resend (for notifications)
-- **Media**: Uploadcare (for image uploads)
+- **Payments**: Stripe (live keys configured)
+- **Email**: Resend API
+- **Auth**: JWT with RBAC
 
-### User Roles & Permissions
-| Role | Permissions |
-|------|-------------|
-| Student | View courses, enrollments, grades, payments |
-| Lecturer | Manage assigned courses, build content, enter grades |
-| Admin | Full system access, user/course management, white-labeling |
-| Registrar | Academic records, transcripts, student data |
-
-## Core Requirements (Static)
-
-### Authentication
-- Email/password login (no self-signup)
-- JWT token-based sessions
-- Role-based access control
-- Account locking/unlocking
-- Student expulsion/reinstatement
-
-### White-Labeling
-- University name, logo, favicon customization
-- Primary/secondary color theming
-- Login page text and image customization
-- Bank details for invoices
-
-### Student Features
-- Dashboard with stats (courses, lessons, quizzes, minutes)
-- Course enrollment and progress tracking
-- XP/points earning system
-- Grade/result viewing with CGPA calculation
-- Payment history and invoices
-
-### Lecturer Features
-- Dashboard with course stats
-- Course builder with modules and lessons
-- Quiz creation and management
-- Grade entry for enrolled students
-
-### Admin Features
-- User management (CRUD, lock/unlock, expel/reinstate)
-- Course management (CRUD, lecturer assignment)
-- System settings (branding, colors, bank details)
-- Overview dashboard with stats
+### Project Structure
+```
+/app/
+├── backend/           # FastAPI server
+│   ├── server.py      # Main API (2200+ lines)
+│   └── .env           # Stripe keys, Resend, MongoDB
+├── frontend/          # Main LMS React app
+│   └── src/pages/     # Admin, Student, Lecturer dashboards
+├── school/            # Public landing page (separate app)
+│   ├── src/App.js     # Homepage, courses, application flow
+│   └── .env           # API URL config
+└── memory/PRD.md
+```
 
 ## What's Been Implemented
 
-### Date: Feb 13, 2026 - UI Redesign Complete
+### Date: Feb 13, 2026
 
-**UI/UX Overhaul**
-- ✅ Modern pastel-themed design (pink, blue, mint, yellow cards)
-- ✅ Clean sidebar navigation with icon-based items
-- ✅ Streak badge and notification counter in header
-- ✅ Global search bar placeholder
-- ✅ "Made with Emergent" badge removed
-- ✅ Responsive layout with collapsible sidebar
+**Landing Page (`/app/school/`) - NEW**
+- ✅ Homepage with hero, stats, featured courses
+- ✅ Course catalog with search functionality
+- ✅ Course detail page with application form
+- ✅ Stripe checkout for €50 application fee
+- ✅ Application success page with payment status polling
+- ✅ About and Contact pages
+- ✅ Green/orange GITB branding theme
+- ✅ Responsive design with Tailwind
 
-**Backend Improvements**
-- ✅ Added `/api/student/stats` endpoint
-- ✅ Added `/api/enrollments/my` endpoint
-- ✅ All 22+ API tests passing
+**Stripe Integration**
+- ✅ Application fee payments (€50 EUR)
+- ✅ Checkout session creation
+- ✅ Payment status tracking
+- ✅ payment_transactions collection
 
-**Frontend Fixes**
-- ✅ Fixed login function (was calling with wrong parameters)
-- ✅ Added Outlet for nested route rendering
-- ✅ Added index routes for /student, /lecturer, /admin paths
-- ✅ Fixed navigation links (billing -> payments)
+**Backend API Additions**
+- ✅ `/api/courses/public` - No auth required
+- ✅ `/api/courses/public/{id}` - Single course
+- ✅ `/api/applications/create` - Create & pay
+- ✅ `/api/applications/status/{session_id}` - Check payment
+- ✅ `/api/webhook/stripe` - Stripe webhooks
+
+**Admin Users Page**
+- ✅ Student Quick Stats cards (Total, Paid, Locked, Expelled)
+- ✅ Export Students to Excel (names, emails)
+- ✅ Action buttons all working (Edit, Lock, Expel, Delete)
+
+**Email Notifications**
+- ✅ Application received confirmation email
+- ✅ GITB branded HTML templates
 
 ### Previously Implemented
-- ✅ JWT authentication with bcrypt password hashing
-- ✅ User CRUD with lock/unlock/expel/reinstate
-- ✅ Course management with modules and lessons
-- ✅ Enrollment system with progress tracking
-- ✅ Grade entry with GPA calculation
-- ✅ Payment tracking with invoices
-- ✅ Admin settings with tabbed interface (Branding, Login Page, Bank Details)
+- UI/UX redesign with pastel theme
+- Role-based dashboards (Admin, Student, Lecturer)
+- User management with lock/unlock/expel
+- Course CRUD operations
+- Enrollment system
+- Grade management
+- Admin settings (branding, login page, bank details)
 
 ## Test Credentials
 | Role | Email | Password |
@@ -101,42 +87,44 @@ Build a University LMS (LuminaLMS) with comprehensive features including:
 | Student | student@unilms.edu | student123 |
 | Lecturer | lecturer@unilms.edu | lecturer123 |
 
+## Stripe Configuration
+- Public Key: pk_live_51SHqYK... (configured)
+- Secret Key: sk_live_51SHqYK... (configured)
+- Application Fee: €50.00
+
 ## Prioritized Backlog
 
-### P0 (Critical) - COMPLETE
-- ✅ UI/UX redesign to modern pastel theme
-- ✅ All role dashboards working
-- ✅ Navigation and routing fixed
-- ✅ Emergent badge removed
+### P0 (Critical - In Progress)
+- [ ] Course Builder for Admin/Lecturer (add materials, quizzes)
+- [ ] Admin approval workflow for applications
+- [ ] PDF admission letter generation
+- [ ] Course duration settings
 
-### P1 (High Priority - Next Phase)
-- Quiz system with bulk upload from Excel
-- Quiz grading and attempt tracking
-- Student course enrollment based on program
-- Graduation features (confetti, PDF certificates)
-- PDF invoice generation
-- Automated onboarding with email credentials
+### P1 (High Priority)
+- [ ] EUR currency display across all pages
+- [ ] Personalized student dashboard ("Welcome, John!")
+- [ ] Quiz system with bulk Excel upload
+- [ ] Quiz grading and attempt tracking
 
 ### P2 (Medium Priority)
-- Backend refactoring (break server.py into modules)
-- Transcript request feature
-- Course progress visualization
-- Real-time notifications
+- [ ] Canvas-confetti on course completion
+- [ ] PDF certificates and invoices
+- [ ] Admin payment tracking dashboard
+- [ ] Course change fee enforcement
 
 ### P3 (Nice to Have)
-- Analytics dashboard
-- Calendar integration
-- Mobile app version
-- Dark mode theme
+- [ ] Interactive course card hover effects
+- [ ] Transcript PDF generation
+- [ ] Backend refactoring (modular routers)
 
 ## Technical Notes
-- MongoDB Atlas connection has SSL certificate issues - using local MongoDB
-- Uploadcare is configured for image uploads
-- Resend is configured for email notifications
+- MongoDB Atlas SSL issue - using local MongoDB
+- Stripe live keys are configured (handle with care)
+- School landing page is separate app for independent deployment
+- Application fee prevents multiple enrollments simultaneously
 
-## Next Tasks
-1. Implement quiz system backend (bulk upload, grading)
-2. Add PDF generation for certificates and invoices
-3. Implement canvas-confetti for course completion
-4. Refactor server.py into modular routers
-5. Add transcript request feature
+## Next Development Steps
+1. Build Course Editor with materials upload
+2. Implement admin application approval flow
+3. Generate PDF admission letters (letterhead template)
+4. Add course duration settings UI
