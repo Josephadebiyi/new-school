@@ -66,7 +66,12 @@ const AdminSettings = () => {
         // Login Page Customization
         login_image_url: systemConfig.login_image_url || "",
         login_headline: systemConfig.login_headline || "Learn with",
-        login_subtext: systemConfig.login_subtext || "Affordable higher education you can take wherever life takes you."
+        login_subtext: systemConfig.login_subtext || "Affordable higher education you can take wherever life takes you.",
+        // Fees & Currency
+        default_currency: systemConfig.default_currency || "EUR",
+        application_fee: systemConfig.application_fee || 50,
+        tuition_fee: systemConfig.tuition_fee || 2500,
+        tuition_fee_per: systemConfig.tuition_fee_per || "semester"
       });
     }
   }, [systemConfig]);
