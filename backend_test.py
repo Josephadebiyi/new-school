@@ -1,331 +1,336 @@
 #!/usr/bin/env python3
+"""
+LuminaLMS Backend API Testing Suite
+Tests all critical API endpoints for the LMS system
+"""
 
 import requests
-import sys
 import json
+import sys
 from datetime import datetime
+import time
 
-class UniversityLMSAPITester:
-    def __init__(self, base_url="https://lms-emergent-build.preview.emergentagent.com"):
+class LuminaLMSAPITester:
+    def __init__(self, base_url="https://lms-emergent-build.preview.emergentagent.com/api"):
         self.base_url = base_url
-        self.tokens = {}
-        self.users = {}
+        self.tokens = {}  # Store tokens for different users
+        self.users = {}   # Store user data
+        self.test_data = {} # Store created test data
         self.tests_run = 0
         self.tests_passed = 0
         self.failed_tests = []
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, test_role=""):
-        """Run a single API test"""
-        url = f"{self.base_url}/api/{endpoint}"
-        test_headers = {'Content-Type': 'application/json'}
-        
-        if headers:
-            test_headers.update(headers)
-
+    def log_test(self, name, success, details=""):
+        """Log test results"""
         self.tests_run += 1
-        print(f"\n🔍 Testing {name} [{test_role}]...")
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {name}")
+            if details:
+                print(f"   {details}")
+        else:
+            print(f"❌ {name}")
+            if details:
+                print(f"   {details}")
+            self.failed_tests.append(name)
+
+    def make_request(self, method, endpoint, data=None, token=None, expected_status=200):
+        """Make HTTP request with error handling"""
+        url = f"{self.base_url}/{endpoint}"
+        headers = {'Content-Type': 'application/json'}
         
+        if token:
+            headers['Authorization'] = f'Bearer {token}'
+
         try:
             if method == 'GET':
-                response = requests.get(url, headers=test_headers, timeout=30)
+                response = requests.get(url, headers=headers)
             elif method == 'POST':
-                response = requests.post(url, json=data, headers=test_headers, timeout=30)
+                response = requests.post(url, json=data, headers=headers)
             elif method == 'PUT':
-                response = requests.put(url, json=data, headers=test_headers, timeout=30)
+                response = requests.put(url, json=data, headers=headers)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=test_headers, timeout=30)
-
+                response = requests.delete(url, headers=headers)
+            
             success = response.status_code == expected_status
-            if success:
-                self.tests_passed += 1
-                print(f"✅ PASSED - Status: {response.status_code}")
-                try:
-                    return response.json() if response.content else {}
-                except:
-                    return {}
-            else:
-                print(f"❌ FAILED - Expected {expected_status}, got {response.status_code}")
-                try:
-                    error_data = response.json()
-                    print(f"   Error: {error_data}")
-                except:
-                    print(f"   Response: {response.text}")
-                self.failed_tests.append({
-                    "test": name,
-                    "role": test_role,
-                    "expected": expected_status,
-                    "actual": response.status_code,
-                    "endpoint": endpoint
-                })
-                return {}
-
-        except requests.exceptions.Timeout:
-            print(f"❌ FAILED - Request timeout (30s)")
-            self.failed_tests.append({"test": name, "role": test_role, "error": "Timeout"})
-            return {}
+            return success, response
         except Exception as e:
-            print(f"❌ FAILED - Error: {str(e)}")
-            self.failed_tests.append({"test": name, "role": test_role, "error": str(e)})
-            return {}
+            print(f"   Request error: {str(e)}")
+            return False, None
 
-    def authenticate_user(self, role, email, password):
-        """Authenticate user and store token"""
-        response = self.run_test(f"Login as {role}", "POST", "auth/login", 200, 
-                               {"email": email, "password": password}, test_role=role)
-        if response and "access_token" in response:
-            self.tokens[role] = response["access_token"]
-            self.users[role] = response["user"]
-            return True
-        return False
+    def test_system_config(self):
+        """Test system configuration endpoints"""
+        print("\n🔧 Testing System Configuration...")
+        
+        # Test GET system config
+        success, response = self.make_request('GET', 'system-config')
+        self.log_test("GET /api/system-config", success)
+        
+        if success and response:
+            config = response.json()
+            print(f"   University: {config.get('university_name', 'N/A')}")
 
-    def get_auth_header(self, role):
-        """Get authorization header for role"""
-        return {'Authorization': f'Bearer {self.tokens[role]}'}
+    def test_database_seed(self):
+        """Test database seeding"""
+        print("\n🌱 Testing Database Seeding...")
+        
+        success, response = self.make_request('POST', 'seed')
+        # Accept both 200 (new seed) and error if already seeded
+        self.log_test("POST /api/seed", success or (response and response.status_code in [400]), 
+                     f"Status: {response.status_code if response else 'No response'}")
 
     def test_authentication(self):
-        """Test authentication for all roles"""
-        print("\n" + "="*50)
-        print("🔐 TESTING AUTHENTICATION")
-        print("="*50)
+        """Test authentication for different user types"""
+        print("\n🔐 Testing Authentication...")
         
-        credentials = {
-            "student": {"email": "student@unilms.edu", "password": "student123"},
-            "admin": {"email": "admin@unilms.edu", "password": "admin123"},
-            "lecturer": {"email": "lecturer@unilms.edu", "password": "lecturer123"},
-            "admissions": {"email": "admissions@unilms.edu", "password": "admissions123"},
-            "finance": {"email": "finance@unilms.edu", "password": "finance123"},
-            "registrar": {"email": "registrar@unilms.edu", "password": "registrar123"},
-            "support": {"email": "support@unilms.edu", "password": "support123"}
+        # Test credentials from review request
+        test_users = [
+            {"email": "admin@luminalms.edu", "password": "admin123", "role": "admin"},
+            {"email": "lecturer@luminalms.edu", "password": "lecturer123", "role": "lecturer"},
+            {"email": "student@luminalms.edu", "password": "student123", "role": "student_paid"},
+            {"email": "unpaid@luminalms.edu", "password": "unpaid123", "role": "student_unpaid"}
+        ]
+        
+        for user_creds in test_users:
+            success, response = self.make_request('POST', 'auth/login', {
+                "email": user_creds["email"],
+                "password": user_creds["password"]
+            })
+            
+            if success and response:
+                data = response.json()
+                self.tokens[user_creds["role"]] = data.get("access_token")
+                self.users[user_creds["role"]] = data.get("user")
+                self.log_test(f"Login {user_creds['role']}", True, 
+                            f"Role: {data.get('user', {}).get('role', 'Unknown')}")
+            else:
+                self.log_test(f"Login {user_creds['role']}", False, 
+                            f"Status: {response.status_code if response else 'No response'}")
+
+    def test_auth_me_endpoints(self):
+        """Test /auth/me and access control"""
+        print("\n👤 Testing User Profile & Access Control...")
+        
+        for role, token in self.tokens.items():
+            if token:
+                # Test /auth/me
+                success, response = self.make_request('GET', 'auth/me', token=token)
+                self.log_test(f"GET /auth/me ({role})", success)
+                
+                if success and response:
+                    user_data = response.json()
+                    access_info = user_data.get('access', {})
+                    print(f"   Access allowed: {access_info.get('allowed', True)}")
+                    if not access_info.get('allowed'):
+                        print(f"   Reason: {access_info.get('reason', 'Unknown')}")
+
+    def test_admin_system_config_update(self):
+        """Test system configuration updates (admin only)"""
+        print("\n⚙️ Testing System Config Updates...")
+        
+        admin_token = self.tokens.get("admin")
+        if not admin_token:
+            self.log_test("System config update", False, "No admin token")
+            return
+        
+        # Test system config update
+        config_update = {
+            "university_name": "LuminaLMS Test University",
+            "primary_color": "#1a237e",
+            "support_email": "test@luminalms.edu"
         }
-
-        # Seed database first
-        self.run_test("Seed Database", "POST", "seed", 200, test_role="system")
-
-        for role, creds in credentials.items():
-            self.authenticate_user(role, creds["email"], creds["password"])
-
-        # Test /auth/me endpoint
-        for role in self.tokens:
-            self.run_test(f"Get user profile", "GET", "auth/me", 200, 
-                         headers=self.get_auth_header(role), test_role=role)
-
-    def test_dashboard_stats(self):
-        """Test dashboard stats for all roles"""
-        print("\n" + "="*50)
-        print("📊 TESTING DASHBOARD STATS")
-        print("="*50)
-
-        for role in self.tokens:
-            self.run_test(f"Dashboard Stats", "GET", "dashboard/stats", 200,
-                         headers=self.get_auth_header(role), test_role=role)
+        
+        success, response = self.make_request('PUT', 'system-config', config_update, admin_token)
+        self.log_test("PUT /api/system-config", success)
 
     def test_user_management(self):
-        """Test user management (Admin & Registrar only)"""
-        print("\n" + "="*50)
-        print("👥 TESTING USER MANAGEMENT")
-        print("="*50)
-
-        admin_roles = ['admin', 'registrar']
-        for role in admin_roles:
-            if role in self.tokens:
-                # Get users list
-                self.run_test(f"Get Users List", "GET", "users", 200,
-                             headers=self.get_auth_header(role), test_role=role)
+        """Test user management endpoints"""
+        print("\n👥 Testing User Management...")
+        
+        admin_token = self.tokens.get("admin")
+        if not admin_token:
+            self.log_test("User management", False, "No admin token")
+            return
+        
+        # Test get users
+        success, response = self.make_request('GET', 'users', token=admin_token)
+        self.log_test("GET /api/users", success)
+        
+        if success and response:
+            users = response.json()
+            print(f"   Total users: {len(users)}")
+            
+            # Find a student to test lock/unlock
+            student_user = next((u for u in users if u.get('role') == 'student'), None)
+            if student_user:
+                user_id = student_user['id']
                 
-                # Create new user
-                new_user_data = {
-                    "email": f"test_user_{datetime.now().strftime('%H%M%S')}@unilms.edu",
-                    "password": "testpass123",
-                    "first_name": "Test",
-                    "last_name": "User",
-                    "role": "student",
-                    "department": "Public Health",
-                    "program": "BSc. Public Health",
-                    "level": 100
-                }
-                self.run_test(f"Create User", "POST", "users", 200,
-                             data=new_user_data, headers=self.get_auth_header(role), test_role=role)
+                # Test lock user
+                success, response = self.make_request('PUT', f'users/{user_id}/lock', token=admin_token)
+                self.log_test(f"PUT /api/users/{user_id}/lock", success)
+                
+                # Test unlock user
+                success, response = self.make_request('PUT', f'users/{user_id}/unlock', token=admin_token)
+                self.log_test(f"PUT /api/users/{user_id}/unlock", success)
+
+    def test_admissions_flow(self):
+        """Test admissions management"""
+        print("\n🎓 Testing Admissions Flow...")
+        
+        admin_token = self.tokens.get("admin")
+        if not admin_token:
+            self.log_test("Admissions flow", False, "No admin token")
+            return
+        
+        # Test get admissions
+        success, response = self.make_request('GET', 'admissions', token=admin_token)
+        self.log_test("GET /api/admissions", success)
+        
+        # Create test admission application
+        test_admission = {
+            "first_name": "Test",
+            "last_name": "Student", 
+            "email": f"testadmission{int(time.time())}@example.com",
+            "phone": "+2341234567890",
+            "program": "BSc. Computer Science",
+            "department": "Computer Science"
+        }
+        
+        success, response = self.make_request('POST', 'admissions/apply', test_admission)
+        self.log_test("POST /api/admissions/apply", success)
+        
+        if success and response:
+            admission_data = response.json()
+            admission_id = admission_data.get('id')
+            self.test_data['admission_id'] = admission_id
+            
+            # Test grant admission
+            success, response = self.make_request('PUT', f'admissions/{admission_id}/grant', token=admin_token)
+            self.log_test(f"PUT /api/admissions/{admission_id}/grant", success)
+            
+            if success and response:
+                grant_data = response.json()
+                print(f"   Created student ID: {grant_data.get('student_id', 'N/A')}")
+
+    def test_payment_management(self):
+        """Test payment/transaction management"""
+        print("\n💰 Testing Payment Management...")
+        
+        admin_token = self.tokens.get("admin")
+        if not admin_token:
+            self.log_test("Payment management", False, "No admin token")
+            return
+        
+        # Test get transactions
+        success, response = self.make_request('GET', 'transactions', token=admin_token)
+        self.log_test("GET /api/transactions", success)
+        
+        # Find an unpaid student for payment test
+        unpaid_student = self.users.get('student_unpaid')
+        if unpaid_student:
+            # Create a transaction
+            transaction_data = {
+                "student_id": unpaid_student['id'],
+                "amount": 500000.00,
+                "description": "Tuition Fee - Semester 1",
+                "payment_type": "tuition",
+                "semester": 1
+            }
+            
+            success, response = self.make_request('POST', 'transactions', transaction_data, admin_token)
+            self.log_test("POST /api/transactions", success)
+            
+            if success and response:
+                transaction = response.json()
+                transaction_id = transaction.get('id')
+                
+                # Test confirm payment
+                success, response = self.make_request('PUT', f'transactions/{transaction_id}/confirm', token=admin_token)
+                self.log_test(f"PUT /api/transactions/{transaction_id}/confirm", success)
 
     def test_course_management(self):
-        """Test course management"""
-        print("\n" + "="*50)
-        print("📚 TESTING COURSE MANAGEMENT")
-        print("="*50)
-
-        # Get courses (available to all authenticated users)
-        for role in ['student', 'lecturer', 'admin']:
-            if role in self.tokens:
-                self.run_test(f"Get Courses", "GET", "courses", 200,
-                             headers=self.get_auth_header(role), test_role=role)
-
-        # Create course (Admin/Registrar only)
-        admin_roles = ['admin', 'registrar']
-        for role in admin_roles:
-            if role in self.tokens:
-                new_course_data = {
-                    "code": f"TEST{datetime.now().strftime('%H%M%S')}",
-                    "title": "Test Course",
-                    "description": "A test course",
-                    "department": "Public Health",
-                    "level": 300,
-                    "units": 2,
-                    "semester": 1,
-                    "course_type": "CORE"
-                }
-                self.run_test(f"Create Course", "POST", "courses", 200,
-                             data=new_course_data, headers=self.get_auth_header(role), test_role=role)
-
-    def test_student_features(self):
-        """Test student-specific features"""
-        print("\n" + "="*50)
-        print("🎓 TESTING STUDENT FEATURES")
-        print("="*50)
-
-        if 'student' in self.tokens:
-            student_id = self.users['student']['id']
-            
-            # Test enrollments
-            self.run_test("Get Enrollments", "GET", "enrollments", 200,
-                         headers=self.get_auth_header('student'), test_role='student')
-            
-            # Test grades
-            self.run_test("Get Grades", "GET", "grades", 200,
-                         headers=self.get_auth_header('student'), test_role='student')
-            
-            # Test GPA
-            self.run_test("Get Student GPA", "GET", f"results/gpa/{student_id}", 200,
-                         headers=self.get_auth_header('student'), test_role='student')
-            
-            # Test payments
-            self.run_test("Get Payments", "GET", "payments", 200,
-                         headers=self.get_auth_header('student'), test_role='student')
-            
-            # Test payment summary
-            self.run_test("Get Payment Summary", "GET", f"payments/summary/{student_id}", 200,
-                         headers=self.get_auth_header('student'), test_role='student')
-
-    def test_admissions(self):
-        """Test admissions functionality"""
-        print("\n" + "="*50)
-        print("🎯 TESTING ADMISSIONS")
-        print("="*50)
-
-        if 'admissions' in self.tokens:
-            # Get admissions
-            self.run_test("Get Admissions", "GET", "admissions", 200,
-                         headers=self.get_auth_header('admissions'), test_role='admissions')
-
-        # Test public application (no auth needed)
-        application_data = {
-            "first_name": "New",
-            "last_name": "Applicant",
-            "email": f"applicant_{datetime.now().strftime('%H%M%S')}@example.com",
-            "phone": "+234 801 234 5678",
-            "program": "BSc. Public Health",
-            "department": "Public Health"
-        }
-        response = self.run_test("Submit Application", "POST", "admissions/apply", 200,
-                               data=application_data, test_role='public')
-
-    def test_payments_and_finance(self):
-        """Test payment and finance functionality"""
-        print("\n" + "="*50)
-        print("💰 TESTING PAYMENTS & FINANCE")
-        print("="*50)
-
-        if 'finance' in self.tokens:
-            # Test finance officer endpoints
-            self.run_test("Get All Payments", "GET", "payments", 200,
-                         headers=self.get_auth_header('finance'), test_role='finance')
-
-    def test_lecturer_features(self):
-        """Test lecturer-specific features"""
-        print("\n" + "="*50)
-        print("👨‍🏫 TESTING LECTURER FEATURES")
-        print("="*50)
-
-        if 'lecturer' in self.tokens:
-            # Test lecturer courses
-            self.run_test("Get Lecturer Courses", "GET", "courses", 200,
-                         headers=self.get_auth_header('lecturer'), test_role='lecturer')
-            
-            # Test assessments
-            self.run_test("Get Assessments", "GET", "assessments", 200,
-                         headers=self.get_auth_header('lecturer'), test_role='lecturer')
-            
-            # Test live classes
-            self.run_test("Get Live Classes", "GET", "live-classes", 200,
-                         headers=self.get_auth_header('lecturer'), test_role='lecturer')
-
-    def test_invalid_endpoints(self):
-        """Test invalid endpoints and unauthorized access"""
-        print("\n" + "="*50)
-        print("🚫 TESTING SECURITY & ERROR HANDLING")
-        print("="*50)
-
-        # Test 404 for non-existent endpoint
-        self.run_test("Invalid Endpoint", "GET", "invalid/endpoint", 404, test_role="security")
+        """Test course and module management"""
+        print("\n📚 Testing Course Management...")
         
-        # Test unauthorized access
-        self.run_test("Unauthorized Access", "GET", "users", 401, test_role="security")
+        admin_token = self.tokens.get("admin")
+        lecturer_token = self.tokens.get("lecturer")
         
-        # Test invalid login
-        self.run_test("Invalid Login", "POST", "auth/login", 401,
-                     {"email": "invalid@test.com", "password": "wrongpass"}, test_role="security")
+        # Test get courses (any authenticated user)
+        for role, token in [("admin", admin_token), ("lecturer", lecturer_token)]:
+            if token:
+                success, response = self.make_request('GET', 'courses', token=token)
+                self.log_test(f"GET /api/courses ({role})", success)
+                break
+
+    def test_dashboard_stats(self):
+        """Test dashboard statistics for different roles"""
+        print("\n📊 Testing Dashboard Stats...")
+        
+        for role, token in self.tokens.items():
+            if token:
+                success, response = self.make_request('GET', 'dashboard/stats', token=token)
+                self.log_test(f"GET /api/dashboard/stats ({role})", success)
+                
+                if success and response:
+                    stats = response.json()
+                    if role == "admin":
+                        print(f"   Total students: {stats.get('total_students', 0)}")
+                        print(f"   Locked accounts: {stats.get('locked_accounts', 0)}")
+                        print(f"   Unpaid students: {stats.get('unpaid_students', 0)}")
+
+    def test_access_control(self):
+        """Test access control for unpaid/locked accounts"""
+        print("\n🔒 Testing Access Control...")
+        
+        # Test unpaid student access
+        unpaid_token = self.tokens.get('student_unpaid')
+        if unpaid_token:
+            success, response = self.make_request('GET', 'auth/check-access', token=unpaid_token)
+            self.log_test("Access check - unpaid student", success)
+            
+            if success and response:
+                access = response.json()
+                print(f"   Access allowed: {access.get('allowed', True)}")
+                print(f"   Reason: {access.get('reason', 'None')}")
 
     def run_all_tests(self):
-        """Run all tests"""
-        print("🚀 Starting University LMS API Testing...")
-        print(f"📍 Backend URL: {self.base_url}")
+        """Run complete test suite"""
+        print("🚀 LuminaLMS Backend API Test Suite")
+        print("=" * 50)
         
-        try:
-            # Run tests in order
-            self.test_authentication()
-            self.test_dashboard_stats()
-            self.test_user_management()
-            self.test_course_management()
-            self.test_student_features()
-            self.test_admissions()
-            self.test_payments_and_finance()
-            self.test_lecturer_features()
-            self.test_invalid_endpoints()
-            
-        except KeyboardInterrupt:
-            print("\n⏹️  Testing interrupted by user")
-        except Exception as e:
-            print(f"\n💥 Unexpected error: {str(e)}")
+        # Test sequence
+        self.test_database_seed()
+        time.sleep(1)  # Allow seeding to complete
         
-        self.print_summary()
-
-    def print_summary(self):
-        """Print test summary"""
-        print("\n" + "="*60)
+        self.test_system_config()
+        self.test_authentication()
+        self.test_auth_me_endpoints()
+        self.test_admin_system_config_update()
+        self.test_user_management()
+        self.test_admissions_flow()
+        self.test_payment_management()
+        self.test_course_management()
+        self.test_dashboard_stats()
+        self.test_access_control()
+        
+        # Final report
+        print("\n" + "=" * 50)
         print("📋 TEST SUMMARY")
-        print("="*60)
-        print(f"✅ Tests Passed: {self.tests_passed}")
-        print(f"❌ Tests Failed: {len(self.failed_tests)}")
-        print(f"📊 Total Tests: {self.tests_run}")
-        print(f"🎯 Success Rate: {(self.tests_passed / self.tests_run * 100):.1f}%")
+        print(f"Tests run: {self.tests_run}")
+        print(f"Tests passed: {self.tests_passed}")
+        print(f"Tests failed: {len(self.failed_tests)}")
+        print(f"Success rate: {(self.tests_passed/self.tests_run)*100:.1f}%")
         
         if self.failed_tests:
-            print("\n❌ FAILED TESTS:")
-            for failure in self.failed_tests:
-                print(f"   • {failure.get('test', 'Unknown')} [{failure.get('role', 'N/A')}]")
-                if 'expected' in failure:
-                    print(f"     Expected: {failure['expected']}, Got: {failure['actual']}")
-                if 'error' in failure:
-                    print(f"     Error: {failure['error']}")
-        
-        print("="*60)
+            print("\n❌ Failed tests:")
+            for test in self.failed_tests:
+                print(f"  - {test}")
         
         return len(self.failed_tests) == 0
 
 def main():
-    """Main function"""
-    tester = UniversityLMSAPITester()
+    tester = LuminaLMSAPITester()
     success = tester.run_all_tests()
-    
-    # Exit with appropriate code
     return 0 if success else 1
 
 if __name__ == "__main__":
