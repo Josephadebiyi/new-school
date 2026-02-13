@@ -29,8 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { DollarSign, Plus, CheckCircle, Clock, FileText, Download } from "lucide-react";
+import { Euro, Plus, CheckCircle, Clock, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
+import { formatCurrency } from "../../utils/currency";
 
 const AdminPayments = () => {
   const { token } = useAuth();
@@ -172,7 +173,7 @@ const AdminPayments = () => {
               </div>
               
               <div>
-                <Label>Amount ($)</Label>
+                <Label>Amount (€)</Label>
                 <Input
                   type="number"
                   value={formData.amount}
@@ -248,7 +249,7 @@ const AdminPayments = () => {
             <div>
               <p className="text-slate-600 text-sm">Total Collected</p>
               <p className="text-2xl font-heading font-bold text-emerald-600">
-                ${totalCollected.toFixed(2)}
+                {formatCurrency(totalCollected)}
               </p>
             </div>
           </CardContent>
@@ -262,7 +263,7 @@ const AdminPayments = () => {
             <div>
               <p className="text-slate-600 text-sm">Total Pending</p>
               <p className="text-2xl font-heading font-bold text-amber-600">
-                ${totalPending.toFixed(2)}
+                {formatCurrency(totalPending)}
               </p>
             </div>
           </CardContent>
@@ -297,7 +298,7 @@ const AdminPayments = () => {
                         {student ? `${student.first_name} ${student.last_name}` : 'Unknown'}
                       </TableCell>
                       <TableCell className="text-slate-600">{transaction.description}</TableCell>
-                      <TableCell className="font-medium">${transaction.amount.toFixed(2)}</TableCell>
+                      <TableCell className="font-medium">{formatCurrency(transaction.amount)}</TableCell>
                       <TableCell>
                         <span className={`px-3 py-1 rounded text-xs font-semibold ${
                           transaction.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
