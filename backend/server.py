@@ -939,6 +939,39 @@ async def unlock_user(
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "User account unlocked"}
 
+@api_router.put("/users/{user_id}/expel")
+async def expel_student(
+    user_id: str,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN]))
+):
+    """Expel a student - permanently removes access"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.get("role") != UserRole.STUDENT:
+        raise HTTPException(status_code=400, detail="Only students can be expelled")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"account_status": AccountStatus.EXPELLED, "is_active": False}}
+    )
+    return {"message": "Student has been expelled"}
+
+@api_router.put("/users/{user_id}/reinstate")
+async def reinstate_student(
+    user_id: str,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN]))
+):
+    """Reinstate an expelled student"""
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"account_status": AccountStatus.ACTIVE, "is_active": True}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Student has been reinstated"}
+
 @api_router.delete("/users/{user_id}")
 async def delete_user(
     user_id: str,
