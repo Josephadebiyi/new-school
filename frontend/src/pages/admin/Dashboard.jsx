@@ -1,13 +1,38 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "../../App";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Users, BookOpen, GraduationCap, FileText, TrendingUp, Lock, DollarSign, AlertCircle } from "lucide-react";
+import { 
+  Users, 
+  BookOpen, 
+  GraduationCap, 
+  CreditCard,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  Lock,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  UserPlus,
+  Settings,
+  BarChart3
+} from "lucide-react";
 import { toast } from "sonner";
+import { Progress } from "../../components/ui/progress";
 
 const AdminDashboard = () => {
-  const { token } = useAuth();
-  const [stats, setStats] = useState(null);
+  const { token, user } = useAuth();
+  const [stats, setStats] = useState({
+    total_students: 0,
+    total_lecturers: 0,
+    total_courses: 0,
+    pending_admissions: 0,
+    locked_accounts: 0,
+    unpaid_students: 0,
+    total_users: 0
+  });
+  const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,10 +41,16 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await axios.get(`${API}/dashboard/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setStats(response.data);
+      const [statsRes, usersRes] = await Promise.all([
+        axios.get(`${API}/dashboard/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API}/users?limit=5`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      setStats(statsRes.data);
+      setRecentUsers(usersRes.data.slice(0, 5));
     } catch (error) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -35,177 +66,302 @@ const AdminDashboard = () => {
     );
   }
 
+  const statCards = [
+    { 
+      label: "Total Students", 
+      value: stats.total_students, 
+      icon: Users,
+      color: "bg-emerald-100",
+      iconColor: "text-emerald-600",
+      trend: "+3%",
+      trendUp: true
+    },
+    { 
+      label: "Total Lecturers", 
+      value: stats.total_lecturers, 
+      icon: GraduationCap,
+      color: "bg-blue-100",
+      iconColor: "text-blue-600",
+      trend: "+2%",
+      trendUp: true
+    },
+    { 
+      label: "Active Courses", 
+      value: stats.total_courses, 
+      icon: BookOpen,
+      color: "bg-violet-100",
+      iconColor: "text-violet-600",
+      trend: "+5%",
+      trendUp: true
+    },
+    { 
+      label: "Pending Admissions", 
+      value: stats.pending_admissions, 
+      icon: Clock,
+      color: "bg-amber-100",
+      iconColor: "text-amber-600",
+      trend: "0",
+      trendUp: null
+    }
+  ];
+
+  const quickStats = [
+    { 
+      label: "Locked Accounts", 
+      value: stats.locked_accounts,
+      icon: Lock,
+      color: "text-red-500",
+      bgColor: "bg-red-50"
+    },
+    { 
+      label: "Unpaid Students", 
+      value: stats.unpaid_students,
+      icon: AlertCircle,
+      color: "text-amber-500",
+      bgColor: "bg-amber-50"
+    },
+    { 
+      label: "Total Users", 
+      value: stats.total_users,
+      icon: Users,
+      color: "text-blue-500",
+      bgColor: "bg-blue-50"
+    }
+  ];
+
   return (
     <div className="space-y-8" data-testid="admin-dashboard">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-white border border-slate-200" data-testid="students-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <GraduationCap className="text-blue-600" size={24} />
-              </div>
-              <div>
-                <p className="text-slate-600 text-sm">Total Students</p>
-                <p className="text-3xl font-heading font-bold text-slate-900">
-                  {stats?.total_students || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border border-slate-200" data-testid="lecturers-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <Users className="text-emerald-600" size={24} />
-              </div>
-              <div>
-                <p className="text-slate-600 text-sm">Total Lecturers</p>
-                <p className="text-3xl font-heading font-bold text-slate-900">
-                  {stats?.total_lecturers || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border border-slate-200" data-testid="courses-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                <BookOpen className="text-amber-600" size={24} />
-              </div>
-              <div>
-                <p className="text-slate-600 text-sm">Active Courses</p>
-                <p className="text-3xl font-heading font-bold text-slate-900">
-                  {stats?.total_courses || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border border-slate-200" data-testid="admissions-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <FileText className="text-purple-600" size={24} />
-              </div>
-              <div>
-                <p className="text-slate-600 text-sm">Pending Admissions</p>
-                <p className="text-3xl font-heading font-bold text-slate-900">
-                  {stats?.pending_admissions || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Welcome */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Welcome back, {user?.first_name || "Admin"}!
+        </h1>
+        <p className="text-gray-500 mt-1">Here's what's happening in your university today.</p>
       </div>
 
-      {/* Second row stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-white border border-slate-200" data-testid="locked-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <Lock className="text-red-600" size={24} />
+      {/* Main Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div key={index} className="card-modern p-5" data-testid={`stat-${stat.label.toLowerCase().replace(/\s/g, '-')}`}>
+              <div className="flex items-start justify-between">
+                <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}>
+                  <Icon size={24} className={stat.iconColor} />
+                </div>
+                {stat.trendUp !== null && (
+                  <span className={`flex items-center gap-1 text-sm font-medium ${
+                    stat.trendUp ? 'text-emerald-600' : 'text-red-600'
+                  }`}>
+                    {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    {stat.trend}
+                  </span>
+                )}
               </div>
-              <div>
-                <p className="text-slate-600 text-sm">Locked Accounts</p>
-                <p className="text-3xl font-heading font-bold text-red-600">
-                  {stats?.locked_accounts || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border border-slate-200" data-testid="unpaid-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="text-amber-600" size={24} />
-              </div>
-              <div>
-                <p className="text-slate-600 text-sm">Unpaid Students</p>
-                <p className="text-3xl font-heading font-bold text-amber-600">
-                  {stats?.unpaid_students || 0}
-                </p>
+              <div className="mt-4">
+                <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
+                <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border border-slate-200" data-testid="total-users-stat">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                <Users className="text-slate-600" size={24} />
-              </div>
-              <div>
-                <p className="text-slate-600 text-sm">Total Users</p>
-                <p className="text-3xl font-heading font-bold text-slate-900">
-                  {stats?.total_users || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-white border border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-lg font-heading">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <a href="/admin/users" className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-                <Users size={24} className="text-uni-navy mb-2" />
-                <p className="font-medium text-slate-900">Manage Users</p>
-                <p className="text-sm text-slate-500">Lock/unlock accounts</p>
-              </a>
-              <a href="/admin/courses" className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-                <BookOpen size={24} className="text-uni-navy mb-2" />
-                <p className="font-medium text-slate-900">Manage Courses</p>
-                <p className="text-sm text-slate-500">Add/edit courses</p>
-              </a>
-              <a href="/admin/admissions" className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-                <FileText size={24} className="text-uni-navy mb-2" />
-                <p className="font-medium text-slate-900">Admissions</p>
-                <p className="text-sm text-slate-500">Grant/decline applications</p>
-              </a>
-              <a href="/admin/payments" className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-                <DollarSign size={24} className="text-uni-navy mb-2" />
-                <p className="font-medium text-slate-900">Payments</p>
-                <p className="text-sm text-slate-500">Confirm payments</p>
-              </a>
+      {/* Secondary Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {quickStats.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div key={index} className={`card-modern p-4 flex items-center gap-4 ${stat.bgColor}`}>
+              <div className={`w-10 h-10 rounded-lg bg-white flex items-center justify-center`}>
+                <Icon size={20} className={stat.color} />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-gray-900">{stat.value}</div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          );
+        })}
+      </div>
 
-        <Card className="stats-navy">
-          <CardContent className="p-6">
-            <h3 className="text-white font-heading font-semibold text-lg mb-4">System Overview</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-white/70">Total Users</span>
-                <span className="text-white font-semibold">{stats?.total_users || 0}</span>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick Actions */}
+        <div className="lg:col-span-2 card-modern p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <Link to="/admin/users" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Users size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900">Manage Users</div>
+                  <div className="text-sm text-gray-500">Lock/unlock accounts</div>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/70">Locked Accounts</span>
-                <span className="text-red-400 font-semibold">{stats?.locked_accounts || 0}</span>
+            </Link>
+            
+            <Link to="/admin/courses" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <BookOpen size={20} className="text-violet-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900">Manage Courses</div>
+                  <div className="text-sm text-gray-500">Add/edit courses</div>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/70">System Status</span>
-                <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded">Online</span>
+            </Link>
+            
+            <Link to="/admin/admissions" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <GraduationCap size={20} className="text-emerald-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900">Admissions</div>
+                  <div className="text-sm text-gray-500">Grant/decline applications</div>
+                </div>
+              </div>
+            </Link>
+            
+            <Link to="/admin/payments" className="module-item border rounded-xl p-4 hover:shadow-md transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <CreditCard size={20} className="text-amber-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900">Payments</div>
+                  <div className="text-sm text-gray-500">Confirm payments</div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* System Status */}
+        <div className="card-modern p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">System Status</h2>
+            <span className="badge badge-success">Online</span>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">Trained</span>
+                <span className="font-semibold">50%</span>
+              </div>
+              <Progress value={50} className="h-2" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <div>
+                <div className="text-2xl font-bold text-gray-900">50 <span className="text-sm text-emerald-500">+3%</span></div>
+                <div className="text-sm text-gray-500">In progress</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">35 <span className="text-sm text-red-500">-2%</span></div>
+                <div className="text-sm text-gray-500">Overdue</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">75 <span className="text-sm text-emerald-500">+5%</span></div>
+                <div className="text-sm text-gray-500">Passed</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">75 <span className="text-sm text-red-500">-5%</span></div>
+                <div className="text-sm text-gray-500">Failed</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Users Table */}
+      <div className="card-modern overflow-hidden">
+        <div className="p-6 border-b flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Users</h2>
+          <Link to="/admin/users" className="text-sm font-medium text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            View All <ArrowRight size={14} />
+          </Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Progress</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentUsers.map((user, index) => {
+                const score = Math.floor(Math.random() * 100);
+                const progress = Math.floor(Math.random() * 100);
+                const statuses = ['Not started', 'In progress', 'Overdue', 'Completed'];
+                const statusColors = ['text-gray-500', 'text-emerald-600', 'text-red-600', 'text-blue-600'];
+                const statusIdx = Math.floor(Math.random() * statuses.length);
+                
+                return (
+                  <tr key={user.id}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className={`avatar avatar-sm ${
+                          user.role === 'admin' ? 'bg-violet-500' :
+                          user.role === 'lecturer' ? 'bg-blue-500' :
+                          'bg-emerald-500'
+                        }`}>
+                          {user.first_name?.[0]}{user.last_name?.[0]}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{user.first_name} {user.last_name}</div>
+                          <div className="text-sm text-gray-500 capitalize">{user.role}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`flex items-center gap-1.5 ${statusColors[statusIdx]}`}>
+                        <span className={`status-dot ${
+                          statusIdx === 0 ? 'neutral' :
+                          statusIdx === 1 ? 'success' :
+                          statusIdx === 2 ? 'error' : 'info'
+                        }`}></span>
+                        {statuses[statusIdx]}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="flex items-center gap-1">
+                        <span className="text-amber-500">●</span>
+                        {score}pts
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className="circular-progress" style={{ width: 32, height: 32 }}>
+                          <svg width="32" height="32">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#E5E7EB" strokeWidth="3" />
+                            <circle 
+                              cx="16" cy="16" r="14" 
+                              fill="none" 
+                              stroke="#22C55E" 
+                              strokeWidth="3"
+                              strokeDasharray={`${progress * 0.88} 88`}
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </div>
+                        <span className="font-medium">{progress}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
