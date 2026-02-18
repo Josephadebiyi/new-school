@@ -1280,12 +1280,14 @@ const LandingPage = () => {
       <main>
         <Hero />
         <PathForEveryone />
+        <PartnerLogos />
         <OurSchools />
         <NanoDiplomaIntro />
         <TrendingPrograms />
         <ReimaginingDream />
         <Stats />
         <Testimonials />
+        <BlogSection />
       </main>
       <Footer />
     </div>
