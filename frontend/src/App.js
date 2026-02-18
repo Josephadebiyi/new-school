@@ -4,7 +4,10 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import axios from "axios";
 import { Toaster, toast } from "sonner";
 
-// Pages
+// School App (Landing pages)
+import SchoolApp from "./pages/SchoolApp";
+
+// LMS Pages
 import Login from "./pages/Login";
 import DashboardLayout from "./components/DashboardLayout";
 import LimitedAccess from "./pages/LimitedAccess";
