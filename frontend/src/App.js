@@ -4,8 +4,12 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import axios from "axios";
 import { Toaster, toast } from "sonner";
 
-// School App (Landing pages)
-import SchoolApp from "./pages/SchoolApp";
+// School Landing Pages
+import LandingPage from "./pages/LandingPage";
+import ApplyPage from "./pages/ApplyPage";
+import SchoolsPage from "./pages/SchoolsPage";
+import WhyGITBPage from "./pages/WhyGITBPage";
+import CourseDetailPage from "./pages/CourseDetailPage";
 
 // LMS Pages
 import Login from "./pages/Login";
