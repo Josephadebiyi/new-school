@@ -55,11 +55,31 @@ const ApplyPage = () => {
   const fetchCourses = async () => {
     try {
       const response = await axios.get(`${API}/courses/public`);
-      setCourses(response.data);
+      if (response.data && response.data.length > 0) {
+        setCourses(response.data);
+      } else {
+        // Use hardcoded courses as fallback
+        setCourses(getDefaultCourses());
+      }
     } catch (error) {
       console.error("Failed to fetch courses:", error);
+      // Use hardcoded courses as fallback
+      setCourses(getDefaultCourses());
     }
   };
+
+  const getDefaultCourses = () => [
+    { id: 'ui-ux-webflow', title: 'UI/UX & Webflow Design', course_type: 'Diploma' },
+    { id: 'kyc-compliance', title: 'KYC & Compliance', course_type: 'Diploma' },
+    { id: 'cybersecurity-vulnerability', title: 'Cyber-Security Vulnerability Tester', course_type: 'Diploma' },
+    { id: 'languages-french-spanish', title: 'French | Spanish | Lithuanian', course_type: 'Nano-Diploma' },
+    { id: 'identity-access-management', title: 'Identity & Access Management (IAM)', course_type: 'Diploma' },
+    { id: 'data-analytics', title: 'Data Analytics', course_type: 'Diploma' },
+    { id: 'product-management', title: 'Product Management', course_type: 'Diploma' },
+    { id: 'digital-marketing', title: 'Digital Marketing', course_type: 'Nano-Diploma' },
+    { id: 'software-engineering', title: 'Software Engineering', course_type: 'Diploma' },
+    { id: 'business-strategy', title: 'Business Strategy', course_type: 'Diploma' },
+  ];
 
   const countries = [
     'Lithuania', 'Germany', 'France', 'Spain', 'Italy', 'Poland', 'Netherlands',
