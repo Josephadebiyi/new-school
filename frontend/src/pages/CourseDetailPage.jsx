@@ -225,6 +225,191 @@ const CourseDetailPage = () => {
         'Understanding of security concepts',
         'Experience with enterprise systems preferred'
       ]
+    },
+    'data-analytics': {
+      title: 'Data Analytics',
+      subtitle: 'Transform Data into Business Insights',
+      image: '/images/IMG_1532.JPG',
+      duration: '4 Months',
+      level: 'Beginner',
+      category: 'Data',
+      price: '€1,500',
+      description: 'Master data analysis, visualization, and business intelligence tools.',
+      overview: 'Learn to collect, analyze, and visualize data to drive business decisions. This program covers Excel, SQL, Python, and popular BI tools like Tableau and Power BI.',
+      curriculum: [
+        'Data Analysis Fundamentals',
+        'Excel for Data Analysis',
+        'SQL for Data Querying',
+        'Python for Data Science',
+        'Data Visualization with Tableau',
+        'Business Intelligence & Reporting',
+        'Statistical Analysis',
+        'Real-world Data Projects'
+      ],
+      outcomes: [
+        'Analyze large datasets efficiently',
+        'Create compelling data visualizations',
+        'Build automated reports and dashboards',
+        'Make data-driven recommendations',
+        'Use Python for data manipulation'
+      ],
+      certifications: [
+        'Diploma from GITB',
+        'Google Data Analytics Certificate'
+      ],
+      requirements: [
+        'Basic math skills',
+        'No programming experience required',
+        'Curiosity for data'
+      ]
+    },
+    'product-management': {
+      title: 'Product Management',
+      subtitle: 'Lead Products from Idea to Launch',
+      image: '/images/IMG_1522.JPG',
+      duration: '3 Months',
+      level: 'Intermediate',
+      category: 'Product',
+      price: '€1,600',
+      description: 'Learn to build, launch, and scale successful digital products.',
+      overview: 'Master the art and science of product management. Learn user research, roadmapping, agile methodologies, and how to work with engineering and design teams.',
+      curriculum: [
+        'Product Strategy & Vision',
+        'User Research & Customer Discovery',
+        'Product Roadmapping',
+        'Agile & Scrum Methodologies',
+        'Product Metrics & Analytics',
+        'Go-to-Market Strategy',
+        'Stakeholder Management',
+        'Product Leadership'
+      ],
+      outcomes: [
+        'Define and communicate product vision',
+        'Conduct effective user research',
+        'Build and prioritize product roadmaps',
+        'Work effectively with cross-functional teams',
+        'Launch products successfully'
+      ],
+      certifications: [
+        'Diploma from GITB',
+        'Certified Product Manager (CPM)'
+      ],
+      requirements: [
+        'Basic understanding of technology',
+        '2+ years work experience',
+        'Strong communication skills'
+      ]
+    },
+    'digital-marketing': {
+      title: 'Digital Marketing',
+      subtitle: 'Master Online Growth Strategies',
+      image: '/images/IMG_1530 2.JPG',
+      duration: '3 Months',
+      level: 'Beginner',
+      category: 'Marketing',
+      price: '€1,100',
+      description: 'Learn SEO, social media, content marketing, and paid advertising.',
+      overview: 'Comprehensive digital marketing program covering all aspects of online marketing. From SEO to social media, content to paid ads, learn to drive growth online.',
+      curriculum: [
+        'Digital Marketing Fundamentals',
+        'Search Engine Optimization (SEO)',
+        'Social Media Marketing',
+        'Content Marketing Strategy',
+        'Google Ads & PPC',
+        'Email Marketing',
+        'Analytics & Measurement',
+        'Marketing Automation'
+      ],
+      outcomes: [
+        'Create effective digital marketing strategies',
+        'Optimize websites for search engines',
+        'Run successful paid ad campaigns',
+        'Build engaged social media audiences',
+        'Measure and optimize marketing ROI'
+      ],
+      certifications: [
+        'Diploma from GITB',
+        'Google Digital Marketing Certificate'
+      ],
+      requirements: [
+        'No prior marketing experience',
+        'Basic computer skills',
+        'Creative mindset'
+      ]
+    },
+    'software-engineering': {
+      title: 'Software Engineering',
+      subtitle: 'Build Production-Ready Applications',
+      image: '/images/IMG_1529.JPG',
+      duration: '6 Months',
+      level: 'Beginner to Advanced',
+      category: 'Engineering',
+      price: '€2,500',
+      description: 'Learn full-stack development with modern technologies and best practices.',
+      overview: 'Comprehensive software engineering bootcamp covering frontend, backend, databases, and deployment. Build real projects and graduate job-ready.',
+      curriculum: [
+        'Programming Fundamentals',
+        'Frontend Development (React)',
+        'Backend Development (Node.js/Python)',
+        'Database Design & SQL',
+        'API Development & REST',
+        'Version Control with Git',
+        'Testing & Quality Assurance',
+        'Cloud Deployment & DevOps'
+      ],
+      outcomes: [
+        'Build full-stack web applications',
+        'Write clean, maintainable code',
+        'Design and implement databases',
+        'Deploy applications to the cloud',
+        'Collaborate effectively in development teams'
+      ],
+      certifications: [
+        'Diploma from GITB',
+        'Full-Stack Developer Certificate'
+      ],
+      requirements: [
+        'No prior coding experience',
+        'Strong problem-solving skills',
+        'Commitment to intensive learning'
+      ]
+    },
+    'business-strategy': {
+      title: 'Business Strategy',
+      subtitle: 'Lead Organizations to Success',
+      image: '/images/IMG_1533.JPG',
+      duration: '3 Months',
+      level: 'Advanced',
+      category: 'Business',
+      price: '€1,800',
+      description: 'Master strategic planning, competitive analysis, and business transformation.',
+      overview: 'Executive-level program in business strategy. Learn frameworks used by top consultants and business leaders to drive organizational success.',
+      curriculum: [
+        'Strategic Analysis Frameworks',
+        'Competitive Strategy',
+        'Business Model Innovation',
+        'Financial Analysis for Strategy',
+        'Digital Transformation',
+        'Change Management',
+        'Strategic Leadership',
+        'Case Studies & Simulations'
+      ],
+      outcomes: [
+        'Analyze competitive landscapes',
+        'Develop winning business strategies',
+        'Lead organizational transformation',
+        'Make data-driven strategic decisions',
+        'Communicate strategy effectively'
+      ],
+      certifications: [
+        'Diploma from GITB',
+        'Strategic Management Certificate'
+      ],
+      requirements: [
+        '5+ years work experience',
+        'Leadership or management role',
+        'Strong analytical skills'
+      ]
     }
   };
 
