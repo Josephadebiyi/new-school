@@ -381,30 +381,35 @@ const OurSchools = () => {
       description: 'Software, DevOps, Cloud',
       image: '/images/IMG_1529.JPG',
       icon: Code,
+      slug: 'engineering',
     },
     {
       name: 'Data',
       description: 'Analytics, Science, AI',
       image: '/images/IMG_1532.JPG',
       icon: Database,
+      slug: 'data',
     },
     {
       name: 'Product',
       description: 'Management, Design, UX',
       image: '/images/IMG_1522.JPG',
       icon: Briefcase,
+      slug: 'product',
     },
     {
       name: 'Creative Economy',
       description: 'Marketing, Content, Media',
       image: '/images/IMG_1530 2.JPG',
       icon: Palette,
+      slug: 'creative',
     },
     {
       name: 'Business',
       description: 'Strategy, Operations, Finance',
       image: '/images/IMG_1533.JPG',
       icon: TrendingUp,
+      slug: 'business',
     },
   ];
 
@@ -430,11 +435,12 @@ const OurSchools = () => {
         {/* School Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-6">
           {schools.map((school, index) => (
-            <a
+            <Link
               key={school.name}
-              href="#programs"
+              to={`/schools/${school.slug}`}
               className="reveal opacity-0 group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer"
               style={{ animationDelay: `${0.3 + index * 0.1}s` }}
+              data-testid={`school-card-${school.slug}`}
             >
               {/* Background Image */}
               <img
