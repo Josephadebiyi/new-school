@@ -167,7 +167,7 @@ const AdminSettings = () => {
                     <Input
                       value={formData.university_name}
                       onChange={(e) => setFormData({ ...formData, university_name: e.target.value })}
-                      placeholder="LuminaLMS University"
+                      placeholder="GITB - Student LMS"
                       data-testid="university-name-input"
                     />
                   </div>

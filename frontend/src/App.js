@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
   const [systemConfig, setSystemConfig] = useState({
-    university_name: "LuminaLMS University",
+    university_name: "GITB - Student LMS",
     logo_url: "",
     primary_color: "#0F172A",
     secondary_color: "#D32F2F"

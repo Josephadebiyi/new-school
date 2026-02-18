@@ -48,7 +48,7 @@ const BillingPage = () => {
               </div>
             )}
             <div>
-              <h1 className="font-heading font-bold text-lg">{systemConfig?.university_name || "LuminaLMS"}</h1>
+              <h1 className="font-heading font-bold text-lg">{systemConfig?.university_name || "GITB"}</h1>
               <p className="text-white/70 text-sm">Payment Center</p>
             </div>
           </div>
