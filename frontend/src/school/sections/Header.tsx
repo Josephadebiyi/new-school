@@ -106,7 +106,7 @@ const Header = () => {
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center gap-3">
             <a
-              href={`${import.meta.env.VITE_LMS_URL || ''}/login`}
+              href={`${process.env.REACT_APP_LMS_URL || ''}/login`}
               className="inline-flex items-center justify-center text-sm font-medium text-gray-700 hover:text-gitb-dark hover:bg-gitb-50 h-10 px-4 py-2 rounded-md"
               data-testid="header-login-btn"
             >
@@ -157,7 +157,7 @@ const Header = () => {
           ))}
           <div className="pt-4 border-t border-gray-100 space-y-2">
             <a
-              href={`${import.meta.env.VITE_LMS_URL || ''}/login`}
+              href={`${process.env.REACT_APP_LMS_URL || ''}/login`}
               className="w-full inline-flex items-center justify-center text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 rounded-md"
               data-testid="mobile-login-btn"
             >
