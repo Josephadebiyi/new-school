@@ -22,6 +22,16 @@ import base64
 # Email with Resend
 import resend
 
+# Email Service
+from services.email_service import (
+    send_application_received_email,
+    send_application_approved_email,
+    send_application_rejected_email,
+    send_forgot_password_email,
+    send_password_changed_email,
+    send_test_email
+)
+
 # PDF Generation
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
@@ -41,6 +51,9 @@ db = client[os.environ['DB_NAME']]
 # Resend configuration
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'noreply@gitb.lt')
+
+# Frontend URL for email links
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://gitb-school.preview.emergentagent.com')
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'lumina-lms-secret-key')
