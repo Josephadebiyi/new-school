@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { LMS_URL } from '../App';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -106,14 +105,12 @@ const Header = () => {
 
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center gap-3">
-            <a href={`${LMS_URL}/login`}>
-              <Button
-                variant="ghost"
-                className="text-sm font-medium text-gray-700 hover:text-gitb-dark hover:bg-gitb-50"
-              >
-                Login
-              </Button>
-            </a>
+            <Button
+              variant="ghost"
+              className="text-sm font-medium text-gray-700 hover:text-gitb-dark hover:bg-gitb-50"
+            >
+              Login
+            </Button>
             <Link to="/apply">
               <Button
                 className="bg-gitb-lime hover:bg-gitb-lime-hover text-white text-sm font-medium px-5 py-2 rounded-lg btn-hover"
@@ -157,14 +154,12 @@ const Header = () => {
             </Link>
           ))}
           <div className="pt-4 border-t border-gray-100 space-y-2">
-            <a href={`${LMS_URL}/login`} className="block">
-              <Button
-                variant="outline"
-                className="w-full justify-center text-sm font-medium"
-              >
-                Login
-              </Button>
-            </a>
+            <Button
+              variant="outline"
+              className="w-full justify-center text-sm font-medium"
+            >
+              Login
+            </Button>
             <Link to="/apply" className="block">
               <Button
                 className="w-full justify-center bg-gitb-lime hover:bg-gitb-lime-hover text-white text-sm font-medium"

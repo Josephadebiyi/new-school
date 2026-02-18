@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 import { 
   CreditCard, 
   Upload, 
@@ -12,8 +11,7 @@ import {
   Phone,
   MapPin,
   GraduationCap,
-  AlertCircle,
-  Award
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,28 +19,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-import { API_URL } from '../App';
-import Footer from '../sections/Footer';
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-}
 
 const ApplyNow = () => {
   const stripe = useStripe();
   const elements = useElements();
-  const [searchParams] = useSearchParams();
-  const courseId = searchParams.get('course');
-  
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [applicationRef, setApplicationRef] = useState('');
-  
+  const [, setPaymentSuccess] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -50,137 +33,53 @@ const ApplyNow = () => {
     phone: '',
     country: '',
     city: '',
-    program: courseId || '',
+    program: '',
     education: '',
-    highSchoolCertUrl: '',
-    idDocumentUrl: '',
+    documents: null as File | null,
   });
 
-  const [docPreviews, setDocPreviews] = useState({
-    highSchoolCert: '',
-    idDocument: '',
-  });
-
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const response = await fetch(`${API_URL}/courses/public`);
-        const data = await response.json();
-        setCourses(data);
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-      }
-    };
-    fetchCourses();
-  }, []);
-
-  useEffect(() => {
-    if (courseId) {
-      setFormData(prev => ({ ...prev, program: courseId }));
-    }
-  }, [courseId]);
+  const programs = [
+    { id: 'ui-ux-webflow', name: 'UI/UX & Webflow Design', price: '€1,200' },
+    { id: 'kyc-compliance', name: 'KYC & Compliance', price: '€900' },
+    { id: 'cybersecurity-vulnerability', name: 'Cyber-Security Vulnerability Tester', price: '€1,800' },
+    { id: 'languages-french-spanish', name: 'French | Spanish | Lithuanian', price: '€800' },
+    { id: 'identity-access-management', name: 'Identity & Access Management (IAM)', price: '€1,400' },
+  ];
 
   const countries = [
     'Lithuania', 'Germany', 'France', 'Spain', 'Italy', 'Poland', 'Netherlands',
     'Belgium', 'Austria', 'Sweden', 'Denmark', 'Finland', 'Ireland', 'Portugal',
-    'Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Other EU Country', 'Non-EU Country'
+    'Other EU Country', 'Non-EU Country'
   ];
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docType: 'highSchoolCert' | 'idDocument') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a JPG, PNG, or PDF file.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB.');
-      return;
-    }
-
-    setUploading(true);
-    
-    try {
-      const uploadData = new FormData();
-      uploadData.append('file', file);
-      uploadData.append('doc_type', docType === 'highSchoolCert' ? 'high_school_cert' : 'identification');
-
-      const response = await fetch(`${API_URL}/upload/document`, {
-        method: 'POST',
-        body: uploadData,
-      });
-
-      const result = await response.json();
-      
-      if (result.url) {
-        if (docType === 'highSchoolCert') {
-          setFormData(prev => ({ ...prev, highSchoolCertUrl: result.url }));
-          setDocPreviews(prev => ({ ...prev, highSchoolCert: file.name }));
-        } else {
-          setFormData(prev => ({ ...prev, idDocumentUrl: result.url }));
-          setDocPreviews(prev => ({ ...prev, idDocument: file.name }));
-        }
-      }
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      alert('Failed to upload document. Please try again.');
-    } finally {
-      setUploading(false);
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData(prev => ({ ...prev, documents: e.target.files![0] }));
     }
   };
 
   const handlePayment = async () => {
-    if (!formData.highSchoolCertUrl) {
-      alert('Please upload your high school certificate.');
-      return;
-    }
-    if (!formData.idDocumentUrl) {
-      alert('Please upload your means of identification.');
+    if (!stripe || !elements) {
       return;
     }
 
     setIsProcessing(true);
-    
-    try {
-      const response = await fetch(`${API_URL}/applications/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          course_id: formData.program,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          high_school_cert_url: formData.highSchoolCertUrl,
-          identification_url: formData.idDocumentUrl,
-          origin_url: window.location.origin,
-        }),
-      });
 
-      const result = await response.json();
-      
-      if (result.checkout_url) {
-        window.location.href = result.checkout_url;
-      } else if (result.application_id) {
-        setApplicationRef(result.application_id);
-        setPaymentSuccess(true);
-        setCurrentStep(4);
-      }
-    } catch (error) {
-      console.error('Error submitting application:', error);
-      alert('Failed to submit application. Please try again.');
-    } finally {
+    // In a real implementation, you would:
+    // 1. Create a payment intent on your backend
+    // 2. Confirm the card payment with Stripe
+    // 3. Handle the result
+
+    // Simulating payment processing
+    setTimeout(() => {
       setIsProcessing(false);
-    }
+      setPaymentSuccess(true);
+      setCurrentStep(4);
+    }, 2000);
   };
 
   const nextStep = () => {
@@ -233,7 +132,6 @@ const ApplyNow = () => {
               className="pl-10"
               value={formData.firstName}
               onChange={(e) => handleInputChange('firstName', e.target.value)}
-              data-testid="first-name-input"
             />
           </div>
         </div>
@@ -244,7 +142,6 @@ const ApplyNow = () => {
             placeholder="Doe"
             value={formData.lastName}
             onChange={(e) => handleInputChange('lastName', e.target.value)}
-            data-testid="last-name-input"
           />
         </div>
       </div>
@@ -260,7 +157,6 @@ const ApplyNow = () => {
             className="pl-10"
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
-            data-testid="email-input"
           />
         </div>
       </div>
@@ -276,7 +172,6 @@ const ApplyNow = () => {
             className="pl-10"
             value={formData.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
-            data-testid="phone-input"
           />
         </div>
       </div>
@@ -285,7 +180,7 @@ const ApplyNow = () => {
         <div className="space-y-2">
           <Label htmlFor="country">Country *</Label>
           <div className="relative">
-            <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10" />
+            <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
             <Select onValueChange={(value) => handleInputChange('country', value)}>
               <SelectTrigger className="pl-10">
                 <SelectValue placeholder="Select country" />
@@ -317,14 +212,14 @@ const ApplyNow = () => {
     <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="program">Select Program *</Label>
-        <Select value={formData.program} onValueChange={(value) => handleInputChange('program', value)}>
+        <Select onValueChange={(value) => handleInputChange('program', value)}>
           <SelectTrigger>
             <SelectValue placeholder="Choose your program" />
           </SelectTrigger>
           <SelectContent>
-            {courses.map((course) => (
-              <SelectItem key={course.id} value={course.id}>
-                {course.title}
+            {programs.map((program) => (
+              <SelectItem key={program.id} value={program.id}>
+                {program.name} - {program.price}
               </SelectItem>
             ))}
           </SelectContent>
@@ -334,7 +229,7 @@ const ApplyNow = () => {
       <div className="space-y-2">
         <Label htmlFor="education">Highest Education Level *</Label>
         <div className="relative">
-          <GraduationCap className="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10" />
+          <GraduationCap className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
           <Select onValueChange={(value) => handleInputChange('education', value)}>
             <SelectTrigger className="pl-10">
               <SelectValue placeholder="Select education level" />
@@ -350,83 +245,32 @@ const ApplyNow = () => {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <Label>Upload Documents (CV, ID, Certificates)</Label>
-        
-        {/* High School Certificate */}
-        <div className="space-y-2">
-          <Label className="text-sm font-normal text-gray-600">High School Certificate *</Label>
-          <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-            docPreviews.highSchoolCert ? 'border-gitb-lime bg-gitb-lime/5' : 'border-gray-300 hover:border-gitb-lime'
-          }`}>
-            {uploading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-gitb-lime border-t-transparent"></div>
-              </div>
-            ) : docPreviews.highSchoolCert ? (
-              <div className="flex items-center justify-center gap-2 text-gitb-lime">
-                <FileText className="w-5 h-5" />
-                <span>{docPreviews.highSchoolCert}</span>
-              </div>
-            ) : (
-              <>
-                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 mb-2 text-sm">Upload your high school certificate</p>
-              </>
-            )}
-            <label className="cursor-pointer">
-              <input
-                type="file"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, 'highSchoolCert')}
-                accept=".pdf,.jpg,.jpeg,.png"
-                data-testid="high-school-cert-input"
-              />
-              <span className="px-4 py-2 bg-gitb-lime text-white text-sm rounded-lg hover:bg-gitb-lime-hover transition-colors inline-block mt-2">
-                {docPreviews.highSchoolCert ? 'Change File' : 'Browse Files'}
-              </span>
-            </label>
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="documents">Upload Documents (CV, ID, Certificates)</Label>
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-gitb-lime transition-colors">
+          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 mb-2">Drag and drop your files here</p>
+          <p className="text-sm text-gray-400 mb-4">or</p>
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+              accept=".pdf,.doc,.docx,.jpg,.png"
+            />
+            <span className="px-4 py-2 bg-gitb-lime text-white rounded-lg hover:bg-gitb-lime-hover transition-colors">
+              Browse Files
+            </span>
+          </label>
+          {formData.documents && (
+            <p className="mt-4 text-sm text-gitb-lime flex items-center justify-center gap-2">
+              <FileText className="w-4 h-4" />
+              {formData.documents.name}
+            </p>
+          )}
         </div>
-
-        {/* ID Document */}
-        <div className="space-y-2">
-          <Label className="text-sm font-normal text-gray-600">Means of Identification (Passport/National ID) *</Label>
-          <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-            docPreviews.idDocument ? 'border-gitb-lime bg-gitb-lime/5' : 'border-gray-300 hover:border-gitb-lime'
-          }`}>
-            {uploading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-gitb-lime border-t-transparent"></div>
-              </div>
-            ) : docPreviews.idDocument ? (
-              <div className="flex items-center justify-center gap-2 text-gitb-lime">
-                <FileText className="w-5 h-5" />
-                <span>{docPreviews.idDocument}</span>
-              </div>
-            ) : (
-              <>
-                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 mb-2 text-sm">Upload your ID document</p>
-              </>
-            )}
-            <label className="cursor-pointer">
-              <input
-                type="file"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, 'idDocument')}
-                accept=".pdf,.jpg,.jpeg,.png"
-                data-testid="id-document-input"
-              />
-              <span className="px-4 py-2 bg-gitb-lime text-white text-sm rounded-lg hover:bg-gitb-lime-hover transition-colors inline-block mt-2">
-                {docPreviews.idDocument ? 'Change File' : 'Browse Files'}
-              </span>
-            </label>
-          </div>
-        </div>
-
         <p className="text-sm text-gray-500">
-          Accepted formats: PDF, DOC, DOCX, JPG, PNG (Max 5MB)
+          Accepted formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB)
         </p>
       </div>
     </div>
@@ -455,7 +299,6 @@ const ApplyNow = () => {
                 base: {
                   fontSize: '16px',
                   color: '#424770',
-                  fontFamily: 'Inter, system-ui, sans-serif',
                   '::placeholder': {
                     color: '#aab7c4',
                   },
@@ -486,17 +329,15 @@ const ApplyNow = () => {
       </div>
       <h2 className="text-3xl font-bold text-gray-900 mb-4">Application Submitted!</h2>
       <p className="text-gray-600 mb-2">
-        Thank you for applying to GITB. We have received your application.
+        Thank you for applying to GITB. We have received your application and payment.
       </p>
       <p className="text-gray-600 mb-8">
-        You will receive a confirmation email at <strong>{formData.email}</strong> within 24-48 hours.
+        You will receive a confirmation email at <strong>{formData.email}</strong> within 24 hours.
       </p>
-      {applicationRef && (
-        <div className="bg-gray-50 rounded-xl p-6 mb-8 max-w-md mx-auto">
-          <p className="text-sm text-gray-500 mb-2">Application Reference</p>
-          <p className="text-xl font-bold text-gitb-dark">{applicationRef}</p>
-        </div>
-      )}
+      <div className="bg-gray-50 rounded-xl p-6 mb-8 max-w-md mx-auto">
+        <p className="text-sm text-gray-500 mb-2">Application Reference</p>
+        <p className="text-xl font-bold text-gitb-dark">GITB-2025-{Math.random().toString(36).substr(2, 6).toUpperCase()}</p>
+      </div>
       <Button 
         onClick={() => window.location.href = '/'} 
         className="bg-gitb-lime hover:bg-gitb-lime-hover text-white"
@@ -507,103 +348,103 @@ const ApplyNow = () => {
   );
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50 pt-[72px] pb-16">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center py-12">
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Apply to GITB
-            </h1>
-            <p className="text-gray-600">
-              Start your journey to a successful career in tech, business, or languages
-            </p>
-          </div>
-
-          {/* EAHEA Accreditation */}
-          <div className="flex items-center justify-center gap-4 mb-8 p-4 bg-white rounded-xl shadow-sm">
-            <Award className="w-12 h-12 text-gitb-lime" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">EAHEA Accredited</p>
-              <p className="text-xs text-gray-500">European Union & International Recognition</p>
-            </div>
-          </div>
-
-          {/* Step Indicator */}
-          {currentStep < 4 && renderStepIndicator()}
-
-          {/* Form Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {currentStep === 1 && 'Personal Information'}
-                {currentStep === 2 && 'Program Selection'}
-                {currentStep === 3 && 'Payment'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {currentStep === 1 && renderPersonalInfo()}
-              {currentStep === 2 && renderProgramSelection()}
-              {currentStep === 3 && renderPayment()}
-              {currentStep === 4 && renderSuccess()}
-
-              {/* Navigation Buttons */}
-              {currentStep < 4 && (
-                <div className="flex justify-between mt-8">
-                  {currentStep > 1 ? (
-                    <Button
-                      variant="outline"
-                      onClick={prevStep}
-                      className="flex items-center gap-2"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Back
-                    </Button>
-                  ) : (
-                    <div />
-                  )}
-
-                  {currentStep < 3 ? (
-                    <Button
-                      onClick={nextStep}
-                      className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
-                    >
-                      Continue
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handlePayment}
-                      disabled={isProcessing || !stripe}
-                      className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
-                      data-testid="submit-application-btn"
-                    >
-                      {isProcessing ? (
-                        'Processing...'
-                      ) : (
-                        <>
-                          <CreditCard className="w-4 h-4" />
-                          Pay €50.00
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Footer Note */}
-          <p className="text-center text-sm text-gray-500 mt-8">
-            By applying, you agree to our{' '}
-            <a href="/terms" className="text-gitb-lime hover:underline">Terms of Service</a>
-            {' '}and{' '}
-            <a href="/privacy" className="text-gitb-lime hover:underline">Privacy Policy</a>
+    <div className="min-h-screen bg-gray-50 pt-[72px] pb-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center py-12">
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+            Apply to GITB
+          </h1>
+          <p className="text-gray-600">
+            Start your journey to a successful career in tech, business, or languages
           </p>
         </div>
+
+        {/* EAHEA Accreditation */}
+        <div className="flex items-center justify-center gap-4 mb-8 p-4 bg-white rounded-xl shadow-sm">
+          <img 
+            src="/images/eahea-badge.png" 
+            alt="EAHEA Accredited" 
+            className="h-16 w-auto"
+          />
+          <div>
+            <p className="text-sm font-medium text-gray-900">EAHEA Accredited</p>
+            <p className="text-xs text-gray-500">European Union & International Recognition</p>
+          </div>
+        </div>
+
+        {/* Step Indicator */}
+        {currentStep < 4 && renderStepIndicator()}
+
+        {/* Form Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {currentStep === 1 && 'Personal Information'}
+              {currentStep === 2 && 'Program Selection'}
+              {currentStep === 3 && 'Payment'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {currentStep === 1 && renderPersonalInfo()}
+            {currentStep === 2 && renderProgramSelection()}
+            {currentStep === 3 && renderPayment()}
+            {currentStep === 4 && renderSuccess()}
+
+            {/* Navigation Buttons */}
+            {currentStep < 4 && (
+              <div className="flex justify-between mt-8">
+                {currentStep > 1 ? (
+                  <Button
+                    variant="outline"
+                    onClick={prevStep}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                ) : (
+                  <div />
+                )}
+
+                {currentStep < 3 ? (
+                  <Button
+                    onClick={nextStep}
+                    className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handlePayment}
+                    disabled={isProcessing || !stripe}
+                    className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
+                  >
+                    {isProcessing ? (
+                      'Processing...'
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4" />
+                        Pay €50.00
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Footer Note */}
+        <p className="text-center text-sm text-gray-500 mt-8">
+          By applying, you agree to our{' '}
+          <a href="/terms" className="text-gitb-lime hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" className="text-gitb-lime hover:underline">Privacy Policy</a>
+        </p>
       </div>
-      <Footer />
-    </>
+    </div>
   );
 };
 
