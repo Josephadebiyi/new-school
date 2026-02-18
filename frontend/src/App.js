@@ -227,9 +227,6 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors />
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/apply" element={<ApplyPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/limited-access" element={<LimitedAccess />} />
           <Route path="/billing" element={
@@ -291,12 +288,28 @@ function App() {
             <Route path="payments" element={<AdminPayments />} />
           </Route>
 
-          {/* Catch-all redirect to landing page */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Redirect root and unknown paths to school app */}
+          <Route path="*" element={<SchoolRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
   );
 }
+
+// Component to redirect to school app on port 3001
+const SchoolRedirect = () => {
+  useEffect(() => {
+    // Redirect to the school app
+    const currentPath = window.location.pathname;
+    const schoolUrl = window.location.origin.replace(':3000', ':3001') + currentPath;
+    window.location.href = schoolUrl;
+  }, []);
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="spinner"></div>
+    </div>
+  );
+};
 
 export default App;
