@@ -10,6 +10,7 @@ import ApplyPage from "./pages/ApplyPage";
 import SchoolsPage from "./pages/SchoolsPage";
 import WhyGITBPage from "./pages/WhyGITBPage";
 import CourseDetailPage from "./pages/CourseDetailPage";
+import SchoolDetailPage from "./pages/SchoolDetailPage";
 
 // LMS Pages
 import Login from "./pages/Login";
