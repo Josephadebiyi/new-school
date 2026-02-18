@@ -224,11 +224,13 @@ const StudentDashboard = () => {
             
             {/* Add Course Card */}
             {enrollments.length > 0 && enrollments.length < 5 && (
-              <div className="card-dashed p-6 min-w-[200px] flex-shrink-0 flex flex-col items-center justify-center">
-                <Plus size={24} className="text-gray-400 mb-2" />
-                <h3 className="font-medium text-gray-700 text-sm">Add course</h3>
-                <p className="text-xs text-gray-500 mt-1 text-center">Get the third course with a -25% discount</p>
-              </div>
+              <Link to="/student/courses" data-testid="add-course-card">
+                <div className="card-dashed p-6 min-w-[200px] flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all">
+                  <Plus size={24} className="text-gray-400 mb-2" />
+                  <h3 className="font-medium text-gray-700 text-sm">Add course</h3>
+                  <p className="text-xs text-gray-500 mt-1 text-center">Get the third course with a -25% discount</p>
+                </div>
+              </Link>
             )}
           </div>
         </div>
