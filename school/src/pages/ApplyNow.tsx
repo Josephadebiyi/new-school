@@ -12,14 +12,17 @@ import {
   Phone,
   MapPin,
   GraduationCap,
-  AlertCircle
+  AlertCircle,
+  Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { API_URL } from '../App';
+import Footer from '../sections/Footer';
 
 interface Course {
   id: string;
@@ -28,6 +31,8 @@ interface Course {
 }
 
 const ApplyNow = () => {
+  const stripe = useStripe();
+  const elements = useElements();
   const [searchParams] = useSearchParams();
   const courseId = searchParams.get('course');
   
@@ -131,7 +136,7 @@ const ApplyNow = () => {
     }
   };
 
-  const handleSubmitApplication = async () => {
+  const handlePayment = async () => {
     if (!formData.highSchoolCertUrl) {
       alert('Please upload your high school certificate.');
       return;
@@ -164,7 +169,6 @@ const ApplyNow = () => {
       const result = await response.json();
       
       if (result.checkout_url) {
-        // Redirect to Stripe checkout
         window.location.href = result.checkout_url;
       } else if (result.application_id) {
         setApplicationRef(result.application_id);
@@ -268,7 +272,7 @@ const ApplyNow = () => {
           <Input
             id="phone"
             type="tel"
-            placeholder="+234 XXX XXXX XXX"
+            placeholder="+370 600 00000"
             className="pl-10"
             value={formData.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -300,7 +304,7 @@ const ApplyNow = () => {
           <Label htmlFor="city">City *</Label>
           <Input
             id="city"
-            placeholder="Lagos"
+            placeholder="Vilnius"
             value={formData.city}
             onChange={(e) => handleInputChange('city', e.target.value)}
           />
@@ -347,7 +351,7 @@ const ApplyNow = () => {
       </div>
 
       <div className="space-y-4">
-        <Label>Required Documents</Label>
+        <Label>Upload Documents (CV, ID, Certificates)</Label>
         
         {/* High School Certificate */}
         <div className="space-y-2">
@@ -361,7 +365,7 @@ const ApplyNow = () => {
               </div>
             ) : docPreviews.highSchoolCert ? (
               <div className="flex items-center justify-center gap-2 text-gitb-lime">
-                <CheckCircle className="w-5 h-5" />
+                <FileText className="w-5 h-5" />
                 <span>{docPreviews.highSchoolCert}</span>
               </div>
             ) : (
@@ -397,7 +401,7 @@ const ApplyNow = () => {
               </div>
             ) : docPreviews.idDocument ? (
               <div className="flex items-center justify-center gap-2 text-gitb-lime">
-                <CheckCircle className="w-5 h-5" />
+                <FileText className="w-5 h-5" />
                 <span>{docPreviews.idDocument}</span>
               </div>
             ) : (
@@ -422,7 +426,7 @@ const ApplyNow = () => {
         </div>
 
         <p className="text-sm text-gray-500">
-          Accepted formats: PDF, JPG, PNG (Max 5MB)
+          Accepted formats: PDF, DOC, DOCX, JPG, PNG (Max 5MB)
         </p>
       </div>
     </div>
@@ -442,36 +446,35 @@ const ApplyNow = () => {
         </p>
       </div>
 
+      <div className="space-y-4">
+        <Label>Card Information</Label>
+        <div className="border border-gray-300 rounded-xl p-4">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#424770',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  '::placeholder': {
+                    color: '#aab7c4',
+                  },
+                },
+                invalid: {
+                  color: '#9e2146',
+                },
+              },
+            }}
+          />
+        </div>
+      </div>
+
       <div className="flex items-start gap-3 p-4 bg-yellow-50 rounded-xl">
         <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-yellow-700">
-          You will be redirected to our secure payment gateway (Stripe) to complete your payment.
+          Your payment is secured by Stripe. We do not store your card details.
           The registration fee is non-refundable.
         </p>
-      </div>
-
-      <div className="bg-gray-50 rounded-xl p-6">
-        <h4 className="font-semibold mb-4">Application Summary</h4>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Name:</span>
-            <span className="font-medium">{formData.firstName} {formData.lastName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Email:</span>
-            <span className="font-medium">{formData.email}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Program:</span>
-            <span className="font-medium">{courses.find(c => c.id === formData.program)?.title || 'Not selected'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Documents:</span>
-            <span className="text-gitb-lime font-medium">
-              {docPreviews.highSchoolCert && docPreviews.idDocument ? 'Uploaded' : 'Pending'}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -504,91 +507,103 @@ const ApplyNow = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-[72px] pb-16">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center py-12">
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-            Apply to GITB
-          </h1>
-          <p className="text-gray-600">
-            Start your journey to a successful career in tech, business, or languages
+    <>
+      <div className="min-h-screen bg-gray-50 pt-[72px] pb-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="text-center py-12">
+            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Apply to GITB
+            </h1>
+            <p className="text-gray-600">
+              Start your journey to a successful career in tech, business, or languages
+            </p>
+          </div>
+
+          {/* EAHEA Accreditation */}
+          <div className="flex items-center justify-center gap-4 mb-8 p-4 bg-white rounded-xl shadow-sm">
+            <Award className="w-12 h-12 text-gitb-lime" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">EAHEA Accredited</p>
+              <p className="text-xs text-gray-500">European Union & International Recognition</p>
+            </div>
+          </div>
+
+          {/* Step Indicator */}
+          {currentStep < 4 && renderStepIndicator()}
+
+          {/* Form Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {currentStep === 1 && 'Personal Information'}
+                {currentStep === 2 && 'Program Selection'}
+                {currentStep === 3 && 'Payment'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {currentStep === 1 && renderPersonalInfo()}
+              {currentStep === 2 && renderProgramSelection()}
+              {currentStep === 3 && renderPayment()}
+              {currentStep === 4 && renderSuccess()}
+
+              {/* Navigation Buttons */}
+              {currentStep < 4 && (
+                <div className="flex justify-between mt-8">
+                  {currentStep > 1 ? (
+                    <Button
+                      variant="outline"
+                      onClick={prevStep}
+                      className="flex items-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
+
+                  {currentStep < 3 ? (
+                    <Button
+                      onClick={nextStep}
+                      className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
+                    >
+                      Continue
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handlePayment}
+                      disabled={isProcessing || !stripe}
+                      className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
+                      data-testid="submit-application-btn"
+                    >
+                      {isProcessing ? (
+                        'Processing...'
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4" />
+                          Pay €50.00
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Footer Note */}
+          <p className="text-center text-sm text-gray-500 mt-8">
+            By applying, you agree to our{' '}
+            <a href="/terms" className="text-gitb-lime hover:underline">Terms of Service</a>
+            {' '}and{' '}
+            <a href="/privacy" className="text-gitb-lime hover:underline">Privacy Policy</a>
           </p>
         </div>
-
-        {/* Step Indicator */}
-        {currentStep < 4 && renderStepIndicator()}
-
-        {/* Form Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {currentStep === 1 && 'Personal Information'}
-              {currentStep === 2 && 'Program & Documents'}
-              {currentStep === 3 && 'Review & Payment'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentStep === 1 && renderPersonalInfo()}
-            {currentStep === 2 && renderProgramSelection()}
-            {currentStep === 3 && renderPayment()}
-            {currentStep === 4 && renderSuccess()}
-
-            {/* Navigation Buttons */}
-            {currentStep < 4 && (
-              <div className="flex justify-between mt-8">
-                {currentStep > 1 ? (
-                  <Button
-                    variant="outline"
-                    onClick={prevStep}
-                    className="flex items-center gap-2"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back
-                  </Button>
-                ) : (
-                  <div />
-                )}
-
-                {currentStep < 3 ? (
-                  <Button
-                    onClick={nextStep}
-                    className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
-                  >
-                    Continue
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleSubmitApplication}
-                    disabled={isProcessing}
-                    className="bg-gitb-lime hover:bg-gitb-lime-hover text-white flex items-center gap-2"
-                    data-testid="submit-application-btn"
-                  >
-                    {isProcessing ? (
-                      'Processing...'
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4" />
-                        Pay €50.00 & Submit
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Footer Note */}
-        <p className="text-center text-sm text-gray-500 mt-8">
-          By applying, you agree to our{' '}
-          <a href="/terms" className="text-gitb-lime hover:underline">Terms of Service</a>
-          {' '}and{' '}
-          <a href="/privacy" className="text-gitb-lime hover:underline">Privacy Policy</a>
-        </p>
       </div>
-    </div>
+      <Footer />
+    </>
   );
 };
 
