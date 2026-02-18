@@ -619,20 +619,308 @@ const TrendingPrograms = () => {
 // Stats Section
 const Stats = () => {
   const stats = [
-    { value: '10,000+', label: 'Graduates' },
-    { value: '15+', label: 'Programs' },
+    { value: '7,980+', label: 'Learners Served' },
+    { value: '1M+', label: 'Hours of Content' },
     { value: '4+', label: 'Countries' },
-    { value: '98%', label: 'Satisfaction' },
+    { value: '95%', label: 'Success Rate' },
   ];
 
   return (
-    <section id="why-gitb" className="py-16 bg-[#314a06]" data-testid="stats-section">
+    <section id="why-gitb" className="py-16 bg-[#7ebf0d]" data-testid="stats-section">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <p className="text-4xl lg:text-5xl font-bold text-white mb-2">{stat.value}</p>
-              <p className="text-[#7ebf0d] font-medium">{stat.label}</p>
+              <p className="text-white/80 font-medium">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Path For Everyone Section
+const PathForEveryone = () => {
+  const programs = [
+    {
+      icon: BookOpen,
+      title: 'Nano-Diploma',
+      description: 'Self-paced programs that let you go deeper into a focused skill. Earn recognized certificates to boost your profile.',
+      features: ['4-8 weeks flexible', 'Online with recorded lectures', 'GITB certificate'],
+      cta: 'Explore Nano-Diploma',
+      link: '/schools',
+      highlighted: false,
+    },
+    {
+      icon: Award,
+      title: 'Diploma',
+      description: "A comprehensive, instructor-led program with community and mentorship support. Master a new career path in 12 months.",
+      features: ['12 months', 'Live classes + recorded lectures', 'GITB Diploma certificate'],
+      cta: 'Start a Diploma Program',
+      link: '/apply',
+      highlighted: true,
+    },
+    {
+      icon: Users,
+      title: 'Masterclass',
+      description: 'Bite-sized sessions on practical topics to give you quick wins in your career. Perfect for busy professionals.',
+      features: ['1-3 hours', 'Physical/Online, Live Sessions', 'No certificate'],
+      cta: 'Browse Masterclasses',
+      link: '/schools',
+      highlighted: false,
+    },
+  ];
+
+  return (
+    <section className="py-20 lg:py-28 bg-white" data-testid="path-for-everyone">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+            There's a path for everyone
+          </h2>
+          <p className="text-lg text-gray-600">
+            Students! Professionals! Career Switchers!
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+          {programs.map((program, index) => {
+            const Icon = program.icon;
+            return (
+              <div
+                key={program.title}
+                className={`relative group ${program.highlighted ? 'md:-mt-4 md:mb-4' : ''}`}
+              >
+                <div className={`h-full rounded-2xl p-6 lg:p-8 transition-all duration-300 ${
+                  program.highlighted
+                    ? 'bg-[#314a06] text-white shadow-xl'
+                    : 'bg-white border border-gray-200 hover:border-[#7ebf0d]'
+                }`}>
+                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-6 ${
+                    program.highlighted ? 'bg-white/20' : 'bg-[#7ebf0d]/10'
+                  }`}>
+                    <Icon className={`w-7 h-7 ${program.highlighted ? 'text-white' : 'text-[#7ebf0d]'}`} />
+                  </div>
+
+                  <h3 className={`text-xl font-bold mb-3 ${program.highlighted ? 'text-white' : 'text-gray-900'}`}>
+                    {program.title}
+                  </h3>
+                  <p className={`text-sm leading-relaxed mb-6 ${program.highlighted ? 'text-white/90' : 'text-gray-600'}`}>
+                    {program.description}
+                  </p>
+
+                  <ul className="space-y-3 mb-8">
+                    {program.features.map((feature, i) => (
+                      <li key={i} className={`flex items-center gap-3 text-sm ${
+                        program.highlighted ? 'text-white/90' : 'text-gray-600'
+                      }`}>
+                        <Clock className="w-4 h-4 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link to={program.link} className="block">
+                    <Button className={`w-full ${
+                      program.highlighted
+                        ? 'bg-[#7ebf0d] text-white hover:bg-[#6ba50b]'
+                        : 'border border-gray-300 text-gray-700 hover:bg-[#7ebf0d]/10 hover:text-[#314a06] hover:border-[#7ebf0d]'
+                    }`} variant={program.highlighted ? "default" : "outline"}>
+                      {program.cta}
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Nano Diploma Intro Section
+const NanoDiplomaIntro = () => {
+  return (
+    <section className="py-20 lg:py-28 bg-[#7ebf0d] relative overflow-hidden" data-testid="nano-diploma">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#314a06]/10 rounded-full blur-3xl" />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div className="space-y-8">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium backdrop-blur-sm">
+                <Award className="w-4 h-4" />
+                New Program Format
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
+                Introducing<br />Nano-Diploma
+              </h2>
+
+              <p className="text-lg text-white/90 leading-relaxed max-w-lg">
+                Master a skill in less time, no long commitment. Each Nano-Diploma 
+                comes with real-world projects and a recognized certificate to 
+                showcase your expertise to your employer.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              {[
+                { icon: TrendingUp, text: 'Fast-track your career' },
+                { icon: Clock, text: 'Complete in 4-8 weeks' },
+                { icon: Award, text: 'Industry-recognized certificate' },
+              ].map((feature, index) => (
+                <div key={index} className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                  <feature.icon className="w-5 h-5 text-white" />
+                  <span className="text-sm font-medium text-white">{feature.text}</span>
+                </div>
+              ))}
+            </div>
+
+            <Link to="/schools">
+              <Button size="lg" className="bg-white text-[#314a06] hover:bg-gray-100 font-semibold px-8 py-6 text-base rounded-xl">
+                View Programs
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="relative">
+            <div className="bg-white rounded-3xl shadow-2xl p-6 lg:p-8 transform rotate-2 hover:rotate-0 transition-transform duration-500">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="w-16 h-16 bg-[#7ebf0d]/10 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Award className="w-8 h-8 text-[#7ebf0d]" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-1">Nano-Diploma Certificate</h4>
+                  <p className="text-sm text-gray-500">GITB Verified Credential</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { label: 'Program', value: 'UI/UX Design' },
+                  { label: 'Duration', value: '6 Weeks' },
+                  { label: 'Certificate ID', value: 'GITB-UX-2025-001' },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center justify-between py-3 border-b border-gray-100">
+                    <span className="text-sm text-gray-600">{item.label}</span>
+                    <span className="text-sm font-medium text-gray-900">{item.value}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-sm text-gray-600">Status</span>
+                  <span className="px-3 py-1 bg-[#7ebf0d]/10 text-[#314a06] text-xs font-medium rounded-full">Verified</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute -bottom-4 -left-4 bg-[#314a06] text-white rounded-xl px-4 py-3 shadow-lg">
+              <p className="text-sm font-bold">4-8 Weeks</p>
+              <p className="text-xs text-[#7ebf0d]">Average completion</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Reimagining Dream / Why GITB Section
+const ReimaginingDream = () => {
+  const features = [
+    { icon: Globe, title: 'Learn anywhere', description: 'Why go to a lecture hall when you can learn from home, by the beach, at the recording studio or at your shop?' },
+    { icon: Award, title: 'Learning is fun', description: 'Say goodbye to outdated curriculums, bulky lecture notes, and boring lectures.' },
+    { icon: Users, title: 'Learning is Communal', description: 'Learners are working together, sharing knowledge, and collaborating to enhance their understanding.' },
+    { icon: BookOpen, title: 'Learn from the best', description: 'Our instructors are carefully selected to give you the best learning outcome.' },
+    { icon: TrendingUp, title: 'Learn the profitable way', description: "Whether you're exploring a career path, or acquiring new skills, we will help you achieve results." },
+  ];
+
+  return (
+    <section id="reimagining" className="py-20 lg:py-28 bg-slate-50" data-testid="reimagining-dream">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16">
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <span className="inline-block px-4 py-1.5 bg-[#7ebf0d]/10 text-[#314a06] text-sm font-medium rounded-full">
+                WHY GITB
+              </span>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+                Reimagining the<br />African Dream
+              </h2>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                This is where dreams come to life. With our carefully crafted learning 
+                courses and diploma programs we will meet you where you are, and take 
+                you to where you want to be in your career.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <div key={feature.title} className="flex gap-4 p-4 rounded-xl hover:bg-white hover:shadow-sm transition-all duration-300">
+                  <div className="flex-shrink-0 w-12 h-12 bg-[#7ebf0d]/10 rounded-xl flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-[#7ebf0d]" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 mb-1">{feature.title}</h3>
+                    <p className="text-sm text-gray-600 leading-relaxed">{feature.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Testimonials Section
+const Testimonials = () => {
+  const testimonials = [
+    { name: 'Sarah Mitchell', role: 'Product Designer at Spotify', avatar: 'SM', quote: "GITB's UI/UX program completely transformed my career. The hands-on projects and mentorship helped me land my dream job.", color: 'bg-purple-100 text-purple-600' },
+    { name: 'James Okonkwo', role: 'Cybersecurity Analyst', avatar: 'JO', quote: "The Cyber-Security program was intense but incredibly rewarding. The practical labs prepared me for real-world scenarios.", color: 'bg-blue-100 text-blue-600' },
+    { name: 'Maria Gonzalez', role: 'Compliance Officer', avatar: 'MG', quote: "I switched careers thanks to GITB's KYC program. The instructors are industry experts who truly care about your success.", color: 'bg-green-100 text-green-600' },
+  ];
+
+  return (
+    <section className="py-20 lg:py-28 bg-slate-50" data-testid="testimonials">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+            Learners say we know our onions
+          </h2>
+          <p className="text-lg text-gray-600">No jokes - See proof here!</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {testimonials.map((testimonial, index) => (
+            <div key={testimonial.name} className="bg-white rounded-2xl p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+              <div className="w-8 h-8 text-[#7ebf0d]/30 mb-4">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                </svg>
+              </div>
+              <p className="text-gray-700 leading-relaxed mb-6">"{testimonial.quote}"</p>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${testimonial.color}`}>
+                  {testimonial.avatar}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">{testimonial.name}</p>
+                  <p className="text-xs text-gray-500">{testimonial.role}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
