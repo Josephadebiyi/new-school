@@ -1496,22 +1496,42 @@ async def send_admission_email(email: str, first_name: str, last_name: str, prog
 @api_router.post("/applications/{application_id}/reject")
 async def reject_application(
     application_id: str,
+    reason: Optional[str] = None,
     current_user: dict = Depends(require_roles([UserRole.ADMIN, "registrar"]))
 ):
     """Reject an application"""
+    # Get application first to send email
+    application = await db.applications.find_one({"id": application_id}, {"_id": 0})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
     result = await db.applications.update_one(
         {"id": application_id},
         {"$set": {
             "status": "rejected",
             "rejected_at": datetime.now(timezone.utc).isoformat(),
-            "rejected_by": current_user["id"]
+            "rejected_by": current_user["id"],
+            "rejection_reason": reason
         }}
     )
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Application not found")
     
-    return {"message": "Application rejected"}
+    # Send rejection email
+    email_sent = False
+    try:
+        email_sent = await send_application_rejected_email(
+            application["email"],
+            application["first_name"],
+            application["last_name"],
+            application.get("course_title", "Your Program"),
+            reason
+        )
+    except Exception as e:
+        logger.error(f"Failed to send rejection email: {e}")
+    
+    return {"message": "Application rejected", "email_sent": email_sent}
 
 @api_router.get("/applications/{application_id}/admission-letter")
 async def get_admission_letter(
