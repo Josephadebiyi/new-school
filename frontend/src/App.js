@@ -245,6 +245,7 @@ function App() {
           
           {/* LMS Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/limited-access" element={<LimitedAccess />} />
           <Route path="/billing" element={
             <ProtectedRoute allowedRoles={["student"]}>
