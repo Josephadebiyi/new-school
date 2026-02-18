@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { API } from "../App";
 import { Button } from "../components/ui/button";
@@ -31,20 +31,21 @@ const LMS_LOGIN_URL = "/login";
 // Header Component
 const Header = ({ isScrolled, isMobileMenuOpen, setIsMobileMenuOpen }) => {
   const navItems = [
-    { label: 'Home', href: '/' },
+    { label: 'Home', href: '/', isLink: true },
     { 
       label: 'Schools', 
-      href: '#schools',
+      href: '/schools',
+      isLink: true,
       dropdown: [
-        { label: 'Engineering', href: '#schools' },
-        { label: 'Data', href: '#schools' },
-        { label: 'Product', href: '#schools' },
-        { label: 'Business', href: '#schools' },
-        { label: 'Creative Economy', href: '#schools' },
+        { label: 'Engineering', href: '/schools/engineering' },
+        { label: 'Data', href: '/schools/data' },
+        { label: 'Product', href: '/schools/product' },
+        { label: 'Business', href: '/schools/business' },
+        { label: 'Creative Economy', href: '/schools/creative' },
       ]
     },
-    { label: 'Why GITB', href: '#why-gitb' },
-    { label: 'Programs', href: '#programs' },
+    { label: 'Why GITB', href: '/why-gitb', isLink: true },
+    { label: 'Programs', href: '#programs', isLink: false },
   ];
 
   return (
@@ -71,28 +72,37 @@ const Header = ({ isScrolled, isMobileMenuOpen, setIsMobileMenuOpen }) => {
           <nav className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => (
               <div key={item.label} className="relative group">
-                <a
-                  href={item.href}
-                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:text-[#314a06] hover:bg-[#7ebf0d]/10 transition-all duration-200"
-                >
-                  {item.label}
-                  {item.dropdown && (
-                    <ChevronDown className="w-4 h-4 transition-transform duration-200 group-hover:rotate-180" />
-                  )}
-                </a>
+                {item.isLink ? (
+                  <Link
+                    to={item.href}
+                    className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:text-[#314a06] hover:bg-[#7ebf0d]/10 transition-all duration-200"
+                  >
+                    {item.label}
+                    {item.dropdown && (
+                      <ChevronDown className="w-4 h-4 transition-transform duration-200 group-hover:rotate-180" />
+                    )}
+                  </Link>
+                ) : (
+                  <a
+                    href={item.href}
+                    className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:text-[#314a06] hover:bg-[#7ebf0d]/10 transition-all duration-200"
+                  >
+                    {item.label}
+                  </a>
+                )}
                 
                 {/* Dropdown */}
                 {item.dropdown && (
                   <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top">
                     <div className="py-2">
                       {item.dropdown.map((subItem) => (
-                        <a
+                        <Link
                           key={subItem.label}
-                          href={subItem.href}
+                          to={subItem.href}
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#7ebf0d]/10 hover:text-[#314a06] transition-colors"
                         >
                           {subItem.label}
-                        </a>
+                        </Link>
                       ))}
                     </div>
                   </div>
