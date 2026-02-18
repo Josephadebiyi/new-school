@@ -157,12 +157,14 @@ const Header = () => {
             </Link>
           ))}
           <div className="pt-4 border-t border-gray-100 space-y-2">
-            <Button
-              variant="outline"
-              className="w-full justify-center text-sm font-medium"
-            >
-              Login
-            </Button>
+            <a href={`${LMS_URL}/login`} className="block">
+              <Button
+                variant="outline"
+                className="w-full justify-center text-sm font-medium"
+              >
+                Login
+              </Button>
+            </a>
             <Link to="/apply" className="block">
               <Button
                 className="w-full justify-center bg-gitb-lime hover:bg-gitb-lime-hover text-white text-sm font-medium"
