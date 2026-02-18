@@ -229,6 +229,9 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors />
         <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/apply" element={<ApplyPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/limited-access" element={<LimitedAccess />} />
           <Route path="/billing" element={
@@ -290,7 +293,7 @@ function App() {
             <Route path="payments" element={<AdminPayments />} />
           </Route>
 
-          {/* Catch-all redirect */}
+          {/* Catch-all redirect to landing page */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
