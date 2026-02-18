@@ -5,7 +5,7 @@ import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Eye, EyeOff, GraduationCap, Mail, Lock, Award } from "lucide-react";
+import { Eye, EyeOff, GraduationCap, Mail, Lock, Award, X } from "lucide-react";
 import { toast } from "sonner";
 
 // Landing page URL (school site)
@@ -19,6 +19,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [systemConfig, setSystemConfig] = useState(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   useEffect(() => {
     fetchSystemConfig();
