@@ -175,7 +175,14 @@ const Login = () => {
                 <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[#8cc63f] focus:ring-[#8cc63f]" />
                 <span className="text-gray-600">Remember me</span>
               </label>
-              <a href="#" className="text-gray-600 hover:text-gray-900 font-medium">Forgot Password?</a>
+              <button 
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-gray-600 hover:text-gray-900 font-medium"
+                data-testid="forgot-password-link"
+              >
+                Forgot Password?
+              </button>
             </div>
 
             <button
