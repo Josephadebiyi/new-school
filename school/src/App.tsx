@@ -13,8 +13,12 @@ import Resources from './pages/Resources';
 import Policies from './pages/Policies';
 import NotFound from './pages/NotFound';
 
+// API Configuration
+export const API_URL = import.meta.env.VITE_API_URL || 'https://student-hub-370.preview.emergentagent.com/api';
+export const LMS_URL = import.meta.env.VITE_LMS_URL || 'https://student-hub-370.preview.emergentagent.com';
+
 // Initialize Stripe with your publishable key
-const stripePromise = loadStripe('pk_test_your_stripe_publishable_key');
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_KEY || 'pk_test_51QdusACbgnK8j3D3u6VZvSyuqOEtmMCsXWMu56I2eSHxdxAjcpLNVsJH7qF0SkPaGVJ0dqmAQVOMr8cAqLuTQY8q00LAUNKsMw');
 
 function App() {
   return (
