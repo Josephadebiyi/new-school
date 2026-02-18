@@ -100,6 +100,20 @@ webpackConfig.devServer = (devServerConfig) => {
     };
   }
 
+  // Proxy non-LMS routes to school app (port 3001)
+  devServerConfig.proxy = [
+    {
+      context: (pathname) => {
+        // LMS routes that should NOT be proxied
+        const lmsRoutes = ['/login', '/student', '/lecturer', '/admin', '/billing', '/limited-access', '/api', '/static', '/sockjs-node', '/ws'];
+        return !lmsRoutes.some(route => pathname.startsWith(route));
+      },
+      target: 'http://localhost:3001',
+      changeOrigin: true,
+      ws: true,
+    },
+  ];
+
   return devServerConfig;
 };
 
