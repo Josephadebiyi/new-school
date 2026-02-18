@@ -28,7 +28,8 @@ import {
 } from "../../components/ui/dialog";
 import { 
   FileText, Clock, CheckCircle, XCircle, UserPlus, Mail, Copy, 
-  Download, CreditCard, GraduationCap, Euro
+  Download, CreditCard, GraduationCap, Euro, Eye, ExternalLink,
+  Phone, Calendar, BookOpen, FileCheck
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +39,7 @@ const AdminAdmissions = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [grantDialog, setGrantDialog] = useState({ open: false, data: null });
+  const [previewDialog, setPreviewDialog] = useState({ open: false, data: null });
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
