@@ -1094,6 +1094,11 @@ const Footer = () => {
                 alt="EAHEA Accredited" 
                 className="h-12 w-auto"
               />
+              <img 
+                src="/images/eu-flag.png" 
+                alt="European Union" 
+                className="h-10 w-auto"
+              />
               <div className="text-sm text-gray-400">
                 <p className="font-medium text-white">EAHEA Accredited</p>
                 <p>European Union & International</p>
