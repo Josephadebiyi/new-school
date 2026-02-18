@@ -234,7 +234,15 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors />
         <Routes>
-          {/* LMS Routes - Must come BEFORE school catch-all */}
+          {/* School Landing Pages - Public */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/apply" element={<ApplyPage />} />
+          <Route path="/schools" element={<SchoolsPage />} />
+          <Route path="/schools/:schoolId" element={<SchoolsPage />} />
+          <Route path="/why-gitb" element={<WhyGITBPage />} />
+          <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+          
+          {/* LMS Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/limited-access" element={<LimitedAccess />} />
           <Route path="/billing" element={
@@ -244,56 +252,60 @@ function App() {
           } />
           
           {/* Student Routes */}
-          <Route path="/student/*" element={
+          <Route path="/student" element={
             <ProtectedRoute allowedRoles={["student"]}>
-              <Routes>
-                <Route element={<DashboardLayout />}>
-                  <Route index element={<StudentDashboard />} />
-                  <Route path="dashboard" element={<StudentDashboard />} />
-                  <Route path="courses" element={<StudentCourses />} />
-                  <Route path="results" element={<StudentResults />} />
-                  <Route path="payments" element={<StudentPayments />} />
-                </Route>
-                <Route path="course/:enrollmentId" element={<CoursePlayer />} />
-              </Routes>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<StudentDashboard />} />
+            <Route path="dashboard" element={<StudentDashboard />} />
+            <Route path="courses" element={<StudentCourses />} />
+            <Route path="results" element={<StudentResults />} />
+            <Route path="payments" element={<StudentPayments />} />
+          </Route>
+          
+          <Route path="/student/course/:enrollmentId" element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <CoursePlayer />
             </ProtectedRoute>
           } />
 
           {/* Lecturer Routes */}
-          <Route path="/lecturer/*" element={
+          <Route path="/lecturer" element={
             <ProtectedRoute allowedRoles={["lecturer"]}>
-              <Routes>
-                <Route element={<DashboardLayout />}>
-                  <Route index element={<LecturerDashboard />} />
-                  <Route path="dashboard" element={<LecturerDashboard />} />
-                  <Route path="courses" element={<LecturerCourses />} />
-                  <Route path="grades" element={<LecturerGrades />} />
-                </Route>
-                <Route path="course/:courseId/builder" element={<CourseBuilder />} />
-              </Routes>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<LecturerDashboard />} />
+            <Route path="dashboard" element={<LecturerDashboard />} />
+            <Route path="courses" element={<LecturerCourses />} />
+            <Route path="grades" element={<LecturerGrades />} />
+          </Route>
+          
+          <Route path="/lecturer/course/:courseId/builder" element={
+            <ProtectedRoute allowedRoles={["lecturer", "admin"]}>
+              <CourseBuilder />
             </ProtectedRoute>
           } />
 
           {/* Admin Routes */}
-          <Route path="/admin/*" element={
+          <Route path="/admin" element={
             <ProtectedRoute allowedRoles={["admin", "registrar"]}>
-              <Routes>
-                <Route element={<DashboardLayout />}>
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="courses" element={<AdminCourses />} />
-                  <Route path="courses/:courseId/edit" element={<CourseEditor />} />
-                  <Route path="settings" element={<AdminSettings />} />
-                  <Route path="admissions" element={<AdminAdmissions />} />
-                  <Route path="payments" element={<AdminPayments />} />
-                </Route>
-              </Routes>
+              <DashboardLayout />
             </ProtectedRoute>
-          } />
+          }>
+            <Route index element={<AdminDashboard />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="courses" element={<AdminCourses />} />
+            <Route path="courses/:courseId/edit" element={<CourseEditor />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="admissions" element={<AdminAdmissions />} />
+            <Route path="payments" element={<AdminPayments />} />
+          </Route>
 
-          {/* School App (Landing pages) - Catch all other routes */}
-          <Route path="/*" element={<SchoolApp />} />
+          {/* Catch-all redirect to landing page */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
