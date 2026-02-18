@@ -57,7 +57,26 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 
 ## What's Been Implemented
 
-### Date: Feb 13, 2026 - Session 4 (Current)
+### Date: Feb 18, 2026 - Session 5 (Current)
+
+**Bug Fixes (COMPLETED)**
+- ✅ Fixed "Add Course" button on Student Dashboard - now navigates to /student/courses
+- ✅ Added Link wrapper with hover effects and data-testid
+
+**Admission Preview Feature (COMPLETED)**
+- ✅ Preview button on Admin Admissions page for each application
+- ✅ Preview modal shows: applicant info (name, email, phone, date)
+- ✅ Applied program section with course and payment status
+- ✅ Uploaded documents section (High School Certificate, ID)
+- ✅ Action buttons (Approve/Reject) within preview modal
+
+**Bulk Quiz Upload (ALREADY EXISTED)**
+- ✅ Quiz upload dialog in Course Editor
+- ✅ Download Excel template functionality
+- ✅ Upload and parse Excel files using xlsx library
+- ✅ Save questions to backend
+
+### Date: Feb 13, 2026 - Session 4
 
 **Mobile Responsiveness (COMPLETED)**
 - ✅ DashboardLayout: Mobile slide-out menu with overlay
@@ -92,12 +111,12 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 - PDF admission letters
 - EUR currency formatting
 
-## Test Results (Latest - Session 4)
-- **Backend**: 100% (14/14 tests passed)
-- **Frontend Mobile**: 100% - All responsive features verified
+## Test Results (Latest - Session 5)
+- **Frontend Features**: 100% - All 3 features verified and working
 - **Test Reports**: 
-  - /app/test_reports/iteration_5.json (Backend + UI features)
+  - /app/test_reports/iteration_7.json (Current session - Bug fix + Features)
   - /app/test_reports/iteration_6.json (Mobile responsiveness)
+  - /app/test_reports/iteration_5.json (Backend + UI features)
 
 ## Test Credentials
 | Role | Email | Password |
