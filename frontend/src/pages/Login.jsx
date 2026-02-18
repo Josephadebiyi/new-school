@@ -87,6 +87,26 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      toast.error("Please enter your email address");
+      return;
+    }
+    
+    setForgotLoading(true);
+    try {
+      await axios.post(`${API}/auth/forgot-password`, { email: forgotEmail });
+      toast.success("If an account exists with that email, a password reset link has been sent.");
+      setShowForgotPassword(false);
+      setForgotEmail("");
+    } catch (error) {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const universityName = systemConfig?.university_name || "GITB";
   const logoUrl = systemConfig?.logo_url;
   const loginImageUrl = systemConfig?.login_image_url || "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80";
