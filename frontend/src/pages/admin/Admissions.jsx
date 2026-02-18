@@ -133,6 +133,18 @@ const AdminAdmissions = () => {
     }
   };
 
+  const openPreview = (application) => {
+    setPreviewDialog({ open: true, data: application });
+  };
+
+  const getDocumentUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('/api')) {
+      return `${API.replace('/api', '')}${url}`;
+    }
+    return url;
+  };
+
   const stats = {
     pending_payment: applications.filter(a => a.status === 'pending_payment').length,
     pending_review: applications.filter(a => a.status === 'pending_review').length,
