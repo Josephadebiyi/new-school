@@ -885,6 +885,148 @@ const ReimaginingDream = () => {
   );
 };
 
+// Partner Logos Section (Where our learners work)
+const PartnerLogos = () => {
+  const partners = [
+    { name: 'JPMorgan Chase' },
+    { name: 'Flutterwave' },
+    { name: 'Sterling' },
+    { name: 'Binance' },
+    { name: 'Microsoft' },
+  ];
+
+  const allPartners = [...partners, ...partners];
+
+  return (
+    <section className="py-12 bg-slate-50 overflow-hidden" data-testid="partner-logos">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <p className="text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+          Where our learners work
+        </p>
+      </div>
+
+      <div className="relative">
+        <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-slate-50 to-transparent z-10" />
+        <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-slate-50 to-transparent z-10" />
+
+        <div className="flex animate-marquee">
+          {allPartners.map((partner, index) => (
+            <div
+              key={`${partner.name}-${index}`}
+              className="flex-shrink-0 mx-8 lg:mx-12 text-gray-400 hover:text-[#7ebf0d] transition-colors duration-300"
+            >
+              <span className="text-lg font-semibold">{partner.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Blog Section (Keep Growing With Us)
+const BlogSection = () => {
+  const articles = [
+    {
+      title: "A Beginner's Guide to Becoming a PM",
+      excerpt: "Have you ever used an app or a service that just... worked? That feels intuitive, solves a real problem...",
+      category: 'Product Management',
+      date: 'Jul 22, 2025',
+      image: '/images/IMG_1522.JPG',
+      readTime: '5 min read',
+    },
+    {
+      title: "Why Remote Work Is Africa's Next Big Thing",
+      excerpt: "Africa is buzzing, and not just with music, fashion, and innovation. Something big is brewing...",
+      category: 'Career',
+      date: 'Jul 18, 2025',
+      image: '/images/IMG_1529.JPG',
+      readTime: '7 min read',
+    },
+    {
+      title: "Switching Careers? Don't Make These 4 Moves",
+      excerpt: "So, you're thinking of switching careers, maybe from banking to tech, or from teaching into sales...",
+      category: 'Career Advice',
+      date: 'Jul 15, 2025',
+      image: '/images/IMG_1532.JPG',
+      readTime: '6 min read',
+    },
+  ];
+
+  return (
+    <section id="resources" className="py-20 lg:py-28 bg-white" data-testid="blog-section">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+            Keep Growing With Us
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Discover articles, guides, and stories that help you learn smarter, explore new ideas, and achieve more.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {articles.map((article, index) => (
+            <article
+              key={article.title}
+              className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-all duration-300 h-full flex flex-col group"
+            >
+              <div className="relative aspect-[16/10] overflow-hidden">
+                <img
+                  src={article.image}
+                  alt={article.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute top-4 left-4">
+                  <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-xs font-medium text-gray-700 rounded-full">
+                    {article.category}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-6 flex flex-col flex-grow">
+                <h3 className="font-bold text-xl text-gray-900 mb-3 line-clamp-2 group-hover:text-[#7ebf0d] transition-colors">
+                  {article.title}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-3 flex-grow">
+                  {article.excerpt}
+                </p>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Clock className="w-4 h-4" />
+                    <span>{article.date}</span>
+                  </div>
+                  <span className="text-xs text-gray-400">{article.readTime}</span>
+                </div>
+
+                <div className="mt-4">
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-[#7ebf0d] group-hover:text-[#314a06] transition-colors">
+                    Read more
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Link to="/blog">
+            <Button 
+              variant="outline"
+              className="px-6 py-3 border-[#7ebf0d] text-[#7ebf0d] hover:bg-[#7ebf0d] hover:text-white font-medium rounded-xl group"
+            >
+              View all articles
+              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 // Testimonials Section
 const Testimonials = () => {
   const testimonials = [
