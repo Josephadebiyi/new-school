@@ -291,13 +291,7 @@ function App() {
             <Route path="payments" element={<AdminPayments />} />
           </Route>
 
-          {/* Default redirect */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <RoleRedirect />
-            </ProtectedRoute>
-          } />
-          
+          {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
