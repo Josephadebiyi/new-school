@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { LMS_URL } from '../App';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
