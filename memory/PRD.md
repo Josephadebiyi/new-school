@@ -152,20 +152,18 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 ## Remaining Tasks
 
 ### P1 (Next Priority)
-- [ ] Admin approval workflow - view uploaded documents, approve/reject applications
-- [ ] Bulk quiz upload from Excel
 - [ ] Canvas-confetti on course completion
 - [ ] PDF certificates for completed courses
+- [ ] Admin payment tracking dashboard
 
 ### P2 (Medium Priority)
-- [ ] Admin payment tracking dashboard
 - [ ] PDF template editor for admission letters
-- [ ] Document preview in admin admissions
+- [ ] Real-time notifications
 
 ### P3 (Nice to Have)
 - [ ] Backend refactoring (modular routers)
-- [ ] Real-time notifications
 - [ ] Move uploads to cloud storage (S3/Uploadcare)
+- [ ] MongoDB Atlas connection (SSL issue)
 
 ## Technical Notes
 - MongoDB Atlas SSL issue - using local MongoDB
