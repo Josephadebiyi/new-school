@@ -573,8 +573,9 @@ const TrendingPrograms = () => {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             {courses.map((course, index) => {
-              // Map course to slug for detail page
-              const getSlug = (title) => {
+              // Use pre-defined slug if available, otherwise generate from title
+              const getSlug = (c) => {
+                if (c.slug) return c.slug;
                 const slugMap = {
                   'UI/UX & Webflow Design': 'ui-ux-webflow',
                   'KYC & Compliance': 'kyc-compliance',
@@ -582,18 +583,21 @@ const TrendingPrograms = () => {
                   'French | Spanish | Lithuanian': 'languages-french-spanish',
                   'Identity & Access Management (IAM)': 'identity-access-management',
                   'Data Analytics': 'data-analytics',
+                  'Data Analytics with Excel': 'data-analytics',
                   'Product Management': 'product-management',
                   'Digital Marketing': 'digital-marketing',
                   'Business Strategy': 'business-strategy',
                   'Software Engineering': 'software-engineering',
+                  'Backend Engineering': 'software-engineering',
+                  'Frontend Engineering': 'software-engineering',
                 };
-                return slugMap[title] || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                return slugMap[c.title] || c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
               };
 
               return (
                 <Link
                   key={course.id}
-                  to={`/course/${getSlug(course.title)}`}
+                  to={`/course/${getSlug(course)}`}
                   className="reveal opacity-0 group block"
                   style={{ animationDelay: `${0.4 + index * 0.1}s` }}
                   data-testid={`course-card-${index}`}
