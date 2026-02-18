@@ -489,19 +489,25 @@ const TrendingPrograms = () => {
   const fetchCourses = async () => {
     try {
       const response = await axios.get(`${API}/courses/public`);
-      setCourses(response.data.slice(0, 5));
+      // Map API courses to our hardcoded slugs if they match, otherwise use our featured courses
+      const apiCourses = response.data.slice(0, 5);
+      setCourses(apiCourses.length > 0 ? apiCourses : getFeaturedCourses());
     } catch (error) {
       console.error("Failed to fetch courses:", error);
-      // Fallback courses
-      setCourses([
-        { id: '1', title: 'UI/UX & Webflow Design', description: 'Master user interface and experience design', category: 'Design', duration_value: 3, duration_unit: 'months' },
-        { id: '2', title: 'KYC & Compliance', description: 'Learn compliance frameworks', category: 'Finance', duration_value: 2, duration_unit: 'months' },
-        { id: '3', title: 'Cyber-Security', description: 'Become a certified security analyst', category: 'Security', duration_value: 4, duration_unit: 'months' },
-      ]);
+      // Fallback to featured courses that match our CourseDetailPage
+      setCourses(getFeaturedCourses());
     } finally {
       setLoading(false);
     }
   };
+
+  const getFeaturedCourses = () => [
+    { id: '1', title: 'UI/UX & Webflow Design', description: 'Master user interface and experience design with Webflow', category: 'Design', duration_value: 3, duration_unit: 'months', slug: 'ui-ux-webflow' },
+    { id: '2', title: 'KYC & Compliance', description: 'Learn compliance frameworks and regulatory processes', category: 'Finance', duration_value: 2, duration_unit: 'months', slug: 'kyc-compliance' },
+    { id: '3', title: 'Cyber-Security Vulnerability Tester', description: 'Become a certified penetration tester', category: 'Security', duration_value: 4, duration_unit: 'months', slug: 'cybersecurity-vulnerability' },
+    { id: '4', title: 'Data Analytics', description: 'Transform data into business insights', category: 'Data', duration_value: 4, duration_unit: 'months', slug: 'data-analytics' },
+    { id: '5', title: 'Product Management', description: 'Lead products from idea to launch', category: 'Product', duration_value: 3, duration_unit: 'months', slug: 'product-management' },
+  ];
 
   useEffect(() => {
     if (!loading) {
