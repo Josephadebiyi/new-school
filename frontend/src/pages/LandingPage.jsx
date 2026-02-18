@@ -560,55 +560,76 @@ const TrendingPrograms = () => {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-            {courses.map((course, index) => (
-              <div
-                key={course.id}
-                className="reveal opacity-0 group block"
-                style={{ animationDelay: `${0.4 + index * 0.1}s` }}
-              >
-                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full flex flex-col">
-                  {/* Image */}
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <img
-                      src={getCourseImage(course)}
-                      alt={course.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute top-3 left-3">
-                      <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-xs font-medium text-gray-700 rounded-full">
-                        {course.category || course.course_type || 'Course'}
-                      </span>
-                    </div>
-                  </div>
+            {courses.map((course, index) => {
+              // Map course to slug for detail page
+              const getSlug = (title) => {
+                const slugMap = {
+                  'UI/UX & Webflow Design': 'ui-ux-webflow',
+                  'KYC & Compliance': 'kyc-compliance',
+                  'Cyber-Security Vulnerability Tester': 'cybersecurity-vulnerability',
+                  'French | Spanish | Lithuanian': 'languages-french-spanish',
+                  'Identity & Access Management (IAM)': 'identity-access-management',
+                  'Data Analytics': 'data-analytics',
+                  'Product Management': 'product-management',
+                  'Digital Marketing': 'digital-marketing',
+                  'Business Strategy': 'business-strategy',
+                  'Software Engineering': 'software-engineering',
+                };
+                return slugMap[title] || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              };
 
-                  {/* Content */}
-                  <div className="p-4 flex flex-col flex-grow">
-                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#7ebf0d] transition-colors">
-                      {course.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow">
-                      {course.description}
-                    </p>
-
-                    {/* Meta */}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <Clock className="w-4 h-4" />
-                        <span>{course.duration_value || 3} {course.duration_unit || 'months'}</span>
+              return (
+                <Link
+                  key={course.id}
+                  to={`/course/${getSlug(course.title)}`}
+                  className="reveal opacity-0 group block"
+                  style={{ animationDelay: `${0.4 + index * 0.1}s` }}
+                  data-testid={`course-card-${index}`}
+                >
+                  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full flex flex-col">
+                    {/* Image */}
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      <img
+                        src={getCourseImage(course)}
+                        alt={course.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute top-3 left-3">
+                        <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-xs font-medium text-gray-700 rounded-full">
+                          {course.category || course.course_type || 'Course'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* CTA */}
-                    <div className="mt-4 pt-3 border-t border-gray-100">
-                      <span className="inline-flex items-center gap-1 text-sm font-medium text-[#7ebf0d] group-hover:text-[#314a06] transition-colors">
-                        Learn more
-                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                      </span>
+                    {/* Content */}
+                    <div className="p-4 flex flex-col flex-grow">
+                      <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#7ebf0d] transition-colors">
+                        {course.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow">
+                        {course.description}
+                      </p>
+
+                      {/* Meta */}
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <Clock className="w-4 h-4" />
+                          <span>{course.duration_value || 3} {course.duration_unit || 'months'}</span>
+                        </div>
+                      </div>
+
+                      {/* CTA */}
+                      <div className="mt-4 pt-3 border-t border-gray-100">
+                        <span className="inline-flex items-center gap-1 text-sm font-medium text-[#7ebf0d] group-hover:text-[#314a06] transition-colors">
+                          Learn more
+                          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
