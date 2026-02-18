@@ -1369,12 +1369,14 @@ async def get_application_status(session_id: str):
                 {"$set": {"payment_status": "paid"}}
             )
             
-            # Send confirmation email
+            # Send confirmation email using new email service
             try:
                 await send_application_received_email(
                     application["email"],
                     application["first_name"],
-                    application["course_title"]
+                    application["last_name"],
+                    application["course_title"],
+                    application["id"]
                 )
             except Exception as e:
                 logger.error(f"Failed to send confirmation email: {e}")
