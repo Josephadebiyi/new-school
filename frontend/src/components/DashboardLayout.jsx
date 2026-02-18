@@ -36,6 +36,15 @@ const DashboardLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  
+  // Sample notifications - in a real app, fetch from API
+  const notifications = [
+    { id: 1, title: 'New course available', message: 'Product Management is now open for enrollment', time: '2 hours ago', read: false },
+    { id: 2, title: 'Assignment due soon', message: 'Your assignment for Data Analytics is due tomorrow', time: '5 hours ago', read: false },
+    { id: 3, title: 'Quiz completed', message: 'You scored 85% on Module 3 quiz', time: '1 day ago', read: true },
+    { id: 4, title: 'Welcome to GITB!', message: 'Complete your profile to get started', time: '2 days ago', read: true },
+  ];
 
   // Detect mobile screen
   useEffect(() => {
