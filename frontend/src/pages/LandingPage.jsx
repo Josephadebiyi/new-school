@@ -468,7 +468,7 @@ const OurSchools = () => {
                   <ArrowUpRight className="w-5 h-5 text-white" />
                 </div>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </div>
