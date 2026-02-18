@@ -857,6 +857,133 @@ async def login(request: LoginRequest):
         system_config=config
     )
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Request password reset email"""
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if not user:
+        # Return success even if user not found (security)
+        return {"message": "If an account exists with that email, a reset link has been sent."}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expiry = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store reset token in database
+    await db.password_resets.update_one(
+        {"user_id": user["id"]},
+        {"$set": {
+            "user_id": user["id"],
+            "token": reset_token,
+            "expires_at": expiry.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Send reset email
+    try:
+        await send_forgot_password_email(
+            request.email,
+            user["first_name"],
+            reset_token
+        )
+    except Exception as e:
+        logger.error(f"Failed to send password reset email: {e}")
+    
+    return {"message": "If an account exists with that email, a reset link has been sent."}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using token"""
+    # Find reset token
+    reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Check expiry
+    expiry = datetime.fromisoformat(reset_record["expires_at"])
+    if datetime.now(timezone.utc) > expiry:
+        await db.password_resets.delete_one({"token": request.token})
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+    
+    # Update password
+    user = await db.users.find_one({"id": reset_record["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+    
+    new_hash = hash_password(request.new_password)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "password": new_hash,
+            "must_change_password": False
+        }}
+    )
+    
+    # Delete reset token
+    await db.password_resets.delete_one({"token": request.token})
+    
+    # Send confirmation email
+    try:
+        await send_password_changed_email(user["email"], user["first_name"])
+    except Exception as e:
+        logger.error(f"Failed to send password changed email: {e}")
+    
+    return {"message": "Password reset successfully"}
+
+@api_router.post("/auth/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Change password for logged in user"""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password
+    if not verify_password(request.current_password, user.get("password", "")):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    new_hash = hash_password(request.new_password)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "password": new_hash,
+            "must_change_password": False
+        }}
+    )
+    
+    # Send confirmation email
+    try:
+        await send_password_changed_email(user["email"], user["first_name"])
+    except Exception as e:
+        logger.error(f"Failed to send password changed email: {e}")
+    
+    return {"message": "Password changed successfully"}
+
+@api_router.post("/email/test")
+async def test_email_endpoint(
+    to_email: str = Query(..., description="Email address to send test to"),
+    current_user: dict = Depends(require_roles([UserRole.ADMIN]))
+):
+    """Send a test email (admin only)"""
+    result = await send_test_email(to_email)
+    return result
+
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     access_info = check_access(current_user)
