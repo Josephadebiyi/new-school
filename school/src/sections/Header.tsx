@@ -105,15 +105,17 @@ const Header = () => {
 
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center gap-3">
-            <Button
-              variant="ghost"
-              className="text-sm font-medium text-gray-700 hover:text-gitb-dark hover:bg-gitb-50"
+            <a
+              href={`${import.meta.env.VITE_LMS_URL || ''}/login`}
+              className="inline-flex items-center justify-center text-sm font-medium text-gray-700 hover:text-gitb-dark hover:bg-gitb-50 h-10 px-4 py-2 rounded-md"
+              data-testid="header-login-btn"
             >
               Login
-            </Button>
+            </a>
             <Link to="/apply">
               <Button
                 className="bg-gitb-lime hover:bg-gitb-lime-hover text-white text-sm font-medium px-5 py-2 rounded-lg btn-hover"
+                data-testid="header-apply-btn"
               >
                 Apply Now
               </Button>
