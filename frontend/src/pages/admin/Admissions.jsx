@@ -461,6 +461,218 @@ const AdminAdmissions = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Application Preview Dialog */}
+      <Dialog open={previewDialog.open} onOpenChange={(open) => setPreviewDialog({ open, data: null })}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap size={24} className="text-violet-600" />
+              Application Preview
+            </DialogTitle>
+            <DialogDescription>
+              Review application details and uploaded documents
+            </DialogDescription>
+          </DialogHeader>
+          
+          {previewDialog.data && (
+            <div className="space-y-6 py-4">
+              {/* Status Badge */}
+              <div className="flex justify-between items-center">
+                <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                  previewDialog.data.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                  previewDialog.data.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                  previewDialog.data.status === 'pending_review' ? 'bg-blue-100 text-blue-700' :
+                  'bg-amber-100 text-amber-700'
+                }`}>
+                  {previewDialog.data.status?.replace('_', ' ')?.toUpperCase() || 'PENDING'}
+                </span>
+                {previewDialog.data.student_id && (
+                  <span className="text-sm text-gray-500">
+                    Student ID: <span className="font-mono font-bold">{previewDialog.data.student_id}</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Applicant Information */}
+              <div className="bg-gray-50 rounded-xl p-5 space-y-4">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <UserPlus size={18} className="text-violet-500" />
+                  Applicant Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Full Name</p>
+                    <p className="font-medium text-gray-900">
+                      {previewDialog.data.first_name} {previewDialog.data.last_name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Email</p>
+                    <p className="font-medium text-gray-900">{previewDialog.data.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+                    <p className="font-medium text-gray-900 flex items-center gap-1">
+                      <Phone size={14} className="text-gray-400" />
+                      {previewDialog.data.phone || 'Not provided'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Applied On</p>
+                    <p className="font-medium text-gray-900 flex items-center gap-1">
+                      <Calendar size={14} className="text-gray-400" />
+                      {previewDialog.data.created_at ? new Date(previewDialog.data.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', month: 'long', day: 'numeric' 
+                      }) : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Course Information */}
+              <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-5 space-y-3 border border-violet-100">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <BookOpen size={18} className="text-violet-500" />
+                  Applied Program
+                </h4>
+                <p className="text-lg font-medium text-violet-700">
+                  {previewDialog.data.course_title || 'Not specified'}
+                </p>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="px-3 py-1 bg-white rounded-full text-violet-600 font-medium">
+                    €{previewDialog.data.amount || 50} Application Fee
+                  </span>
+                  <span className={`px-3 py-1 rounded-full font-medium ${
+                    previewDialog.data.payment_status === 'paid' 
+                      ? 'bg-emerald-100 text-emerald-700' 
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {previewDialog.data.payment_status === 'paid' ? 'Payment Confirmed' : 'Payment Pending'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Uploaded Documents */}
+              <div className="bg-gray-50 rounded-xl p-5 space-y-4">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <FileCheck size={18} className="text-blue-500" />
+                  Uploaded Documents
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* High School Certificate */}
+                  <div className="bg-white rounded-lg border p-4">
+                    <p className="text-sm text-gray-500 mb-2">High School Certificate</p>
+                    {previewDialog.data.high_school_cert_url ? (
+                      <div className="space-y-2">
+                        {previewDialog.data.high_school_cert_url.endsWith('.pdf') ? (
+                          <div className="flex items-center gap-2 text-blue-600">
+                            <FileText size={32} />
+                            <span className="text-sm">PDF Document</span>
+                          </div>
+                        ) : (
+                          <img 
+                            src={getDocumentUrl(previewDialog.data.high_school_cert_url)} 
+                            alt="High School Certificate"
+                            className="w-full h-32 object-cover rounded border"
+                          />
+                        )}
+                        <a 
+                          href={getDocumentUrl(previewDialog.data.high_school_cert_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                        >
+                          <ExternalLink size={14} />
+                          View Full Document
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-sm italic">Not uploaded</p>
+                    )}
+                  </div>
+
+                  {/* Identification Document */}
+                  <div className="bg-white rounded-lg border p-4">
+                    <p className="text-sm text-gray-500 mb-2">Identification (Passport/ID)</p>
+                    {previewDialog.data.identification_url ? (
+                      <div className="space-y-2">
+                        {previewDialog.data.identification_url.endsWith('.pdf') ? (
+                          <div className="flex items-center gap-2 text-blue-600">
+                            <FileText size={32} />
+                            <span className="text-sm">PDF Document</span>
+                          </div>
+                        ) : (
+                          <img 
+                            src={getDocumentUrl(previewDialog.data.identification_url)} 
+                            alt="Identification Document"
+                            className="w-full h-32 object-cover rounded border"
+                          />
+                        )}
+                        <a 
+                          href={getDocumentUrl(previewDialog.data.identification_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                        >
+                          <ExternalLink size={14} />
+                          View Full Document
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-sm italic">Not uploaded</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              {previewDialog.data.status === 'pending_review' && (
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => {
+                      approveApplication(previewDialog.data.id);
+                      setPreviewDialog({ open: false, data: null });
+                    }}
+                    disabled={processing}
+                  >
+                    <CheckCircle size={16} className="mr-2" />
+                    Approve Application
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => {
+                      rejectApplication(previewDialog.data.id);
+                      setPreviewDialog({ open: false, data: null });
+                    }}
+                  >
+                    <XCircle size={16} className="mr-2" />
+                    Reject Application
+                  </Button>
+                </div>
+              )}
+
+              {previewDialog.data.status === 'approved' && (
+                <Button 
+                  className="w-full"
+                  onClick={() => downloadAdmissionLetter(previewDialog.data.id)}
+                >
+                  <Download size={16} className="mr-2" />
+                  Download Admission Letter
+                </Button>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDialog({ open: false, data: null })}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
