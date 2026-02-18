@@ -9,75 +9,86 @@ GITB (Global Institute of Technology and Business) is a white-label Learning Man
 
 ### Frontend Architecture
 - **Main Frontend** (Port 3000): CRA + JavaScript React app
-  - Landing page with all sections (Hero, PathForEveryone, PartnerLogos, OurSchools, NanoDiplomaIntro, TrendingPrograms, ReimaginingDream, Stats, Testimonials, BlogSection/Keep Growing With Us, Footer)
-  - Login, Admin/Student/Lecturer dashboards
-  - Reset Password page
+  - Landing page with all sections
+  - Login, Forgot Password, Reset Password
+  - Admin/Student/Lecturer dashboards
+  - School detail pages
+  - Course detail pages
 
 ### Backend
 - FastAPI on port 8001
-- MongoDB (local instance)
+- MongoDB (local instance - Atlas needs IP whitelisting)
 - Stripe integration for payments
 - Resend for email
 
-## Current Status (December 2025)
+## Current Status (February 2026)
 
 ### Completed Features ✅
 1. **Landing Page** - All sections implemented:
-   - Hero section with "Europe's Best Innovative Online School"
-   - PathForEveryone (Nano-Diploma, Diploma, Masterclass cards)
-   - PartnerLogos marquee ("WHERE OUR LEARNERS WORK")
-   - OurSchools (5 school cards)
-   - NanoDiplomaIntro (green section)
-   - TrendingPrograms (courses from API)
-   - ReimaginingDream (Why GITB)
-   - Stats (7,980+ learners, etc.)
-   - Testimonials (3 cards)
-   - BlogSection ("Keep Growing With Us" with 3 articles)
-   - Footer with social links and EAHEA badge
+   - Hero, PathForEveryone, PartnerLogos, OurSchools
+   - NanoDiplomaIntro, TrendingPrograms, ReimaginingDream
+   - Stats, Testimonials, BlogSection ("Keep Growing With Us"), Footer
 
-2. **Authentication**
-   - Login page with GITB branding and EAHEA badge
-   - Forgot Password modal with email input
-   - Password reset flow (email + reset page)
+2. **School & Course Navigation**
+   - School cards are clickable → `/schools/:schoolId`
+   - Course cards are clickable → `/course/:courseId`
+   - SchoolDetailPage shows programs per school
+   - CourseDetailPage shows full course info (10 courses)
+
+3. **Authentication**
+   - Login page with GITB branding
+   - Forgot Password modal
+   - Reset Password page
    - JWT-based auth with role-based access
 
-3. **Email Service** (via Resend)
-   - Application received email
-   - Application approved email (with credentials)
-   - Application rejected email
+4. **Email Service** (via Resend)
+   - Application received, approved, rejected emails
    - Forgot password email
    - Password changed confirmation
 
-4. **LMS Features**
-   - Admin dashboard with stats, quick actions
-   - Student dashboard with enrolled courses
-   - Lecturer dashboard with course management
-   - Course builder for creating/editing courses
-   - Admissions management
-   - Payment integration (Stripe)
+5. **Images Saved**
+   - gitb-logo.png (uploaded by user)
+   - eahea-badge.png (uploaded by user)
+   - eu-flag.png (uploaded by user)
+   - Course images (IMG_1522.JPG, IMG_1529.JPG, etc.)
 
-5. **Title** - "GITB - Student LMS"
+6. **Title** - "GITB - Student LMS"
+
+### Known Issues ⚠️
+1. **Intermittent Cloudflare 524 Timeouts** - Infrastructure issue, not code
+2. **Images sometimes show alt text** - Related to Cloudflare timeouts
 
 ### Pending Tasks 📋
-1. **P1 - BLOCKED** - MongoDB Atlas connection (user provided SQL interface URL, needs standard MongoDB connection string)
-2. **P1** - Backend refactoring (split server.py into modules in /routes, /services)
-3. **P2** - Admin payment tracking dashboard
-4. **P2** - PDF template editor for admission letters
-5. **P2** - Graduation celebration (confetti on 100% completion)
-
-### Known Issues
-- Images may show broken occasionally due to Cloudflare 524 timeout (infrastructure issue, not code)
-- MongoDB Atlas connection blocked - user needs to provide standard MongoDB connection string format:
-  `mongodb+srv://user:password@cluster.mongodb.net/database`
+1. **MongoDB Atlas Connection** - BLOCKED: Need to whitelist IP `34.16.56.64` in MongoDB Atlas Network Access
+2. **Backend Refactoring** - Split server.py into modular routes
+3. **Admin Payment Tracking** - Dashboard for viewing Stripe payments
 
 ## Key Files
-- `/app/frontend/src/pages/LandingPage.jsx` - Landing page with all sections
-- `/app/frontend/src/pages/Login.jsx` - Login with forgot password modal
-- `/app/frontend/src/pages/ResetPassword.jsx` - Password reset page
-- `/app/frontend/src/App.js` - All routes
-- `/app/frontend/src/App.css` - Animations (marquee, fade-in)
-- `/app/backend/server.py` - FastAPI backend
-- `/app/backend/services/email_service.py` - Email templates
+- `/app/frontend/src/pages/LandingPage.jsx` - Landing page
+- `/app/frontend/src/pages/SchoolDetailPage.jsx` - School programs
+- `/app/frontend/src/pages/CourseDetailPage.jsx` - Course details (10 courses)
+- `/app/frontend/src/pages/Login.jsx` - Login with forgot password
+- `/app/frontend/src/pages/ResetPassword.jsx` - Password reset
+- `/app/frontend/public/images/` - All images
+
+## Available Courses
+1. UI/UX & Webflow Design (ui-ux-webflow)
+2. KYC & Compliance (kyc-compliance)
+3. Cyber-Security Vulnerability Tester (cybersecurity-vulnerability)
+4. French | Spanish | Lithuanian (languages-french-spanish)
+5. Identity & Access Management (identity-access-management)
+6. Data Analytics (data-analytics)
+7. Product Management (product-management)
+8. Digital Marketing (digital-marketing)
+9. Software Engineering (software-engineering)
+10. Business Strategy (business-strategy)
+
+## Schools
+1. Engineering - Software, DevOps, Cloud
+2. Data - Analytics, Science, AI
+3. Product - Management, Design, UX
+4. Creative Economy - Marketing, Content, Media
+5. Business - Strategy, Operations, Finance
 
 ## Credentials
 - Admin: admin@unilms.edu / admin123
@@ -88,12 +99,14 @@ GITB (Global Institute of Technology and Business) is a white-label Learning Man
 - Stripe (payments)
 - Resend (email)
 - Uploadcare (media hosting)
-- xlsxwriter (Excel export)
-- reportlab (PDF generation)
 
 ## Database
-- MongoDB local instance: mongodb://localhost:27017
+- Currently using: mongodb://localhost:27017
 - Database name: gitb_lms
+- MongoDB Atlas: Requires IP whitelisting (34.16.56.64)
+
+## Backend Root Directory
+`/app/backend`
 
 ---
 Last Updated: February 18, 2026
