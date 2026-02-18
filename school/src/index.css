@@ -103,7 +103,7 @@ body {
 }
 
 .school-card {
-  @apply relative overflow-hidden rounded-2xl aspect-video cursor-pointer group;
+  @apply relative overflow-hidden rounded-2xl aspect-video cursor-pointer;
 }
 
 .school-card-overlay {
