@@ -14,7 +14,7 @@
     "Navigation items present: Home, Schools, Why GITB, Partner, Resources, Policies",
     "Login button present in header",
     "Apply Now button present in header",
-    "Login button redirects to LMS login page (https://student-hub-370.preview.emergentagent.com/login)",
+    "Login button redirects to LMS login page (https://gitb-school.preview.emergentagent.com/login)",
     "Hero section shows 'Europe's Best Innovative Online School' with GITB branding",
     "Trending Nano-Diploma programs section displays 5 course cards",
     "Course cards have data-testid attributes (e.g., course-card-f6aabdef-0758-499d-bc08-6f766540b774)",
@@ -47,7 +47,7 @@
   "seed_data_creation": "",
   "retest_needed": false,
   "should_main_agent_self_test": false,
-  "context_for_next_testing_agent": "1) School app runs on localhost:3001 with Vite. 2) Courses are fetched from API at /api/courses/public - returns 9 courses. 3) Login button links to LMS at https://student-hub-370.preview.emergentagent.com/login. 4) Apply page wizard works - Step 1 (Personal Info), Step 2 (Program Selection from API + Document Upload), Step 3 (Payment). 5) Course detail pages load course info from API correctly including title, code, department, duration, lessons, and €50 fee.",
+  "context_for_next_testing_agent": "1) School app runs on localhost:3001 with Vite. 2) Courses are fetched from API at /api/courses/public - returns 9 courses. 3) Login button links to LMS at https://gitb-school.preview.emergentagent.com/login. 4) Apply page wizard works - Step 1 (Personal Info), Step 2 (Program Selection from API + Document Upload), Step 3 (Payment). 5) Course detail pages load course info from API correctly including title, code, department, duration, lessons, and €50 fee.",
   "features_verified": {
     "home_page_loads": {
       "status": "PASSED",
@@ -59,7 +59,7 @@
     },
     "login_redirect": {
       "status": "PASSED",
-      "description": "Login button links to https://student-hub-370.preview.emergentagent.com/login"
+      "description": "Login button links to https://gitb-school.preview.emergentagent.com/login"
     },
     "apply_wizard": {
       "status": "PASSED",

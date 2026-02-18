@@ -81,7 +81,7 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 
 **LMS Integration (COMPLETED)**
 - ✅ Login button in header redirects to LMS login page
-- ✅ LMS URL: https://student-hub-370.preview.emergentagent.com/login
+- ✅ LMS URL: https://gitb-school.preview.emergentagent.com/login
 
 **Apply Page Features (COMPLETED)**
 - ✅ 3-step wizard: Personal Info → Program & Documents → Payment

@@ -1,71 +1,76 @@
 <analysis>**original_problem_statement:**
-The user wants to build a white-label Learning Management System (LMS) called LuminaLMS.
+The user wants to build a white-label Learning Management System (LMS) called GITB (formerly LuminaLMS).
 
 **PRODUCT REQUIREMENTS:**
-1.  **Separate Landing Page ():** A standalone, public-facing website for course discovery and student applications, styled like Univerz University.
-2.  **Student Application & Onboarding Flow:**
+1.  **Main Landing Page ():** The primary entry point of the website must be the school's public-facing site. The user has provided a specific Vite+React project in an  file for this purpose.
+2.  **LMS Access:** The core LMS (student/admin/lecturer dashboards) should only be accessible after logging in via the landing page.
+3.  **Student Application & Onboarding Flow:**
     *   Students apply from the landing page with a **€50 application fee** via Stripe.
-    *   Students must upload educational documents: a high school certificate and a means of identification (passport or national ID).
-    *   Admins review applications.
-    *   On approval, an account is created, and an **Admission Letter PDF** with login details is emailed.
-    *   **NEW:** A display or preview for the admission letter is required.
-    *   Admins must be able to edit the **tuition fee** and **application fee**.
-3.  **Advanced Course Management:**
-    *   A Course Builder for admins/lecturers to create/edit courses and add materials (PDF/video).
-    *   Admins must be able to update course images.
-    *   **NEW:** Implement a bulk quiz upload feature (e.g., from Excel).
-4.  **Financials & Payments:**
-    *   Integrate Stripe for the application fee.
-    *   Display all monetary values in **EUR (€)**.
-5.  **User & Student Management:**
-    *   Admins need a Student List and the ability to export it to Excel.
-    *   **BUG:** The Add Course button is not working on the student dashboard.
-6.  **UI/UX Enhancements:**
-    *   Pages should be visually rich, avoiding plain white areas.
-    *   The entire application (LMS and School site) must be mobile-responsive.
+    *   Students must upload educational documents (high school certificate, ID).
+    *   Admins review applications, with the ability to preview application details.
+    *   On approval, an admission letter is generated and emailed.
+4.  **Course Management:**
+    *   Admins/lecturers can create/edit courses and upload materials.
+    *   A bulk quiz upload feature should be available.
+5.  **UI/UX:**
+    *   The website font must be Inter (or similar to Airbnb's font).
+    *   The logo on the LMS login page should link back to the main school landing page.
+    *   The EAHEA (European Agency for Higher Education & Accreditation) logo and footer must be present on the login and application pages, as per the user-provided design.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The project is a full-stack LMS (React/FastAPI/MongoDB). The core LMS application and the separate school landing page are stable, visually rich, and fully mobile-responsive.
+The project is a full-stack application with a FastAPI backend and two separate React frontends:
+1.  : The core LMS application for authenticated users (admins, students, etc.).
+2.  : The public-facing school website. This directory has just been replaced with a new Vite+TypeScript project provided by the user and is currently being configured.
 
-Key features implemented include:
-- A redesigned school landing page.
-- Document uploads (High School Certificate, ID) on the application form.
-- Admin capability to update course images via the Course Editor.
-- UI beautification across admin, student, and school pages with gradients and improved layouts.
-- Full mobile responsiveness with a collapsible sidebar menu for the main LMS app and responsive layouts for the school site.
+The backend uses a local MongoDB instance. The core LMS features (dashboards, notifications, course management) are functional. The agent was in the middle of integrating the user's latest design for the school landing page.
 
 **Last working item**:
-- **Last item agent was working:** The user requested three new items: a preview for the admission letter, a fix for the broken Add Course button on the student dashboard, and a bulk quiz upload feature. The agent acknowledged the request and was about to start investigating the codebase.
-- **Status:** NOT STARTED
+- **Last item agent was working:** The user provided a new  and instructed the agent to completely replace the school landing page with its contents. The agent deleted the old  directory and the temporary landing page component it had created in . It then extracted the new zip into  and began configuring the new Vite project by updating , , and .
+- **Status:** IN PROGRESS
 - **Agent Testing Done:** N
-- **Which testing method agent to use?**
-    - **Add Course Button Fix:** Frontend testing agent to verify the button's functionality after the fix.
-    - **Admission Preview:** Frontend testing agent to check the new UI component.
-    - **Bulk Quiz Upload:** Both backend (for file parsing and database insertion) and frontend (for the upload UI) testing agents.
+- **Which testing method agent to use?** both. The frontend testing agent is needed to verify the new school landing page UI, responsiveness, and all its internal routes (, , ). The backend testing agent is needed to ensure the API connections for fetching courses and submitting applications from this new frontend are working correctly.
 - **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-- **Issue 1: Add Course button is not working on the student dashboard (P0)**
-- **Issue 2: MongoDB Atlas connection failure (P2)**
+- **Issue 1: The application's main entry point () incorrectly shows the LMS login instead of the school landing page. (P0)**
+- **Issue 2: The new user-provided school landing page is not yet fully configured or integrated. (P0)**
+- **Issue 3: MongoDB Atlas connection failure. (P2)**
 
 **Issues Detail:**
 - **Issue 1:**
-    - **Attempted fixes:** None yet. The issue was just reported by the user.
+    - **Attempted fixes:** The agent previously tried to solve this by creating a  component inside the main LMS frontend. This was the wrong approach, as the school app is a separate project. The user rejected this and provided a new  to be used.
     - **Next debug checklist:**
-        1.  View  to locate the Add Course button.
-        2.  Inspect the  handler and any associated functions.
-        3.  Check the browser's developer console for errors when the button is clicked.
-        4.  Verify if the backend endpoint it calls is correct and functional.
-    - **Why fix this issue and what will be achieved with the fix?** This is a critical bug preventing students from adding courses, which is core functionality.
+        1.  The primary challenge is architectural: the school app (port 3001) and the LMS app (port 3000) are separate services. The ingress/routing configuration needs to be modified to direct root traffic () to the school app. The agent should investigate how to modify the NGINX or supervisor configuration to achieve this.
+        2.  After fixing the routing, verify that the Login button on the school page correctly links to the LMS login URL (e.g., ).
+        3.  Ensure the logo and Back to Website links on the LMS login page point to the root domain ().
+    - **Why fix this issue and what will be achieved with the fix?** This is the user's main complaint. Fixing it will establish the correct user journey, where the marketing site is the public entry point.
     - **Status:** NOT STARTED
-    - **Is recurring issue?** N
+    - **Is recurring issue?** Y
     - **Should Test frontend/backend/both after fix?** frontend
-    - **Blocked on other issue:** None.
+    - **Blocked on other issue:** Issue 2. The school app must be working before the routing can be tested.
 - **Issue 2:**
-    - **Attempted fixes:** None in this session. The application continues to use a local MongoDB instance as a workaround.
-    - **Next debug checklist:** Investigate SSL certificate verification errors. The execution environment may need CA certificates installed to connect to MongoDB Atlas.
+    - **Attempted fixes:** This is the current task. The agent has started configuration.
+    - **Next debug checklist:**
+        1.  Finish editing  to use the correct port (3001) and environment variables.
+        2.  Finish editing  to correctly read the Stripe key from the environment.
+        3.  Ensure all components that fetch API data (, , , ) are updated to use the .
+        4.  Install dependencies (yarn install v1.22.22
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+success Saved lockfile.
+Done in 0.03s.) and start the school app via supervisor to confirm it runs.
+    - **Why fix this issue and what will be achieved with the fix?** This is a prerequisite for fixing the main routing issue and fulfilling the user's request to use their new design.
+    - **Status:** IN PROGRESS
+    - **Is recurring issue?** N
+    - **Should Test frontend/backend/both after fix?** both
+    - **Blocked on other issue:** None.
+- **Issue 3:**
+    - **Attempted fixes:** None in this session.
+    - **Next debug checklist:** Investigate SSL certificate verification errors. The execution environment may need CA certificates installed.
     - **Why fix this issue and what will be achieved with this?** To connect the application to a production-ready, managed database service.
     - **Status:** NOT STARTED
     - **Is recurring issue?** Y
@@ -73,41 +78,36 @@ Key features implemented include:
     - **Blocked on other issue:** None.
 
 **In progress Task List**:
-- **Task 1: Implement Admission Preview/Display (P1)**
-    - **Where to resume:** This is a new feature. Start by designing a UI component to display the admission data. This will likely be on the  page.
-    - **What will be achieved with this?** Admins will be able to preview admission details before taking action.
-    - **Status:** NOT STARTED
-    - **Should Test frontend/backend/both after fix?** frontend
-    - **Blocked on something:** None.
-- **Task 2: Implement Bulk Quiz Upload (P1)**
-    - **Where to resume:** This is a new feature. Start by designing the UI in the Course Editor for file upload and then implement the backend logic in  to parse the file (e.g., Excel) and create quiz entries.
-    - **What will be achieved with this?** Lecturers will be able to add quizzes to courses more efficiently.
-    - **Status:** NOT STARTED
+- **Task 1: Complete setup of the new school landing page (P0)**
+    - **Where to resume:** The agent has replaced the files in  and has started editing configuration files (, , ). The next immediate step is to complete these configurations, install dependencies, and restart the service.
+    - **What will be achieved with this?** A functional, user-approved public website that is ready to be set as the application's main entry point.
+    - **Status:** IN PROGRESS
     - **Should Test frontend/backend/both after fix?** both
     - **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
--   **(P1) Finalize Application Workflow:** Implement the admin-side approval/rejection logic on the  page and trigger the admission letter email upon approval.
--   **(P1) PDF Generation Enhancements:** Create an admin interface to edit the template for the admission letter PDF.
--   **(P1) Admin Payment Tracking:** Build a new dashboard for admins to view and track all Stripe payments.
--   **(P2) Graduation Features:** Integrate  for a celebration effect on 100% course completion.
--   **(P2) Refactor Backend:** Break down the monolithic  into a modular structure using FastAPI's  (e.g., , ).
+- **Upcoming Tasks:**
+  - **(P0)** Reconfigure application routing to make the school app the main () page.
+  - **(P1)** Finalize Application Workflow: Implement admin-side approval/rejection logic on the  page and trigger the admission letter email upon approval.
+  - **(P1)** PDF Generation Enhancements: Create an admin interface to edit the template for the admission letter PDF.
+- **Future Tasks:**
+  - **(P1)** Admin Payment Tracking: Build a new dashboard for admins to view and track all Stripe payments.
+  - **(P2)** Graduation Features: Integrate  for a celebration effect on 100% course completion.
+  - **(P2)** Refactor Backend: Break down the monolithic  into a modular structure using FastAPI's .
 
 **Completed work in this session**
--   **Document Upload on Application Page:** Implemented frontend UI in  and backend endpoint  in .
--   **Admin Course Image Management:** Added image upload UI to .
--   **UI Beautification:** Enhanced Admin, Student, and School pages with gradient banners, improved card layouts, and other visual elements.
--   **Full Mobile Responsiveness:**
-    -   Implemented a responsive  with a slide-out mobile menu.
-    -   Made Admin Dashboard, Student Dashboard, and Login pages responsive.
-    -   Ensured the School landing page and course application form are mobile-friendly.
+- **Add Course Button Fix:** The broken button on the student dashboard was fixed and now correctly links to the course catalog.
+- **Admission Preview Feature:** An application preview dialog was successfully added to the admin admissions page.
+- **Notification System Implementation:** A functional notification dropdown was added to the main LMS dashboard layout.
+- **Multiple School Landing Page Iterations:** The agent implemented two full redesigns of the school landing page, including one with a green theme and another based on a user-provided zip file, connecting them to the backend API.
+- **Font and Branding Updates:** The font across the LMS and School apps was standardized to Inter, and the LMS login page was updated with the EAHEA logo and correct links back to the landing page.
 
 **Earlier issues found/mentioned but not fixed**
--   **Issue 1: MongoDB Atlas connection failure.**
-    -   **Debug checklist:** An SSL certificate verification error occurs when connecting. The root cause is likely missing CA certificates in the execution environment. The application continues to use a local MongoDB instance.
-    -   **Why to solve this issue and what will be achieved with this?** To allow the application to connect to a production-ready, managed database service.
-    -   **Should Test frontend/backend/both after fix:** backend
-    -   **Is recurring issue?** Y
+- **Issue 1: MongoDB Atlas connection failure.**
+    - **Debug checklist:** An SSL certificate verification error occurs when connecting. The root cause is likely missing CA certificates in the execution environment.
+    - **Why to solve this issue and what will be achieved with this?** To allow the application to connect to a production-ready, managed database service instead of a local instance.
+    - **Should Test frontend/backend/both after fix:** backend
+    - **Is recurring issue?** Y
 
 **Known issue recurrence from previous fork**
 -   None.
@@ -116,13 +116,12 @@ Key features implemented include:
 
 
 **Key Technical Concepts**
--   **Frontend:** React, Tailwind CSS, Shadcn/UI
+-   **Frontend (LMS):** React, Create-React-App, JavaScript, Tailwind CSS
+-   **Frontend (School):** React, Vite, TypeScript, Tailwind CSS
 -   **Backend:** FastAPI, Python
 -   **Database:** MongoDB (local instance)
 -   **Authentication:** JWT with Role-Based Access Control (RBAC)
 -   **Payments:** Stripe
--   **File Generation:**  for Excel,  for PDF.
--   **File Hosting:** Uploadcare
 
 **key DB schema**
 -   **SystemConfig:** 
@@ -131,52 +130,46 @@ Key features implemented include:
 -   **Application:** 
 
 **changes in tech stack**
--   None.
+-   The  frontend has been changed from a JavaScript Create-React-App to a **TypeScript Vite** application.
 
 **All files of reference**
--   : Added  import and a new  endpoint.
--   : Major updates for mobile responsiveness and a slide-out menu.
--   : UI beautification and responsive layout updates.
--   : UI beautification and responsive layout updates.
--   : Responsive layout updates.
--   : Added course image upload UI.
--   : Responsive layout updates.
--   : Added styles for UI beautification.
--   : Added document upload fields and made responsive.
--   : Environment variable for backend URL was updated.
+-   **/app/school/**: This entire directory has been replaced with the contents of the user's latest  file.
+-   : Updated to include the EAHEA logo and a link back to the main landing page.
+-   : Updated to import and use the 'Inter' font.
+-   : Was temporarily modified to include a landing page route, but these changes were reverted.
+-   : Updated to use yarn run v1.22.22
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command. for the new Vite project.
+-   Files deleted:  and all previous contents of .
 
 **Areas that need refactoring**:
--   The  file is still monolithic and a high-priority candidate for refactoring into smaller modules using FastAPI's .
+-   The  file is still monolithic and a high-priority candidate for refactoring.
 
 **key api endpoints**
--    (GET)
--    (POST) - **New**
--    (GET)
--    (GET, PUT)
+-    (GET): Fetches active courses for the public landing page.
+-    (POST): Submits a new student application.
+-    (POST)
+-    (GET): Fetches applications for the admin dashboard.
 
 **Critical Info for New Agent**
--   The immediate priority is to fix the broken Add Course button on the student dashboard (P0).
--   After the bug fix, proceed with the user's other requests: implementing the admission preview and the bulk quiz upload feature.
--   The entire application is now mobile-responsive. Any new features must also adhere to this standard.
--   The monolithic  remains a technical debt item to be addressed after current features are delivered.
--   The MongoDB Atlas connection issue persists; the application currently relies on a local MongoDB instance.
+-   The user's top priority is making the new school app (from the latest ) the main landing page at the root URL (). This is an infrastructure/routing problem, not just a React routing problem. You will likely need to adjust NGINX or a similar proxy configuration.
+-   The agent was in the middle of configuring the new Vite-based school app in . This task must be completed before the routing can be addressed.
+-   The database is a **local MongoDB** instance. The URL is  and the database name is . This was a direct question from the user.
 
 **documents and test reports created in this job**
--   
--   
--    (Updated)
+-    through 
+-    (Updated multiple times)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (Latest):** Yes please go ahead with the next features and action, the display or preview for admission and The add course button is not working in the student dashboard, bulk quiz,
-    -   **Summary:** User confirmed the previous work and provided the next set of tasks: fix a bug and add two new features.
-    -   **Status:** Not Started.
-2.  **User:** Finis what is left now stop wasting time and make sure all screens and pages adapt to mobile verification and veiws if its on mobile and desktop version check all pages
-    -   **Summary:** User was impatient and asked the agent to finish up, but also requested a major new feature: full mobile responsiveness for all pages.
-    -   **Status:** Completed. The agent successfully implemented and verified mobile responsiveness across the entire application.
+1.  **User (Latest):** use the new landing page I gave you not the old one you created and delete the old one totally - **Status: In Progress**. Agent is implementing this.
+2.  **User:** the main page is now deployed on a live site gitb.lt but its taking me to the lms instead of the landing page also the logo for the once u load the site tit should be the landing page ,also which database are we using I need the url - **Status: Partially Addressed**. Agent identified the DB URL but has not fixed the main routing issue yet.
+3.  **User:** I want the school to be the main page while the lms will be from the log in page and change the website font to inter or the same font on Airbnb also the logo on the log in page should link back to the landing page also , make sure the EAHEA logo appear on the log in page too and the apply page just as the file was and footer too - **Status: Completed**, except for the school as main page part.
+4.  **User:** delete the front end landing page we have and replace it with this and do all the necessary connections... (with first ) - **Status: Completed**. The agent did this, but it was superseded by a later request.
+5.  **User:** recreate these as the front end dont miss any detail and generate images that can be edited later also the demo courses should also be ad to the data base and admin too... (with screenshots) - **Status: Completed**. Agent implemented this green theme design before it was replaced.
+6.  **User:** pirotize all task and do it now , and the add course button on the student portal make it function properly - **Status: Completed**. The button was fixed.
 
 **Project Health Check:**
--   **Healthy:** The main LMS application () and the school landing page application ().
--   **Broken:** The Add Course button on the student dashboard is non-functional.
+-   **Healthy:** The core LMS application () and the backend ().
+-   **Broken:** The main application routing is incorrect, directing users to the LMS instead of the intended landing page. The school landing page itself is in the middle of a complete replacement and is non-functional.
 
 **3rd Party Integrations**
 -   **Resend:** Email sending.
@@ -186,10 +179,10 @@ Key features implemented include:
 -   **reportlab:** PDF generation.
 
 **Testing status**
--   **Testing agent used after significant changes:** YES. The testing agent was used twice. First, to verify the document upload, image upload, and UI beautification features. Second, to verify the full mobile responsiveness implementation. All tests passed.
+-   **Testing agent used after significant changes:** YES. The testing agent was used multiple times to verify new features and landing page redesigns.
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** None
--   **Known regressions:** None.
+-   **Known regressions:** The main URL routing is now incorrect after the various landing page changes.
 
 **Credentials to test flow:**
 -   **Admin:**  / 
@@ -197,4 +190,4 @@ Key features implemented include:
 -   **Student:**  / 
 
 **What agent forgot to execute**
--   The agent successfully completed all planned tasks and addressed the user's mid-stream request for mobile responsiveness. Nothing was forgotten.</analysis>
+- The agent has not yet addressed the root cause of the primary routing issue (i.e., making the school app at port 3001 the main  route). It has focused on in-app changes rather than the required infrastructure-level routing configuration. The next agent must investigate NGINX/ingress configuration.</analysis>
