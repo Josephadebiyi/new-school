@@ -10,6 +10,11 @@
   --bg-white: #FFFFFF;
   --bg-card: #FFFFFF;
   
+  /* Primary Brand Color - GITB Green */
+  --primary-green: #8cc63f;
+  --primary-green-dark: #7ab535;
+  --primary-green-light: #a3d465;
+  
   /* Text Colors */
   --text-primary: #1A1A1A;
   --text-secondary: #666666;
