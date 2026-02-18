@@ -227,8 +227,6 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors />
         <Routes>
-          {/* Public Landing Page */}
-          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/limited-access" element={<LimitedAccess />} />
           <Route path="/billing" element={
