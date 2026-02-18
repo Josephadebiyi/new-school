@@ -313,7 +313,7 @@ const SchoolsSection = () => (
             <Link 
               key={school.id}
               to={`/courses?school=${school.id}`}
-              className="school-card"
+              className="school-card group"
             >
               <img 
                 src={school.image} 
