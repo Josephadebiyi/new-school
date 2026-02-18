@@ -202,6 +202,10 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 
 ## Remaining Tasks
 
+### P0 (Critical)
+- [ ] Create notifications API endpoint to fetch real notifications from database
+- [ ] Store notifications when events occur (course enrollment, assignment due, etc.)
+
 ### P1 (Next Priority)
 - [ ] Canvas-confetti on course completion
 - [ ] PDF certificates for completed courses
@@ -209,7 +213,7 @@ Build a comprehensive University LMS (LuminaLMS/GITB) with:
 
 ### P2 (Medium Priority)
 - [ ] PDF template editor for admission letters
-- [ ] Real-time notifications
+- [ ] Real-time notifications via WebSocket
 
 ### P3 (Nice to Have)
 - [ ] Backend refactoring (modular routers)
