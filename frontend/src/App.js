@@ -243,6 +243,7 @@ function App() {
           <Route path="/schools/:schoolId" element={<SchoolDetailPage />} />
           <Route path="/why-gitb" element={<WhyGITBPage />} />
           <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+          <Route path="/course/:courseId" element={<CourseDetailPage />} />
           
           {/* LMS Routes */}
           <Route path="/login" element={<Login />} />
