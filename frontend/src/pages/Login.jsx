@@ -187,8 +187,8 @@ const Login = () => {
           </form>
 
           {/* EAHEA Accreditation Badge */}
-          <div className="mt-8 flex items-center justify-center gap-3 p-4 bg-gray-50 rounded-xl">
-            <Award size={24} className="text-[#8cc63f]" />
+          <div className="mt-8 flex items-center justify-center gap-4 p-4 bg-gray-50 rounded-xl">
+            <img src="/images/eahea-badge.png" alt="EAHEA Accredited" className="h-14 w-auto" />
             <div>
               <p className="text-sm font-medium text-gray-900">EAHEA Accredited</p>
               <p className="text-xs text-gray-500">EU & International Recognition</p>
