@@ -288,28 +288,12 @@ function App() {
             <Route path="payments" element={<AdminPayments />} />
           </Route>
 
-          {/* Redirect root and unknown paths to school app */}
-          <Route path="*" element={<SchoolRedirect />} />
+          {/* Default redirect to login for LMS */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
   );
 }
-
-// Component to redirect to school app on port 3001
-const SchoolRedirect = () => {
-  useEffect(() => {
-    // Redirect to the school app
-    const currentPath = window.location.pathname;
-    const schoolUrl = window.location.origin.replace(':3000', ':3001') + currentPath;
-    window.location.href = schoolUrl;
-  }, []);
-  
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="spinner"></div>
-    </div>
-  );
-};
 
 export default App;
