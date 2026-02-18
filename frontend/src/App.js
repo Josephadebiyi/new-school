@@ -6,6 +6,8 @@ import { Toaster, toast } from "sonner";
 
 // Pages
 import Login from "./pages/Login";
+import LandingPage from "./pages/LandingPage";
+import ApplyPage from "./pages/ApplyPage";
 import DashboardLayout from "./components/DashboardLayout";
 import LimitedAccess from "./pages/LimitedAccess";
 import BillingPage from "./pages/BillingPage";
