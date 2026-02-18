@@ -42,7 +42,7 @@
   "seed_data_creation": "",
   "retest_needed": false,
   "should_main_agent_self_test": false,
-  "context_for_next_testing_agent": "1) Login page (LMS) at https://gitb-school.preview.emergentagent.com/login has EAHEA badge and 'Back to Website' link. 2) Apply page (School app) at localhost:3001/apply has EAHEA badge at top and full footer. 3) Both apps use Inter font via @import. 4) School landing page loads 5 courses from /api/courses/public.",
+  "context_for_next_testing_agent": "1) Login page (LMS) at https://gitb-admissions.preview.emergentagent.com/login has EAHEA badge and 'Back to Website' link. 2) Apply page (School app) at localhost:3001/apply has EAHEA badge at top and full footer. 3) Both apps use Inter font via @import. 4) School landing page loads 5 courses from /api/courses/public.",
   "features_verified": {
     "login_eahea_badge": {
       "status": "PASSED",

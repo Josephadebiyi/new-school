@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 FROM_EMAIL = "noreply@gitb.lt"
 GITB_WEBSITE = "https://www.gitb.lt"
-GITB_LMS_URL = os.environ.get('FRONTEND_URL', 'https://gitb-school.preview.emergentagent.com')
+GITB_LMS_URL = os.environ.get('FRONTEND_URL', 'https://gitb-admissions.preview.emergentagent.com')
 
 # Logo URLs (using the deployed assets)
 GITB_LOGO_URL = f"{GITB_LMS_URL}/images/gitb-logo.png"

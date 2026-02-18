@@ -53,7 +53,7 @@ resend.api_key = os.environ.get('RESEND_API_KEY', '')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'noreply@gitb.lt')
 
 # Frontend URL for email links
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://gitb-school.preview.emergentagent.com')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://gitb-admissions.preview.emergentagent.com')
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'lumina-lms-secret-key')
@@ -1590,7 +1590,7 @@ async def send_admission_email(email: str, first_name: str, last_name: str, prog
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
-                <a href="https://gitb-school.preview.emergentagent.com/login" 
+                <a href="https://gitb-admissions.preview.emergentagent.com/login" 
                    style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
                     Access Student Portal
                 </a>
