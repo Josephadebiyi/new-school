@@ -68,6 +68,10 @@ body {
   line-height: 1.5;
 }
 
+.font-inter {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 /* Modern Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
