@@ -48,7 +48,7 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 # Create the main app
-app = FastAPI(title="LuminaLMS API")
+app = FastAPI(title="GITB Student LMS API")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
@@ -100,7 +100,7 @@ class SystemConfigUpdate(BaseModel):
     tuition_fee_per: Optional[str] = None
 
 class SystemConfig(BaseModel):
-    university_name: str = "LuminaLMS University"
+    university_name: str = "GITB - Student LMS"
     logo_url: str = ""
     favicon_url: str = ""
     primary_color: str = "#0F172A"
@@ -392,7 +392,7 @@ async def get_system_config() -> dict:
     config = await db.system_config.find_one({}, {"_id": 0})
     if not config:
         default_config = {
-            "university_name": "LuminaLMS University",
+            "university_name": "GITB - Student LMS",
             "logo_url": "",
             "favicon_url": "",
             "primary_color": "#0F172A",
@@ -456,7 +456,7 @@ async def send_welcome_email(email: str, first_name: str, student_id: str, temp_
     """Send welcome email with credentials to new student"""
     try:
         config = await get_system_config()
-        university_name = config.get("university_name", "LuminaLMS University")
+        university_name = config.get("university_name", "GITB - Student LMS")
         
         html_content = f"""
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -509,7 +509,7 @@ async def send_congratulations_email(email: str, first_name: str, course_title: 
     """Send congratulations email on course completion"""
     try:
         config = await get_system_config()
-        university_name = config.get("university_name", "LuminaLMS University")
+        university_name = config.get("university_name", "GITB - Student LMS")
         
         html_content = f"""
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -560,7 +560,7 @@ async def send_congratulations_email(email: str, first_name: str, course_title: 
 async def generate_certificate_pdf(student_name: str, course_title: str, completion_date: str, certificate_id: str) -> bytes:
     """Generate a certificate PDF"""
     config = await get_system_config()
-    university_name = config.get("university_name", "LuminaLMS University")
+    university_name = config.get("university_name", "GITB - Student LMS")
     
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=50, bottomMargin=50)
@@ -626,7 +626,7 @@ async def generate_certificate_pdf(student_name: str, course_title: str, complet
 async def generate_invoice_pdf(student_name: str, student_id: str, transaction: dict) -> bytes:
     """Generate an invoice PDF with logo and bank details"""
     config = await get_system_config()
-    university_name = config.get("university_name", "LuminaLMS University")
+    university_name = config.get("university_name", "GITB - Student LMS")
     logo_url = config.get("logo_url", "")
     bank_name = config.get("bank_name", "")
     account_name = config.get("account_name", "")
@@ -723,7 +723,7 @@ async def generate_invoice_pdf(student_name: str, student_id: str, transaction: 
 async def generate_transcript_pdf(student: dict, grades: list, courses: dict) -> bytes:
     """Generate a transcript PDF"""
     config = await get_system_config()
-    university_name = config.get("university_name", "LuminaLMS University")
+    university_name = config.get("university_name", "GITB - Student LMS")
     
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=30, bottomMargin=30)
@@ -2598,7 +2598,7 @@ async def seed_database():
     
     # Create system config
     config = {
-        "university_name": "LuminaLMS University",
+        "university_name": "GITB - Student LMS",
         "logo_url": "",
         "favicon_url": "",
         "primary_color": "#0F172A",
@@ -2941,7 +2941,7 @@ async def upload_course_image(
 
 @api_router.get("/")
 async def root():
-    return {"message": "LuminaLMS API", "version": "2.0.0"}
+    return {"message": "GITB Student LMS API", "version": "2.0.0"}
 
 # Include router
 app.include_router(api_router)
