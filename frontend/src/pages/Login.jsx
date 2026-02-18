@@ -9,7 +9,7 @@ import { Eye, EyeOff, GraduationCap, Mail, Lock, Award } from "lucide-react";
 import { toast } from "sonner";
 
 // Landing page URL (school site)
-const LANDING_URL = "http://localhost:3001";
+const LANDING_URL = "/";
 
 const Login = () => {
   const navigate = useNavigate();
