@@ -589,3 +589,53 @@ body {
 
 .rounded-modern { border-radius: var(--radius-lg); }
 .rounded-full { border-radius: var(--radius-full); }
+
+/* Landing Page Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+/* GITB Color utilities */
+.bg-gitb-dark {
+  background-color: #314a06;
+}
+
+.bg-gitb-lime {
+  background-color: #7ebf0d;
+}
+
+.text-gitb-dark {
+  color: #314a06;
+}
+
+.text-gitb-lime {
+  color: #7ebf0d;
+}
+
+.hover\:bg-gitb-lime-hover:hover {
+  background-color: #6ba50b;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Line clamp utilities */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
