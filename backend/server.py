@@ -1363,6 +1363,7 @@ async def approve_application(
         "is_active": True,
         "account_status": "active",
         "payment_status": "paid",
+        "must_change_password": True,  # Flag to prompt password change
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -1379,30 +1380,18 @@ async def approve_application(
         }}
     )
     
-    # Get system config for tuition fee
-    system_config = await db.system_config.find_one({}, {"_id": 0}) or {}
-    tuition_fee = system_config.get("tuition_fee", 2500)
-    tuition_fee_per = system_config.get("tuition_fee_per", "semester")
-    currency = system_config.get("default_currency", "EUR")
-    currency_symbol = {"EUR": "€", "USD": "$", "GBP": "£", "NGN": "₦"}.get(currency, "€")
-    
-    # Send welcome email with admission details
+    # Send approval email with login credentials using new email service
     email_sent = False
     try:
-        await send_admission_email(
+        email_sent = await send_application_approved_email(
             application["email"],
             application["first_name"],
             application["last_name"],
             application.get("course_title", "Your Program"),
-            student_id,
-            temp_password,
-            tuition_fee,
-            tuition_fee_per,
-            currency_symbol
+            temp_password
         )
-        email_sent = True
     except Exception as e:
-        logger.error(f"Failed to send admission email: {e}")
+        logger.error(f"Failed to send approval email: {e}")
     
     return {
         "message": "Application approved",
