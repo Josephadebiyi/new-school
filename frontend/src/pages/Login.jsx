@@ -293,6 +293,63 @@ const Login = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" data-testid="forgot-password-modal">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Reset Password</h2>
+              <button 
+                onClick={() => setShowForgotPassword(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <p className="text-gray-600 text-sm mb-6">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+            
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <Label className="text-gray-700 font-medium text-sm">Email Address</Label>
+                <div className="relative mt-2">
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="you@gitb.lt"
+                    className="input-modern pl-11 text-sm"
+                    data-testid="forgot-email-input"
+                  />
+                </div>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="btn-modern w-full h-11 text-sm text-white bg-[#8cc63f] hover:bg-[#7ab235]"
+                data-testid="forgot-submit-btn"
+              >
+                {forgotLoading ? <div className="spinner"></div> : "Send Reset Link"}
+              </button>
+            </form>
+            
+            <p className="text-center text-xs text-gray-500 mt-4">
+              Remember your password?{" "}
+              <button 
+                onClick={() => setShowForgotPassword(false)}
+                className="text-[#8cc63f] font-medium hover:underline"
+              >
+                Sign in
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
