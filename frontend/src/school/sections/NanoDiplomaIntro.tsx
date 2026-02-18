@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ArrowRight, Zap, Clock, Award } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
 
 const NanoDiplomaIntro = () => {

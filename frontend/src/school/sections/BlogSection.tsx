@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ArrowRight, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 
 const BlogSection = () => {
   const sectionRef = useRef<HTMLDivElement>(null);

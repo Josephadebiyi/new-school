@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Globe, Sparkles, Users, GraduationCap, TrendingUp, Check, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 
 const ReimaginingDream = () => {
   const sectionRef = useRef<HTMLDivElement>(null);

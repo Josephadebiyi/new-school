@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Clock, Users, Award, ArrowRight, Play, BookOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
 
 const PathForEveryone = () => {

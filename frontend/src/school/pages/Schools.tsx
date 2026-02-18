@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, BookOpen, Users, Clock, Award } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 
 const Schools = () => {
   const { schoolId } = useParams();

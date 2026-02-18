@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Building2, Handshake, Users, ArrowRight, Mail } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 
 const Partner = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
