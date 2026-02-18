@@ -319,6 +319,15 @@ const AdminAdmissions = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => openPreview(app)}
+                          data-testid={`preview-btn-${app.id}`}
+                        >
+                          <Eye size={14} className="mr-1" />
+                          Preview
+                        </Button>
                         {app.status === 'pending_review' && (
                           <>
                             <Button 
@@ -349,7 +358,7 @@ const AdminAdmissions = () => {
                             onClick={() => downloadAdmissionLetter(app.id)}
                           >
                             <Download size={14} className="mr-1" />
-                            Admission Letter
+                            Letter
                           </Button>
                         )}
                       </div>
