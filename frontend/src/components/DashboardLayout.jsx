@@ -337,10 +337,56 @@ const DashboardLayout = () => {
               </div>
 
               {/* Notifications */}
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors" data-testid="notifications-btn">
-                <Bell size={20} className="text-gray-600" />
-                <span className="notification-badge">6</span>
-              </button>
+              <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors" data-testid="notifications-btn">
+                    <Bell size={20} className="text-gray-600" />
+                    {notifications.filter(n => !n.read).length > 0 && (
+                      <span className="notification-badge">{notifications.filter(n => !n.read).length}</span>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
+                  <div className="px-4 py-3 border-b bg-gradient-to-r from-emerald-50 to-teal-50">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-900">Notifications</h3>
+                      <span className="text-xs text-emerald-600 font-medium">{notifications.filter(n => !n.read).length} new</span>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-gray-500">
+                        <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!notification.read ? 'bg-emerald-50/50' : ''}`}
+                          data-testid={`notification-item-${notification.id}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!notification.read ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm ${!notification.read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                                {notification.title}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notification.message}</p>
+                              <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="px-4 py-2 border-t bg-gray-50">
+                    <button className="w-full text-center text-sm text-emerald-600 font-medium hover:underline" data-testid="view-all-notifications">
+                      View all notifications
+                    </button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {/* User Avatar - Desktop Only */}
               <div className="hidden md:block">
