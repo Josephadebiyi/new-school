@@ -13,6 +13,7 @@ import CourseDetailPage from "./pages/CourseDetailPage";
 
 // LMS Pages
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import DashboardLayout from "./components/DashboardLayout";
 import LimitedAccess from "./pages/LimitedAccess";
 import BillingPage from "./pages/BillingPage";
