@@ -240,7 +240,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/apply" element={<ApplyPage />} />
           <Route path="/schools" element={<SchoolsPage />} />
-          <Route path="/schools/:schoolId" element={<SchoolsPage />} />
+          <Route path="/schools/:schoolId" element={<SchoolDetailPage />} />
           <Route path="/why-gitb" element={<WhyGITBPage />} />
           <Route path="/courses/:courseId" element={<CourseDetailPage />} />
           
