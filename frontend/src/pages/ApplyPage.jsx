@@ -361,10 +361,10 @@ const ApplyPage = () => {
 
       {/* High School Certificate Upload */}
       <div className="space-y-2">
-        <Label>High School Certificate *</Label>
+        <Label>High School Certificate (Optional)</Label>
         <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-[#7ebf0d] transition-colors">
           <Upload className="w-8 h-8 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-600 mb-2 text-sm">Upload your high school certificate</p>
+          <p className="text-gray-600 mb-2 text-sm">Upload your high school certificate (optional)</p>
           <label className="cursor-pointer">
             <input
               type="file"
