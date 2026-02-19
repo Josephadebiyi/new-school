@@ -1,41 +1,48 @@
-# Render Blueprint - Deploy both backend and frontend
-# Deploy via: render.com → New Blueprint Instance → Connect Repo
-
 services:
-  # Backend API Service
+  # Backend API (Node.js)
   - type: web
     name: gitb-backend
-    runtime: python
+    runtime: node
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: MONGO_URL
-        sync: false  # Set manually in dashboard
+        sync: false
       - key: DB_NAME
         value: gitb_lms
+      - key: JWT_SECRET
+        sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: ADMIN_EMAIL
+        value: noreply@gitb.lt
       - key: STRIPE_SECRET_KEY
         sync: false
-      - key: FRONTEND_URL
+      - key: STRIPE_PUBLIC_KEY
         sync: false
-      - key: JWT_SECRET
-        generateValue: true
-      - key: PYTHON_VERSION
-        value: 3.11.0
+      - key: APPLICATION_FEE_EUR
+        value: "50.00"
+      - key: DEFAULT_CURRENCY
+        value: EUR
+      - key: FRONTEND_URL
+        value: https://gitb.lt
+      - key: CORS_ORIGINS
+        value: "*"
+    healthCheckPath: /api
 
-  # Frontend Static Site
+  # Frontend (Static Site)
   - type: web
     name: gitb-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: yarn install && yarn build
+    buildCommand: npm install && npm run build
     staticPublishPath: build
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=31536000
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        value: https://new-school-vam1.onrender.com
     routes:
       - type: rewrite
         source: /*
