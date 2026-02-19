@@ -12,7 +12,7 @@ from pathlib import Path
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://gitb-admissions.preview.emergentagent.com"
+    BASE_URL = "https://learning-hub-297.preview.emergentagent.com"
 
 # Test credentials
 ADMIN_EMAIL = "admin@unilms.edu"

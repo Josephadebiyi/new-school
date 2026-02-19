@@ -1,193 +1,485 @@
 <analysis>**original_problem_statement:**
-The user wants to build a white-label Learning Management System (LMS) called GITB (formerly LuminaLMS).
+The user wants to build a white-label Learning Management System (LMS) called GITB.
 
 **PRODUCT REQUIREMENTS:**
-1.  **Main Landing Page ():** The primary entry point of the website must be the school's public-facing site. The user has provided a specific Vite+React project in an  file for this purpose.
-2.  **LMS Access:** The core LMS (student/admin/lecturer dashboards) should only be accessible after logging in via the landing page.
-3.  **Student Application & Onboarding Flow:**
-    *   Students apply from the landing page with a **€50 application fee** via Stripe.
-    *   Students must upload educational documents (high school certificate, ID).
-    *   Admins review applications, with the ability to preview application details.
-    *   On approval, an admission letter is generated and emailed.
-4.  **Course Management:**
-    *   Admins/lecturers can create/edit courses and upload materials.
-    *   A bulk quiz upload feature should be available.
-5.  **UI/UX:**
-    *   The website font must be Inter (or similar to Airbnb's font).
-    *   The logo on the LMS login page should link back to the main school landing page.
-    *   The EAHEA (European Agency for Higher Education & Accreditation) logo and footer must be present on the login and application pages, as per the user-provided design.
+1.  **Main Landing Page ():** A complete, multi-section landing page matching the user's original design. This includes a hero section, program listings, partner logos, testimonials, and a blog section (Keep Growing With Us).
+2.  **LMS Access & Pages:**
+    *   The core LMS (admin/student dashboards) must be accessible only after login.
+    *   All public-facing pages (Course Details, School/Department pages) must have a consistent header and navigation menu.
+    *   Each course and school/department listed on the landing page must be clickable and redirect to its corresponding detail page.
+3.  **Application & Onboarding:**
+    *   A comprehensive application form with a dropdown for all courses, a list of all countries, and fields for personal information.
+    *   Document uploads: A mandatory ID document and an optional high-school certificate.
+    *   A €50 application fee processed via Stripe.
+4.  **Backend & Database:**
+    *   The backend must use the provided MongoDB Atlas instance.
+    *   An admin user needs to be created:  / .
+    *   The backend file structure needs to be organized to support deployment on services like Render.
+5.  **Authentication:** A full Forgot Password and Reset Password flow must be implemented.
+6.  **UI/UX:**
+    *   Fix all missing images and logos across the entire application.
+    *   The frontend page title should be updated to something relevant to the business model.
+    *   The application form placeholders should be generic (e.g., First Name) instead of specific names (John Doe).
 
 **User's preferred language**: English
 
 **what currently exists?**
-The project is a full-stack application with a FastAPI backend and two separate React frontends:
-1.  : The core LMS application for authenticated users (admins, students, etc.).
-2.  : The public-facing school website. This directory has just been replaced with a new Vite+TypeScript project provided by the user and is currently being configured.
-
-The backend uses a local MongoDB instance. The core LMS features (dashboards, notifications, course management) are functional. The agent was in the middle of integrating the user's latest design for the school landing page.
+The application is a full-stack LMS with a FastAPI backend and a React frontend. The agent has successfully implemented most of the user's requirements. The landing page is complete, all images and logos are displaying correctly, and the application is connected to the user's MongoDB Atlas instance. All public pages have a consistent header, and navigation between the landing page and course/school detail pages is functional. The application form has been updated with all countries and correct field requirements. An admin user has been created, and the Stripe integration was refactored to use the official SDK. The project has been structured for Render deployment by adding  and  files. However, the project is currently not deployable due to a Python dependency conflict.
 
 **Last working item**:
-- **Last item agent was working:** The user provided a new  and instructed the agent to completely replace the school landing page with its contents. The agent deleted the old  directory and the temporary landing page component it had created in . It then extracted the new zip into  and began configuring the new Vite project by updating , , and .
+- **Last item agent was working:** The agent was attempting to resolve a Python dependency conflict in . The user reported that their deployment on Render was failing with a build error related to , , and other related packages. The agent was trying different strategies to create a compatible list of dependencies.
 - **Status:** IN PROGRESS
 - **Agent Testing Done:** N
-- **Which testing method agent to use?** both. The frontend testing agent is needed to verify the new school landing page UI, responsiveness, and all its internal routes (, , ). The backend testing agent is needed to ensure the API connections for fetching courses and submitting applications from this new frontend are working correctly.
+- **Which testing method agent to use?** main agent to test via Looking in indexes: https://pypi.org/simple, https://d33sy5i8bnduwe.cloudfront.net/simple/
+Requirement already satisfied: fastapi==0.110.1 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 2)) (0.110.1)
+Requirement already satisfied: starlette==0.37.2 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 3)) (0.37.2)
+Requirement already satisfied: uvicorn==0.25.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 4)) (0.25.0)
+Requirement already satisfied: python-multipart==0.0.22 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 5)) (0.0.22)
+Requirement already satisfied: PyJWT==2.9.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 8)) (2.9.0)
+Requirement already satisfied: python-jose==3.3.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 9)) (3.3.0)
+Requirement already satisfied: passlib==1.7.4 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 10)) (1.7.4)
+Requirement already satisfied: bcrypt==4.2.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 11)) (4.2.0)
+Requirement already satisfied: cryptography==43.0.1 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 12)) (43.0.1)
+Requirement already satisfied: motor==3.6.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 15)) (3.6.0)
+Requirement already satisfied: pymongo==4.9.2 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 16)) (4.9.2)
+Requirement already satisfied: httpx>=0.27.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 19)) (0.28.1)
+Requirement already satisfied: httpcore>=1.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 20)) (1.0.9)
+Requirement already satisfied: requests>=2.31.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 21)) (2.32.5)
+Requirement already satisfied: aiohttp>=3.9.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 22)) (3.13.3)
+Requirement already satisfied: pydantic>=2.5.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 25)) (2.12.5)
+Requirement already satisfied: email-validator>=2.1.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 26)) (2.3.0)
+Requirement already satisfied: stripe>=10.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 29)) (14.3.0)
+Requirement already satisfied: resend>=2.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 30)) (2.21.0)
+Requirement already satisfied: pyuploadcare>=5.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 33)) (6.2.1)
+Requirement already satisfied: google-api-core==2.20.0 in /root/.venv/lib/python3.11/site-packages (from google-api-core[grpc]==2.20.0->-r /app/backend/requirements.txt (line 36)) (2.20.0)
+Requirement already satisfied: google-api-python-client>=2.100.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 37)) (2.189.0)
+Requirement already satisfied: google-auth>=2.25.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 38)) (2.49.0.dev0)
+Requirement already satisfied: google-auth-httplib2>=0.2.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 39)) (0.3.0)
+Requirement already satisfied: google-generativeai>=0.5.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 40)) (0.8.6)
+Requirement already satisfied: googleapis-common-protos>=1.60.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 41)) (1.72.0)
+Requirement already satisfied: proto-plus>=1.24.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 42)) (1.27.1)
+Requirement already satisfied: protobuf<6.0.0,>=4.25.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 43)) (5.29.6)
+Requirement already satisfied: openai>=1.30.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 46)) (1.99.9)
+Requirement already satisfied: tiktoken>=0.7.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 47)) (0.12.0)
+Requirement already satisfied: tokenizers>=0.19.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 48)) (0.22.2)
+Requirement already satisfied: boto3>=1.34.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 51)) (1.42.42)
+Requirement already satisfied: botocore>=1.34.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 52)) (1.42.42)
+Requirement already satisfied: s3transfer>=0.10.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 53)) (0.16.0)
+Requirement already satisfied: numpy>=1.26.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 56)) (2.4.2)
+Requirement already satisfied: pandas>=2.1.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 57)) (3.0.0)
+Requirement already satisfied: pillow>=10.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 58)) (12.1.0)
+Requirement already satisfied: reportlab>=4.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 61)) (4.4.10)
+Requirement already satisfied: Jinja2>=3.1.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 64)) (3.1.6)
+Requirement already satisfied: MarkupSafe>=2.1.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 65)) (3.0.3)
+Requirement already satisfied: python-dotenv>=1.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 68)) (1.2.1)
+Requirement already satisfied: certifi>=2024.2.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 69)) (2026.1.4)
+Requirement already satisfied: dnspython>=2.6.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 70)) (2.8.0)
+Requirement already satisfied: PyYAML>=6.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 71)) (6.0.3)
+Requirement already satisfied: regex>=2024.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 72)) (2026.1.15)
+Requirement already satisfied: tqdm>=4.66.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 73)) (4.67.3)
+Requirement already satisfied: tenacity>=8.2.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 74)) (9.1.2)
+Requirement already satisfied: six>=1.16.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 75)) (1.17.0)
+Requirement already satisfied: packaging>=24.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 76)) (26.0)
+Requirement already satisfied: typing_extensions>=4.10.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 77)) (4.15.0)
+Requirement already satisfied: python-dateutil>=2.9.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 80)) (2.9.0.post0)
+Requirement already satisfied: tzdata>=2024.1 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 81)) (2025.3)
+Requirement already satisfied: anyio>=4.4.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 84)) (4.12.1)
+Requirement already satisfied: sniffio>=1.3.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 85)) (1.3.1)
+Requirement already satisfied: aiosignal>=1.3.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 86)) (1.4.0)
+Requirement already satisfied: frozenlist>=1.4.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 87)) (1.8.0)
+Requirement already satisfied: multidict>=6.0.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 88)) (6.7.1)
+Requirement already satisfied: yarl>=1.9.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 89)) (1.22.0)
+Requirement already satisfied: click>=8.1.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 92)) (8.3.1)
+Requirement already satisfied: rich>=13.7.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 93)) (14.3.2)
+Requirement already satisfied: jsonschema>=4.21.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 96)) (4.26.0)
+Requirement already satisfied: annotated-types>=0.6.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 97)) (0.7.0)
+Requirement already satisfied: attrs>=23.2.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 100)) (25.4.0)
+Requirement already satisfied: idna>=3.7 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 101)) (3.11)
+Requirement already satisfied: charset-normalizer>=3.3.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 102)) (3.4.4)
+Requirement already satisfied: urllib3>=2.2.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 103)) (2.6.3)
+Requirement already satisfied: h11>=0.14.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 104)) (0.16.0)
+Requirement already satisfied: httplib2>=0.22.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 105)) (0.31.2)
+Requirement already satisfied: watchfiles>=0.21.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 106)) (1.1.1)
+Requirement already satisfied: websockets>=12.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 107)) (15.0.1)
+Requirement already satisfied: distro>=1.9.0 in /root/.venv/lib/python3.11/site-packages (from -r /app/backend/requirements.txt (line 108)) (1.9.0)
+Requirement already satisfied: ecdsa!=0.15 in /root/.venv/lib/python3.11/site-packages (from python-jose==3.3.0->-r /app/backend/requirements.txt (line 9)) (0.19.1)
+Requirement already satisfied: rsa in /root/.venv/lib/python3.11/site-packages (from python-jose==3.3.0->-r /app/backend/requirements.txt (line 9)) (4.9.1)
+Requirement already satisfied: pyasn1 in /root/.venv/lib/python3.11/site-packages (from python-jose==3.3.0->-r /app/backend/requirements.txt (line 9)) (0.6.2)
+Requirement already satisfied: cffi>=1.12 in /root/.venv/lib/python3.11/site-packages (from cryptography==43.0.1->-r /app/backend/requirements.txt (line 12)) (2.0.0)
+Requirement already satisfied: grpcio<2.0dev,>=1.33.2 in /root/.venv/lib/python3.11/site-packages (from google-api-core[grpc]==2.20.0->-r /app/backend/requirements.txt (line 36)) (1.76.0)
+Requirement already satisfied: grpcio-status<2.0.dev0,>=1.33.2 in /root/.venv/lib/python3.11/site-packages (from google-api-core[grpc]==2.20.0->-r /app/backend/requirements.txt (line 36)) (1.71.2)
+Requirement already satisfied: pydantic-core==2.41.5 in /root/.venv/lib/python3.11/site-packages (from pydantic>=2.5.0->-r /app/backend/requirements.txt (line 25)) (2.41.5)
+Requirement already satisfied: typing-inspection>=0.4.2 in /root/.venv/lib/python3.11/site-packages (from pydantic>=2.5.0->-r /app/backend/requirements.txt (line 25)) (0.4.2)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in /root/.venv/lib/python3.11/site-packages (from google-auth>=2.25.0->-r /app/backend/requirements.txt (line 38)) (0.4.2)
+Requirement already satisfied: aiohappyeyeballs>=2.5.0 in /root/.venv/lib/python3.11/site-packages (from aiohttp>=3.9.0->-r /app/backend/requirements.txt (line 22)) (2.6.1)
+Requirement already satisfied: propcache>=0.2.0 in /root/.venv/lib/python3.11/site-packages (from aiohttp>=3.9.0->-r /app/backend/requirements.txt (line 22)) (0.4.1)
+Requirement already satisfied: uritemplate<5,>=3.0.1 in /root/.venv/lib/python3.11/site-packages (from google-api-python-client>=2.100.0->-r /app/backend/requirements.txt (line 37)) (4.2.0)
+Requirement already satisfied: pyparsing<4,>=3.1 in /root/.venv/lib/python3.11/site-packages (from httplib2>=0.22.0->-r /app/backend/requirements.txt (line 105)) (3.3.2)
+Requirement already satisfied: google-ai-generativelanguage==0.6.15 in /root/.venv/lib/python3.11/site-packages (from google-generativeai>=0.5.0->-r /app/backend/requirements.txt (line 40)) (0.6.15)
+Requirement already satisfied: jiter<1,>=0.4.0 in /root/.venv/lib/python3.11/site-packages (from openai>=1.30.0->-r /app/backend/requirements.txt (line 46)) (0.13.0)
+Requirement already satisfied: huggingface-hub<2.0,>=0.16.4 in /root/.venv/lib/python3.11/site-packages (from tokenizers>=0.19.0->-r /app/backend/requirements.txt (line 48)) (1.4.0)
+Requirement already satisfied: filelock in /root/.venv/lib/python3.11/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.19.0->-r /app/backend/requirements.txt (line 48)) (3.20.3)
+Requirement already satisfied: fsspec>=2023.5.0 in /root/.venv/lib/python3.11/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.19.0->-r /app/backend/requirements.txt (line 48)) (2026.1.0)
+Requirement already satisfied: hf-xet<2.0.0,>=1.2.0 in /root/.venv/lib/python3.11/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.19.0->-r /app/backend/requirements.txt (line 48)) (1.2.0)
+Requirement already satisfied: shellingham in /root/.venv/lib/python3.11/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.19.0->-r /app/backend/requirements.txt (line 48)) (1.5.4)
+Requirement already satisfied: typer-slim in /root/.venv/lib/python3.11/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.19.0->-r /app/backend/requirements.txt (line 48)) (0.21.1)
+Requirement already satisfied: jmespath<2.0.0,>=0.7.1 in /root/.venv/lib/python3.11/site-packages (from boto3>=1.34.0->-r /app/backend/requirements.txt (line 51)) (1.1.0)
+Requirement already satisfied: markdown-it-py>=2.2.0 in /root/.venv/lib/python3.11/site-packages (from rich>=13.7.0->-r /app/backend/requirements.txt (line 93)) (4.0.0)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /root/.venv/lib/python3.11/site-packages (from rich>=13.7.0->-r /app/backend/requirements.txt (line 93)) (2.19.2)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /root/.venv/lib/python3.11/site-packages (from jsonschema>=4.21.0->-r /app/backend/requirements.txt (line 96)) (2025.9.1)
+Requirement already satisfied: referencing>=0.28.4 in /root/.venv/lib/python3.11/site-packages (from jsonschema>=4.21.0->-r /app/backend/requirements.txt (line 96)) (0.37.0)
+Requirement already satisfied: rpds-py>=0.25.0 in /root/.venv/lib/python3.11/site-packages (from jsonschema>=4.21.0->-r /app/backend/requirements.txt (line 96)) (0.30.0)
+Requirement already satisfied: pycparser in /root/.venv/lib/python3.11/site-packages (from cffi>=1.12->cryptography==43.0.1->-r /app/backend/requirements.txt (line 12)) (3.0)
+Requirement already satisfied: mdurl~=0.1 in /root/.venv/lib/python3.11/site-packages (from markdown-it-py>=2.2.0->rich>=13.7.0->-r /app/backend/requirements.txt (line 93)) (0.1.2) to confirm the dependencies can be installed successfully without conflicts.
 - **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-- **Issue 1: The application's main entry point () incorrectly shows the LMS login instead of the school landing page. (P0)**
-- **Issue 2: The new user-provided school landing page is not yet fully configured or integrated. (P0)**
-- **Issue 3: MongoDB Atlas connection failure. (P2)**
+- **Issue 1: Python Dependency Conflict in  (P0)**
 
 **Issues Detail:**
 - **Issue 1:**
-    - **Attempted fixes:** The agent previously tried to solve this by creating a  component inside the main LMS frontend. This was the wrong approach, as the school app is a separate project. The user rejected this and provided a new  to be used.
-    - **Next debug checklist:**
-        1.  The primary challenge is architectural: the school app (port 3001) and the LMS app (port 3000) are separate services. The ingress/routing configuration needs to be modified to direct root traffic () to the school app. The agent should investigate how to modify the NGINX or supervisor configuration to achieve this.
-        2.  After fixing the routing, verify that the Login button on the school page correctly links to the LMS login URL (e.g., ).
-        3.  Ensure the logo and Back to Website links on the LMS login page point to the root domain ().
-    - **Why fix this issue and what will be achieved with the fix?** This is the user's main complaint. Fixing it will establish the correct user journey, where the marketing site is the public entry point.
-    - **Status:** NOT STARTED
-    - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?** frontend
-    - **Blocked on other issue:** Issue 2. The school app must be working before the routing can be tested.
-- **Issue 2:**
-    - **Attempted fixes:** This is the current task. The agent has started configuration.
-    - **Next debug checklist:**
-        1.  Finish editing  to use the correct port (3001) and environment variables.
-        2.  Finish editing  to correctly read the Stripe key from the environment.
-        3.  Ensure all components that fetch API data (, , , ) are updated to use the .
-        4.  Install dependencies (yarn install v1.22.22
-[1/4] Resolving packages...
-[2/4] Fetching packages...
-[3/4] Linking dependencies...
-[4/4] Building fresh packages...
-success Saved lockfile.
-Done in 0.03s.) and start the school app via supervisor to confirm it runs.
-    - **Why fix this issue and what will be achieved with the fix?** This is a prerequisite for fixing the main routing issue and fulfilling the user's request to use their new design.
-    - **Status:** IN PROGRESS
-    - **Is recurring issue?** N
-    - **Should Test frontend/backend/both after fix?** both
-    - **Blocked on other issue:** None.
-- **Issue 3:**
-    - **Attempted fixes:** None in this session.
-    - **Next debug checklist:** Investigate SSL certificate verification errors. The execution environment may need CA certificates installed.
-    - **Why fix this issue and what will be achieved with this?** To connect the application to a production-ready, managed database service.
-    - **Status:** NOT STARTED
-    - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?** backend
-    - **Blocked on other issue:** None.
+  - **Attempted fixes:** The agent tried several approaches:
+    1.  Removing the  package (which was private) and its dependencies.
+    2.  Attempting to let 
+Usage:   
+  pip <command> [options]
+
+Commands:
+  install                     Install packages.
+  lock                        Generate a lock file.
+  download                    Download packages.
+  uninstall                   Uninstall packages.
+  freeze                      Output installed packages in requirements format.
+  inspect                     Inspect the python environment.
+  list                        List installed packages.
+  show                        Show information about installed packages.
+  check                       Verify installed packages have compatible 
+dependencies.
+  config                      Manage local and global configuration.
+  search                      Search PyPI for packages.
+  cache                       Inspect and manage pip's wheel cache.
+  index                       Inspect information available from package 
+indexes.
+  wheel                       Build wheels from your requirements.
+  hash                        Compute hashes of package archives.
+  completion                  A helper command used for command completion.
+  debug                       Show information useful for debugging.
+  help                        Show help for commands.
+
+General Options:
+  -h, --help                  Show help.
+  --debug                     Let unhandled exceptions propagate outside the
+                              main subroutine, instead of logging them to
+                              stderr.
+  --isolated                  Run pip in an isolated mode, ignoring
+                              environment variables and user configuration.
+  --require-virtualenv        Allow pip to only run in a virtual environment;
+                              exit with an error otherwise.
+  --python <python>           Run pip with the specified Python interpreter.
+  -v, --verbose               Give more output. Option is additive, and can be
+                              used up to 3 times.
+  -V, --version               Show version and exit.
+  -q, --quiet                 Give less output. Option is additive, and can be
+                              used up to 3 times (corresponding to WARNING,
+                              ERROR, and CRITICAL logging levels).
+  --log <path>                Path to a verbose appending log.
+  --no-input                  Disable prompting for input.
+  --keyring-provider <keyring_provider>
+                              Enable the credential lookup via the keyring
+                              library if user input is allowed. Specify which
+                              mechanism to use [auto, disabled, import,
+                              subprocess]. (default: auto)
+  --proxy <proxy>             Specify a proxy in the form
+                              scheme://[user:passwd@]proxy.server:port.
+  --retries <retries>         Maximum attempts to establish a new HTTP
+                              connection. (default: 5)
+  --timeout <sec>             Set the socket timeout (default 15 seconds).
+  --exists-action <action>    Default action when a path already exists:
+                              (s)witch, (i)gnore, (w)ipe, (b)ackup, (a)bort.
+  --trusted-host <hostname>   Mark this host or host:port pair as trusted,
+                              even though it does not have valid or any HTTPS.
+  --cert <path>               Path to PEM-encoded CA certificate bundle. If
+                              provided, overrides the default. See 'SSL
+                              Certificate Verification' in pip documentation
+                              for more information.
+  --client-cert <path>        Path to SSL client certificate, a single file
+                              containing the private key and the certificate
+                              in PEM format.
+  --cache-dir <dir>           Store the cache data in <dir>.
+  --no-cache-dir              Disable the cache.
+  --disable-pip-version-check
+                              Don't periodically check PyPI to determine
+                              whether a new version of pip is available for
+                              download. Implied with --no-
+                              index.
+  --no-color                  Suppress colored output.
+  --use-feature <feature>     Enable new functionality, that may be backward
+                              incompatible.
+  --use-deprecated <feature>  Enable deprecated functionality, that will be
+                              removed in the future.
+  --resume-retries <resume_retries>
+                              Maximum attempts to resume or restart an
+                              incomplete download. (default: 5) resolve dependencies by removing version pins for  and related packages.
+    3.  The last attempt still resulted in a conflict where  required a different version of  than what was installed.
+  - **Next debug checklist:**
+    1.  Carefully examine the dependencies of  and .
+    2.  Create a fresh virtual environment and install the problematic packages one by one to identify the exact point of conflict.
+    3.  Try upgrading or downgrading packages like , , and  to find a compatible set.
+    4.  Generate a new  file using aiohappyeyeballs==2.6.1
+aiohttp==3.13.3
+aiosignal==1.4.0
+annotated-types==0.7.0
+anyio==4.12.1
+attrs==25.4.0
+bcrypt==4.2.0
+black==26.1.0
+boto3==1.42.42
+botocore==1.42.42
+certifi==2026.1.4
+cffi==2.0.0
+charset-normalizer==3.4.4
+click==8.3.1
+cryptography==43.0.1
+distro==1.9.0
+dnspython==2.8.0
+ecdsa==0.19.1
+email-validator==2.3.0
+emergentintegrations==0.1.0
+fastapi==0.110.1
+fastuuid==0.14.0
+filelock==3.20.3
+flake8==7.3.0
+frozenlist==1.8.0
+fsspec==2026.1.0
+google-ai-generativelanguage==0.6.15
+google-api-core==2.20.0
+google-api-python-client==2.189.0
+google-auth==2.49.0.dev0
+google-auth-httplib2==0.3.0
+google-genai==1.62.0
+google-generativeai==0.8.6
+googleapis-common-protos==1.72.0
+grpcio==1.76.0
+grpcio-status==1.71.2
+h11==0.16.0
+hf-xet==1.2.0
+httpcore==1.0.9
+httplib2==0.31.2
+httpx==0.28.1
+huggingface_hub==1.4.0
+idna==3.11
+importlib_metadata==8.7.1
+iniconfig==2.3.0
+isort==7.0.0
+Jinja2==3.1.6
+jiter==0.13.0
+jmespath==1.1.0
+jq==1.11.0
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+librt==0.7.8
+litellm==1.80.0
+markdown-it-py==4.0.0
+MarkupSafe==3.0.3
+mccabe==0.7.0
+mdurl==0.1.2
+motor==3.6.0
+multidict==6.7.1
+mypy==1.19.1
+mypy_extensions==1.1.0
+numpy==2.4.2
+oauthlib==3.3.1
+openai==1.99.9
+packaging==26.0
+pandas==3.0.0
+passlib==1.7.4
+pathspec==1.0.4
+pillow==12.1.0
+platformdirs==4.5.1
+pluggy==1.6.0
+propcache==0.4.1
+proto-plus==1.27.1
+protobuf==5.29.6
+pyasn1==0.6.2
+pyasn1_modules==0.4.2
+pycodestyle==2.14.0
+pycparser==3.0
+pydantic==2.12.5
+pydantic_core==2.41.5
+pyflakes==3.4.0
+Pygments==2.19.2
+PyJWT==2.9.0
+pymongo==4.9.2
+pyparsing==3.3.2
+pytest==9.0.2
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.1
+python-jose==3.3.0
+python-multipart==0.0.22
+pytokens==0.4.1
+pyuploadcare==6.2.1
+PyYAML==6.0.3
+referencing==0.37.0
+regex==2026.1.15
+reportlab==4.4.10
+requests==2.32.5
+requests-oauthlib==2.0.0
+resend==2.21.0
+rich==14.3.2
+rpds-py==0.30.0
+rsa==4.9.1
+s3transfer==0.16.0
+s5cmd==0.2.0
+shellingham==1.5.4
+six==1.17.0
+sniffio==1.3.1
+starlette==0.37.2
+stripe==14.3.0
+tenacity==9.1.2
+tiktoken==0.12.0
+tokenizers==0.22.2
+tqdm==4.67.3
+typer==0.21.1
+typer-slim==0.21.1
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+tzdata==2025.3
+uritemplate==4.2.0
+urllib3==2.6.3
+uvicorn==0.25.0
+watchfiles==1.1.1
+websockets==15.0.1
+yarl==1.22.0
+zipp==3.23.0 after a successful installation.
+  - **Why fix this issue and what will be achieved with the fix?** This is a critical blocker preventing the user from deploying the application. Resolving it will enable a successful build on Render.
+  - **Status:** IN PROGRESS
+  - **Is recurring issue?** Y
+  - **Should Test frontend/backend/both after fix?** backend
+  - **Blocked on other issue:** None.
 
 **In progress Task List**:
-- **Task 1: Complete setup of the new school landing page (P0)**
-    - **Where to resume:** The agent has replaced the files in  and has started editing configuration files (, , ). The next immediate step is to complete these configurations, install dependencies, and restart the service.
-    - **What will be achieved with this?** A functional, user-approved public website that is ready to be set as the application's main entry point.
+- **Task 1: Resolve Dependency Conflicts (P0)**
+    - **Where to resume:** . The agent needs to generate a fully compatible dependency list.
+    - **What will be achieved with this?** A working, deployable backend.
     - **Status:** IN PROGRESS
-    - **Should Test frontend/backend/both after fix?** both
+    - **Should Test frontend/backend/both after fix?** backend
     - **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
 - **Upcoming Tasks:**
-  - **(P0)** Reconfigure application routing to make the school app the main () page.
-  - **(P1)** Finalize Application Workflow: Implement admin-side approval/rejection logic on the  page and trigger the admission letter email upon approval.
-  - **(P1)** PDF Generation Enhancements: Create an admin interface to edit the template for the admission letter PDF.
+  - **(P1) Refactor Backend :** Move the endpoint logic from the monolithic  file into the respective files in the  directory. This was part of the original request but has been deferred.
 - **Future Tasks:**
-  - **(P1)** Admin Payment Tracking: Build a new dashboard for admins to view and track all Stripe payments.
-  - **(P2)** Graduation Features: Integrate  for a celebration effect on 100% course completion.
-  - **(P2)** Refactor Backend: Break down the monolithic  into a modular structure using FastAPI's .
+  - **(P1)** Admin Payment Tracking: Build a dashboard for admins to view Stripe payments.
+  - **(P2)** PDF Generation Enhancements: Create an admin interface to edit the admission letter template.
+  - **(P2)** Graduation Features: Integrate  on course completion.
 
 **Completed work in this session**
-- **Add Course Button Fix:** The broken button on the student dashboard was fixed and now correctly links to the course catalog.
-- **Admission Preview Feature:** An application preview dialog was successfully added to the admin admissions page.
-- **Notification System Implementation:** A functional notification dropdown was added to the main LMS dashboard layout.
-- **Multiple School Landing Page Iterations:** The agent implemented two full redesigns of the school landing page, including one with a green theme and another based on a user-provided zip file, connecting them to the backend API.
-- **Font and Branding Updates:** The font across the LMS and School apps was standardized to Inter, and the LMS login page was updated with the EAHEA logo and correct links back to the landing page.
+- **Landing Page Completion:** Added all missing sections (, , etc.) to .
+- **Image & Logo Fixes:** Resolved issues causing images (logos, hero images, badges) not to display across the site by fixing webpack configuration.
+- **MongoDB Atlas Integration:** Successfully connected the backend to the user's provided MongoDB Atlas cluster after resolving authentication and SSL issues.
+- **Application Form Overhaul:**
+    - Replaced a limited country dropdown with a comprehensive list of all countries.
+    - Updated form placeholders from John Doe to First Name / Last Name.
+    - Made the High School Certificate upload optional while keeping the ID Document required.
+- **Authentication & User Management:**
+    - Implemented a complete Forgot Password modal and a new  page.
+    - Created the admin user () as requested.
+    - Fixed a critical bug in the login endpoint related to  vs uid=0(root) gid=0(root) groups=0(root) from MongoDB.
+- **Navigation & UI Consistency:**
+    - Extracted the header into a shared component and added it to all public-facing pages (, , etc.) to fix the disappearing menu issue.
+    - Made course and school cards on the landing page clickable, linking to their respective detail pages.
+- **Deployment Preparation:**
+    - Restructured the project by adding ,  files, and an updated  for easier deployment on Render.
+- **Stripe Integration Refactor:** Removed the dependency on a private  package and re-implemented Stripe payment processing using the official  Python SDK.
 
 **Earlier issues found/mentioned but not fixed**
-- **Issue 1: MongoDB Atlas connection failure.**
-    - **Debug checklist:** An SSL certificate verification error occurs when connecting. The root cause is likely missing CA certificates in the execution environment.
-    - **Why to solve this issue and what will be achieved with this?** To allow the application to connect to a production-ready, managed database service instead of a local instance.
-    - **Should Test frontend/backend/both after fix:** backend
-    - **Is recurring issue?** Y
+- None. All major issues from previous sessions have been addressed. The primary remaining work is the new dependency issue and the pending backend refactor.
 
 **Known issue recurrence from previous fork**
--   None.
+- None.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Frontend (LMS):** React, Create-React-App, JavaScript, Tailwind CSS
--   **Frontend (School):** React, Vite, TypeScript, Tailwind CSS
+-   **Frontend:** React, Create-React-App (with Craco), JavaScript, Tailwind CSS
 -   **Backend:** FastAPI, Python
--   **Database:** MongoDB (local instance)
--   **Authentication:** JWT with Role-Based Access Control (RBAC)
+-   **Database:** MongoDB Atlas
+-   **Emails:** Resend API
 -   **Payments:** Stripe
 
 **key DB schema**
--   **SystemConfig:** 
--   **User:** 
--   **Course:** 
--   **Application:** 
+-   **users:** 
+-   **courses:** 
+-   **applications:** 
 
 **changes in tech stack**
--   The  frontend has been changed from a JavaScript Create-React-App to a **TypeScript Vite** application.
+-   Removed dependency on the private  package.
+-   Stripe functionality is now implemented using the official  Python library.
 
 **All files of reference**
--   **/app/school/**: This entire directory has been replaced with the contents of the user's latest  file.
--   : Updated to include the EAHEA logo and a link back to the main landing page.
--   : Updated to import and use the 'Inter' font.
--   : Was temporarily modified to include a landing page route, but these changes were reverted.
--   : Updated to use yarn run v1.22.22
-info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command. for the new Vite project.
--   Files deleted:  and all previous contents of .
+-   : The source of the current blocking issue.
+-   : Contains all backend logic, including the newly refactored Stripe code. Needs to be broken up.
+-   : Updated with country list and optional fields.
+-   : Updated with forgot password modal.
+-   : New shared component used across public pages.
+-   : Updated to use the shared Header.
+-   : New page with shared Header.
+-   : Modified to fix static image serving.
+-   : New file for Render deployment configuration.
 
 **Areas that need refactoring**:
--   The  file is still monolithic and a high-priority candidate for refactoring.
+-   : This is a high-priority technical debt item. All endpoint logic resides in this single file and should be moved into the  directory for better maintainability, as per the original plan.
 
 **key api endpoints**
--    (GET): Fetches active courses for the public landing page.
--    (POST): Submits a new student application.
 -    (POST)
--    (GET): Fetches applications for the admin dashboard.
+-    (POST)
+-    (POST)
+-    (POST)
+-    (POST) - Now uses direct Stripe SDK.
+-    (POST) - Now uses direct Stripe SDK.
 
 **Critical Info for New Agent**
--   The user's top priority is making the new school app (from the latest ) the main landing page at the root URL (). This is an infrastructure/routing problem, not just a React routing problem. You will likely need to adjust NGINX or a similar proxy configuration.
--   The agent was in the middle of configuring the new Vite-based school app in . This task must be completed before the routing can be addressed.
--   The database is a **local MongoDB** instance. The URL is  and the database name is . This was a direct question from the user.
+-   **Deployment is Blocked:** The absolute top priority (P0) is to fix the Python dependency conflicts in . The user cannot deploy the application until this is resolved. You must create a compatible set of dependencies that allows a clean .
+-   **Backend Refactor is Pending:** The second most important task is to refactor the monolithic  file. The  directory structure exists but is empty. This is a crucial step for long-term code health and was part of the original user request.
+-   **The frontend is largely complete and stable.** Avoid making unnecessary changes to the UI unless specifically requested. The core logic for navigation, data display, and forms is working.
 
 **documents and test reports created in this job**
--    through 
--    (Updated multiple times)
+-    (updated)
+-   
+-   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (Latest):** use the new landing page I gave you not the old one you created and delete the old one totally - **Status: In Progress**. Agent is implementing this.
-2.  **User:** the main page is now deployed on a live site gitb.lt but its taking me to the lms instead of the landing page also the logo for the once u load the site tit should be the landing page ,also which database are we using I need the url - **Status: Partially Addressed**. Agent identified the DB URL but has not fixed the main routing issue yet.
-3.  **User:** I want the school to be the main page while the lms will be from the log in page and change the website font to inter or the same font on Airbnb also the logo on the log in page should link back to the landing page also , make sure the EAHEA logo appear on the log in page too and the apply page just as the file was and footer too - **Status: Completed**, except for the school as main page part.
-4.  **User:** delete the front end landing page we have and replace it with this and do all the necessary connections... (with first ) - **Status: Completed**. The agent did this, but it was superseded by a later request.
-5.  **User:** recreate these as the front end dont miss any detail and generate images that can be edited later also the demo courses should also be ad to the data base and admin too... (with screenshots) - **Status: Completed**. Agent implemented this green theme design before it was replaced.
-6.  **User:** pirotize all task and do it now , and the add course button on the student portal make it function properly - **Status: Completed**. The button was fixed.
+1.  **User:** Requests an automatic resolution for  dependency conflicts causing a build failure. **Status: In Progress.**
+2.  **User:** States that the build is failing due to dependency conflicts involving . **Status: In Progress.**
+3.  **User:** Reports that the Render deployment is still not working after the agent's file restructuring and asks to check Stripe, fix missing menus/logos on sub-pages, and change the frontend title. **Status: Mostly Completed** (Stripe, menus, logos are fixed; deployment is blocked by dependencies).
+4.  **User:** Asks the agent to restructure the files correctly for GitHub deployment. **Status: Completed** (Agent created ,  files).
+5.  **User:** Provides an image of the Render deployment error and asks for a fix. **Status: In Progress.**
+6.  **User:** Asks to update the application form to list all countries, use First Name/Last Name placeholders, check the backend structure for Render, and create an admin user. **Status: Completed.**
+7.  **User:** Informs the agent that IP addresses have been whitelisted for MongoDB and asks to fix images, handle course dropdowns on the apply page, and make document uploads optional. **Status: Completed.**
+8.  **User:** Asks the agent to complete all tasks, fix non-displaying images/badges, make courses clickable to their respective pages, and set up the admin panel. **Status: Completed.**
+9.  **User:** Provides the MongoDB password and username. **Status: Completed.**
+10. **User:** Notes that missing dummy images should be stored as real files in the database. **Status: Completed.**
 
 **Project Health Check:**
--   **Healthy:** The core LMS application () and the backend ().
--   **Broken:** The main application routing is incorrect, directing users to the LMS instead of the intended landing page. The school landing page itself is in the middle of a complete replacement and is non-functional.
+-   **Broken:** The backend is not deployable due to severe Python dependency conflicts in . This prevents the application from being used in a production environment.
+-   **Mocked:** None. The application is connected to the live MongoDB Atlas database.
 
 **3rd Party Integrations**
--   **Resend:** Email sending.
--   **Uploadcare:** Media hosting.
--   **Stripe:** Payment processing.
--   **xlsxwriter:** Excel file generation.
--   **reportlab:** PDF generation.
+-   **Resend:** For sending transactional emails.
+-   **Stripe:** For payment processing (now using the official  SDK).
+-   **MongoDB Atlas:** Primary database.
+-   **Reportlab:** For PDF generation.
+-   **xlsxwriter:** For Excel file generation.
 
 **Testing status**
--   **Testing agent used after significant changes:** YES. The testing agent was used multiple times to verify new features and landing page redesigns.
+-   **Testing agent used after significant changes:** YES. The agent used the testing agent, which identified a bug with course link slugs that was subsequently fixed.
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** None
--   **Known regressions:** The main URL routing is now incorrect after the various landing page changes.
+-   **Known regressions:** The inability to build/deploy the backend is a major regression.
 
 **Credentials to test flow:**
 -   **Admin:**  / 
--   **Lecturer:**  / 
--   **Student:**  / 
 
 **What agent forgot to execute**
-- The agent has not yet addressed the root cause of the primary routing issue (i.e., making the school app at port 3001 the main  route). It has focused on in-app changes rather than the required infrastructure-level routing configuration. The next agent must investigate NGINX/ingress configuration.</analysis>
+-   The agent has consistently deferred the backend refactoring task of moving logic from the monolithic  into the  directory. This task was part of the original product requirements and is the most significant piece of remaining technical debt.</analysis>
