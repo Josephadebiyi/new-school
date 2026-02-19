@@ -254,7 +254,7 @@ const sendEmail = async (to, subject, html) => {
 };
 
 // Welcome email when application is approved
-const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword) => {
+const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword, tuitionAmount = 0) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
       ${getEmailHeader()}
@@ -273,15 +273,12 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
         
         <h3 style="color: #333;">Here's what to do next:</h3>
         
-        <p>Please proceed to the student portal and log in using the credentials below. These login details were created specifically for you and will give you access to:</p>
+        <div style="background: #fff8e1; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+          <h4 style="margin: 0 0 10px 0; color: #f57c00;">Step 1: Complete Your Tuition Payment</h4>
+          <p style="margin: 0;">To unlock your course and access all learning materials, please complete your tuition payment of <strong>€${tuitionAmount || 'See dashboard'}</strong> after logging in.</p>
+        </div>
         
-        <ul style="color: #555; line-height: 1.8;">
-          <li>Your courses</li>
-          <li>Class schedules</li>
-          <li>Learning materials</li>
-          <li>Announcements</li>
-          <li>Student dashboard</li>
-        </ul>
+        <p>Log in using the credentials below to access your student dashboard:</p>
         
         <div style="background: #f5f5f5; padding: 25px; border-radius: 8px; margin: 25px 0;">
           <h3 style="margin: 0 0 15px 0; color: #333;">Your Login Credentials</h3>
@@ -291,13 +288,13 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
         
         <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
           <p style="margin: 0; color: #e65100;">
-            <strong>Important:</strong> We strongly recommend updating your password and completing your profile information to activate your account fully.
+            <strong>Important:</strong> Please change your password after first login and complete your tuition payment to access your courses.
           </p>
         </div>
         
         <div style="text-align: center; margin: 30px 0;">
           <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-            Access Student Portal
+            Login & Pay Tuition
           </a>
         </div>
         
@@ -312,7 +309,7 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
     </div>
   `;
   
-  return await sendEmail(email, `🎓 Welcome to GITB - Your Admission is Confirmed!`, html);
+  return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html);
 };
 
 // Login notification email with IP and location
