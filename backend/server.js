@@ -1420,9 +1420,12 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
 app.get("/api/my-courses", authenticate, async (req, res) => {
   try {
     const userId = req.user.sub;
+    console.log("My courses - userId:", userId);
     
     // Get user info
     const user = await db.collection("users").findOne({ id: userId }, { projection: { _id: 0, password: 0 } });
+    console.log("My courses - user found:", user ? user.email : "null");
+    
     if (!user) {
       return res.status(404).json({ detail: "User not found" });
     }
@@ -1431,6 +1434,8 @@ app.get("/api/my-courses", authenticate, async (req, res) => {
     const enrollments = await db.collection("enrollments")
       .find({ user_id: userId }, { projection: { _id: 0 } })
       .toArray();
+    
+    console.log("My courses - enrollments found:", enrollments.length);
 
     // Get course details for each enrollment
     const courseIds = enrollments.map(e => e.course_id);
