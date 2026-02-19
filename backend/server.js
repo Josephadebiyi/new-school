@@ -1379,9 +1379,7 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="text-align: center; padding: 20px; background: #333; color: white; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0;">GITB</h1>
-        </div>
+        ${getEmailHeader("Application Update")}
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <h2>Application Update</h2>
           <p>Dear ${application.first_name},</p>
