@@ -3,6 +3,21 @@
 ## Original Problem Statement
 Build a white-label Learning Management System (LMS) for an online educational institution. The system needs to support multiple user roles (admin, student, lecturer, registrar, staff), course management, application processing with Stripe payments, and comprehensive email notifications.
 
+## Two-Stage Payment System (IMPLEMENTED)
+
+### Stage 1: Registration Fee (€50)
+- Student applies for a course
+- Redirected to Stripe checkout for €50 registration fee
+- After payment, application moves to "pending" status
+- Admin reviews and approves/rejects
+
+### Stage 2: Tuition Fee (Course Price)
+- Upon approval, student receives welcome email with login credentials
+- Student logs in and sees their course with "pending_payment" status
+- Student clicks "Pay Tuition" → Stripe checkout for course price
+- After payment, course is unlocked with **lifetime access**
+- New courses require separate tuition payments
+
 ## Core Requirements
 
 ### 1. User Management & Authentication
