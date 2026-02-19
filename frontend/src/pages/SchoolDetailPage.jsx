@@ -125,7 +125,9 @@ const SchoolDetailPage = () => {
   const SchoolIcon = school.icon;
 
   return (
-    <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="school-detail-page">
+    <>
+      <PublicHeader />
+      <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="school-detail-page">
       {/* Hero Section */}
       <section className="relative bg-[#314a06] text-white py-16 lg:py-24">
         <div className="absolute inset-0 overflow-hidden">
