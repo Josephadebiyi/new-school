@@ -312,45 +312,8 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
   return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html);
 };
 
-// Login notification email with IP and location
-const sendLoginNotificationEmail = async (email, firstName, ip, location, timestamp) => {
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      ${getEmailHeader("Security Alert")}
-      
-      <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #333; margin-top: 0;">New Login Detected</h2>
-        
-        <p>Hello ${firstName},</p>
-        
-        <p>We detected a new login to your GITB account. Here are the details:</p>
-        
-        <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ddd;">
-          <p style="margin: 5px 0;"><strong>Time:</strong> ${timestamp}</p>
-          <p style="margin: 5px 0;"><strong>IP Address:</strong> ${ip}</p>
-          <p style="margin: 5px 0;"><strong>Location:</strong> ${location}</p>
-        </div>
-        
-        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0; color: #e65100;">
-            <strong>Don't recognize this login?</strong><br>
-            If this wasn't you, please reset your password immediately and contact our support team.
-          </p>
-        </div>
-        
-        <div style="text-align: center; margin: 25px 0;">
-          <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 12px 30px; background: #d32f2f; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px;">
-            Reset Password
-          </a>
-        </div>
-        
-        <p style="color: #666; font-size: 12px;">If this was you, no action is needed. This email is for your security.</p>
-      </div>
-    </div>
-  `;
-  
-  return await sendEmail(email, `Security Alert: New Login to Your GITB Account`, html);
-};
+// Login notification email - DISABLED per user request
+// const sendLoginNotificationEmail = async (email, firstName, ip, location, timestamp) => { ... };
 
 // Password change confirmation email
 const sendPasswordChangedEmail = async (email, firstName) => {
