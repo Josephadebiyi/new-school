@@ -82,9 +82,48 @@ const ApplyPage = () => {
   ];
 
   const countries = [
-    'Lithuania', 'Germany', 'France', 'Spain', 'Italy', 'Poland', 'Netherlands',
-    'Belgium', 'Austria', 'Sweden', 'Denmark', 'Finland', 'Ireland', 'Portugal',
-    'Other EU Country', 'Non-EU Country'
+    // European Union Countries
+    'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic',
+    'Denmark', 'Estonia', 'Finland', 'France', 'Germany', 'Greece', 'Hungary',
+    'Ireland', 'Italy', 'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
+    'Poland', 'Portugal', 'Romania', 'Slovakia', 'Slovenia', 'Spain', 'Sweden',
+    // European Economic Area
+    'Iceland', 'Liechtenstein', 'Norway', 'Switzerland',
+    // United Kingdom
+    'United Kingdom',
+    // Other European Countries
+    'Albania', 'Andorra', 'Armenia', 'Azerbaijan', 'Belarus', 'Bosnia and Herzegovina',
+    'Georgia', 'Kosovo', 'Moldova', 'Monaco', 'Montenegro', 'North Macedonia',
+    'Russia', 'San Marino', 'Serbia', 'Turkey', 'Ukraine', 'Vatican City',
+    // Africa
+    'Algeria', 'Angola', 'Benin', 'Botswana', 'Burkina Faso', 'Burundi', 'Cameroon',
+    'Cape Verde', 'Central African Republic', 'Chad', 'Comoros', 'Congo', 'DR Congo',
+    'Djibouti', 'Egypt', 'Equatorial Guinea', 'Eritrea', 'Eswatini', 'Ethiopia',
+    'Gabon', 'Gambia', 'Ghana', 'Guinea', 'Guinea-Bissau', 'Ivory Coast', 'Kenya',
+    'Lesotho', 'Liberia', 'Libya', 'Madagascar', 'Malawi', 'Mali', 'Mauritania',
+    'Mauritius', 'Morocco', 'Mozambique', 'Namibia', 'Niger', 'Nigeria', 'Rwanda',
+    'Sao Tome and Principe', 'Senegal', 'Seychelles', 'Sierra Leone', 'Somalia',
+    'South Africa', 'South Sudan', 'Sudan', 'Tanzania', 'Togo', 'Tunisia', 'Uganda',
+    'Zambia', 'Zimbabwe',
+    // Americas
+    'Argentina', 'Bahamas', 'Barbados', 'Belize', 'Bolivia', 'Brazil', 'Canada',
+    'Chile', 'Colombia', 'Costa Rica', 'Cuba', 'Dominican Republic', 'Ecuador',
+    'El Salvador', 'Guatemala', 'Guyana', 'Haiti', 'Honduras', 'Jamaica', 'Mexico',
+    'Nicaragua', 'Panama', 'Paraguay', 'Peru', 'Suriname', 'Trinidad and Tobago',
+    'United States', 'Uruguay', 'Venezuela',
+    // Asia
+    'Afghanistan', 'Bahrain', 'Bangladesh', 'Bhutan', 'Brunei', 'Cambodia', 'China',
+    'India', 'Indonesia', 'Iran', 'Iraq', 'Israel', 'Japan', 'Jordan', 'Kazakhstan',
+    'Kuwait', 'Kyrgyzstan', 'Laos', 'Lebanon', 'Malaysia', 'Maldives', 'Mongolia',
+    'Myanmar', 'Nepal', 'North Korea', 'Oman', 'Pakistan', 'Palestine', 'Philippines',
+    'Qatar', 'Saudi Arabia', 'Singapore', 'South Korea', 'Sri Lanka', 'Syria',
+    'Taiwan', 'Tajikistan', 'Thailand', 'Timor-Leste', 'Turkmenistan',
+    'United Arab Emirates', 'Uzbekistan', 'Vietnam', 'Yemen',
+    // Oceania
+    'Australia', 'Fiji', 'New Zealand', 'Papua New Guinea', 'Samoa', 'Solomon Islands',
+    'Tonga', 'Vanuatu',
+    // Other
+    'Other'
   ];
 
   const handleInputChange = (field, value) => {
