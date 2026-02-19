@@ -10,6 +10,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8001';
 app.use('/api', createProxyMiddleware({
   target: BACKEND_URL,
   changeOrigin: true,
+  pathRewrite: (path) => `/api${path}`,
 }));
 
 // Serve static files from the root /app directory (where the React build is)
