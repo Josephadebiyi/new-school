@@ -1344,7 +1344,7 @@ async def create_application(app_data: ApplicationCreate):
         }
         await db.payment_transactions.insert_one(payment_transaction)
         
-        return {"checkout_url": session.url, "session_id": session.session_id}
+        return {"checkout_url": session.url, "session_id": session.id}
         
     except Exception as e:
         logger.error(f"Stripe checkout error: {str(e)}")
@@ -1368,11 +1368,10 @@ async def get_application_status(session_id: str):
     
     # Check with Stripe
     try:
-        stripe_checkout = StripeCheckout(api_key=STRIPE_SECRET_KEY, webhook_url="")
-        checkout_status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
         
         # Update application if payment completed
-        if checkout_status.payment_status == "paid":
+        if checkout_session.payment_status == "paid":
             await db.applications.update_one(
                 {"session_id": session_id},
                 {"$set": {
