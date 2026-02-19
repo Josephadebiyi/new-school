@@ -923,6 +923,25 @@ app.get("/api/courses", authenticate, async (req, res) => {
   }
 });
 
+// Admin endpoint to get all courses with tuition fees
+app.get("/api/admin/courses/tuition", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const courses = await db.collection("courses")
+      .find({}, { projection: { _id: 0, id: 1, title: 1, slug: 1, price: 1, is_active: 1 } })
+      .sort({ title: 1 })
+      .toArray();
+    
+    res.json({
+      courses: courses,
+      total: courses.length,
+      message: "Use PUT /api/courses/:courseId/tuition with {price: amount} to update"
+    });
+  } catch (error) {
+    console.error("Get courses tuition error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
 app.get("/api/courses/public", async (req, res) => {
   try {
     if (!db) {
