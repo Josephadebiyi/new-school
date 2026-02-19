@@ -842,7 +842,7 @@ async def update_config(
 
 @api_router.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    user = await db.users.find_one({"email": request.email})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -852,8 +852,14 @@ async def login(request: LoginRequest):
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Account is inactive")
     
-    token = create_access_token(user["id"], user["role"])
-    user_response = {k: v for k, v in user.items() if k != "password"}
+    # Use _id as string or id field if exists
+    user_id = str(user.get("_id")) if user.get("_id") else user.get("id", "")
+    token = create_access_token(user_id, user["role"])
+    
+    # Prepare user response without password and _id
+    user_response = {k: v for k, v in user.items() if k not in ["password", "_id"]}
+    user_response["id"] = user_id  # Add id to response
+    
     config = await get_system_config()
     
     return LoginResponse(
