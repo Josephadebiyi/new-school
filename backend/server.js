@@ -1273,22 +1273,24 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
 
     const tempPassword = generatePassword();
     const hashedPassword = await bcrypt.hash(tempPassword, 12);
+    let userId;
 
     if (existingUser) {
+      userId = existingUser.id;
       await db.collection("users").updateOne(
         { email: application.email },
         {
-          $addToSet: { enrolled_courses: application.course_id },
           $set: {
-            payment_status: "paid",
             password: hashedPassword,
-            must_change_password: true
+            must_change_password: true,
+            payment_status: "unpaid" // Tuition not yet paid
           }
         }
       );
     } else {
+      userId = uuidv4();
       const newUser = {
-        id: uuidv4(),
+        id: userId,
         email: application.email,
         password: hashedPassword,
         first_name: application.first_name,
@@ -1301,9 +1303,9 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
         program: application.course_title,
         is_active: true,
         account_status: "active",
-        payment_status: "paid",
+        payment_status: "unpaid", // Tuition not yet paid
         must_change_password: true,
-        enrolled_courses: [application.course_id],
+        enrolled_courses: [],
         completed_lessons: [],
         created_at: new Date().toISOString()
       };
@@ -1311,14 +1313,21 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       await db.collection("users").insertOne(newUser);
     }
 
-    const studentUser = await db.collection("users").findOne({ email: application.email });
+    // Get course info for price
+    const course = await db.collection("courses").findOne({ id: application.course_id });
 
+    // Create enrollment with pending_payment status (tuition not paid yet)
     const enrollment = {
       id: uuidv4(),
-      student_id: studentUser.id || studentUser._id.toString(),
+      user_id: userId,
+      student_id: userId,
       course_id: application.course_id,
+      course_title: application.course_title,
+      application_id: applicationId,
       enrolled_at: new Date().toISOString(),
-      status: "active",
+      status: "pending_payment", // Requires tuition payment
+      payment_status: "unpaid",
+      tuition_amount: course ? course.price : 0,
       progress: 0
     };
 
@@ -1329,13 +1338,13 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       {
         $set: {
           status: "approved",
-          approved_by: req.user.id,
+          approved_by: req.user.sub,
           approved_at: new Date().toISOString()
         }
       }
     );
 
-    // Send welcome email with credentials
+    // Send welcome email with credentials and tuition info
     await sendWelcomeEmail(
       application.email,
       application.first_name,
