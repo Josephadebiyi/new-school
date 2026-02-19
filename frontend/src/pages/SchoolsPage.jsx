@@ -263,6 +263,7 @@ const SchoolsPage = () => {
         </div>
       </section>
     </div>
+    </>
   );
 };
 
