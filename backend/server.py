@@ -1400,8 +1400,8 @@ async def get_application_status(session_id: str):
                 logger.error(f"Failed to send confirmation email: {e}")
         
         return {
-            "status": checkout_status.status,
-            "payment_status": checkout_status.payment_status
+            "status": checkout_session.status,
+            "payment_status": checkout_session.payment_status
         }
         
     except Exception as e:
