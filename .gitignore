@@ -1,7 +1,9 @@
-# Dependencies
+# Dependencies (in source folders)
 node_modules/
+_source/frontend/node_modules/
+_source/backend/node_modules/
 
-# Environment files (keep examples)
+# Environment files
 .env
 .env.local
 !.env.example
@@ -10,7 +12,6 @@ node_modules/
 .idea/
 .vscode/
 *.swp
-*.swo
 
 # OS
 .DS_Store
@@ -18,32 +19,6 @@ Thumbs.db
 
 # Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Test
-coverage/
-.pytest_cache/
-__pycache__/
-
-# Temp files
-*.zip
-*.tmp
-
-# Python backup (keep for reference but not needed)
-backend-python-backup/
-frontend/node_modules/.cache/default-development/0.pack
-frontend/node_modules/.cache/default-development/6.pack
-frontend/node_modules/.cache/default-development/4.pack
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
 _source/frontend/node_modules/.cache/default-development/0.pack
 _source/frontend/node_modules/.cache/default-development/6.pack
 _source/frontend/node_modules/.cache/default-development/4.pack
