@@ -418,23 +418,28 @@ const CourseDetailPage = () => {
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center pt-[72px]">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Course Not Found</h1>
-          <p className="text-gray-600 mb-6">The course you're looking for doesn't exist.</p>
-          <Link to="/">
-            <Button className="bg-[#7ebf0d] hover:bg-[#6ba50b] text-white">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
-            </Button>
-          </Link>
+      <>
+        <PublicHeader />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center pt-[72px]">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Course Not Found</h1>
+            <p className="text-gray-600 mb-6">The course you're looking for doesn't exist.</p>
+            <Link to="/">
+              <Button className="bg-[#7ebf0d] hover:bg-[#6ba50b] text-white">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="course-detail-page">
+    <>
+      <PublicHeader />
+      <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="course-detail-page">
       {/* Hero Section */}
       <section className="relative bg-[#314a06] text-white py-16 lg:py-24">
         <div className="absolute inset-0 overflow-hidden">
