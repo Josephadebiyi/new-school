@@ -413,23 +413,14 @@ app.post("/api/auth/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    // Get IP and location for login notification
+    // Get IP for login logging (email notification disabled)
     const clientIP = getClientIP(req);
-    const location = await getLocationFromIP(clientIP);
-    const timestamp = new Date().toLocaleString("en-US", { 
-      weekday: "long", year: "numeric", month: "long", day: "numeric", 
-      hour: "2-digit", minute: "2-digit", timeZoneName: "short" 
-    });
-
-    // Security email disabled per user request
-    // sendLoginNotificationEmail(user.email, user.first_name, clientIP, location, timestamp);
 
     // Log the login
     await db.collection("login_logs").insertOne({
       user_id: userId,
       email: user.email,
       ip: clientIP,
-      location,
       timestamp: new Date().toISOString(),
       user_agent: req.headers["user-agent"] || "Unknown"
     });
