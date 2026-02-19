@@ -430,7 +430,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
         
+        # Try to find user by id field first
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+        if not user:
+            # Fallback: try by _id (for users created via MongoDB directly)
+            from bson import ObjectId
+            try:
+                user = await db.users.find_one({"_id": ObjectId(user_id)}, {"password": 0})
+                if user:
+                    user["id"] = str(user.pop("_id"))
+            except:
+                pass
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
