@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, BookOpen, Users, Clock, Award } from "lucide-react";
 import { Button } from "../components/ui/button";
+import PublicHeader from "../components/PublicHeader";
 
 const SchoolsPage = () => {
   const { schoolId } = useParams();
