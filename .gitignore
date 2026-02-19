@@ -21,8 +21,6 @@ node_modules/
 next-env.d.ts
 *.tsbuildinfo
 
-# Production builds
-/build
 dist/
 
 # Environment files (keep .env.example)
