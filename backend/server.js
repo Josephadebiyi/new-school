@@ -225,6 +225,15 @@ const getLocationFromIP = async (ip) => {
 };
 
 // ============ EMAIL FUNCTIONS ============
+const GITB_LOGO_URL = "https://customer-assets.emergentagent.com/job_c38408f7-f182-46c6-9956-2b3ba5b9837c/artifacts/2j37347h_GITB%20Logo-04%202.png";
+
+const getEmailHeader = (subtitle = "Global Institute of Tech and Business") => `
+  <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); border-radius: 10px 10px 0 0;">
+    <img src="${GITB_LOGO_URL}" alt="GITB Logo" style="max-width: 150px; height: auto; margin-bottom: 15px;" />
+    <p style="margin: 0; font-size: 14px; color: white; opacity: 0.9;">${subtitle}</p>
+  </div>
+`;
+
 const sendEmail = async (to, subject, html) => {
   if (!resend) {
     console.warn("Email not sent - Resend not configured");
