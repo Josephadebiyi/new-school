@@ -80,7 +80,9 @@ const WhyGITBPage = () => {
   ];
 
   return (
-    <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="why-gitb-page">
+    <>
+      <PublicHeader />
+      <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="why-gitb-page">
       {/* Hero */}
       <section className="relative bg-[#314a06] text-white py-20 lg:py-32">
         <div className="absolute inset-0 overflow-hidden">
