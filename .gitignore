@@ -23,7 +23,6 @@ next-env.d.ts
 
 # Production builds
 /build
-frontend/build/
 dist/
 
 # Environment files (keep .env.example)
