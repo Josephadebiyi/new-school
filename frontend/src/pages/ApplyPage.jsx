@@ -127,15 +127,21 @@ const ApplyPage = () => {
     setIsProcessing(true);
 
     try {
-      // Upload documents first
-      const formDataToSend = new FormData();
-      formDataToSend.append('file', formData.highSchoolCert);
-      formDataToSend.append('document_type', 'high_school_cert');
+      let certUrl = null;
       
-      const certResponse = await axios.post(`${API}/upload/document`, formDataToSend, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      // Upload high school certificate if provided (optional)
+      if (formData.highSchoolCert) {
+        const formDataToSend = new FormData();
+        formDataToSend.append('file', formData.highSchoolCert);
+        formDataToSend.append('document_type', 'high_school_cert');
+        
+        const certResponse = await axios.post(`${API}/upload/document`, formDataToSend, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        certUrl = certResponse.data.url;
+      }
       
+      // Upload ID document (required)
       const idFormData = new FormData();
       idFormData.append('file', formData.idDocument);
       idFormData.append('document_type', 'id_document');
@@ -154,7 +160,7 @@ const ApplyPage = () => {
         city: formData.city,
         course_id: formData.program,
         education_level: formData.education,
-        high_school_cert_url: certResponse.data.url,
+        high_school_cert_url: certUrl,
         id_document_url: idResponse.data.url,
       };
 
