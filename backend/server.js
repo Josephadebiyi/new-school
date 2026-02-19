@@ -1402,6 +1402,325 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
   }
 });
 
+// ============ TUITION PAYMENT ROUTES ============
+
+// Get student's pending courses (approved but not paid tuition)
+app.get("/api/my-courses", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+    
+    // Get user info
+    const user = await db.collection("users").findOne({ id: userId }, { projection: { _id: 0, password: 0 } });
+    if (!user) {
+      return res.status(404).json({ detail: "User not found" });
+    }
+
+    // Get enrollments for this user
+    const enrollments = await db.collection("enrollments")
+      .find({ user_id: userId }, { projection: { _id: 0 } })
+      .toArray();
+
+    // Get course details for each enrollment
+    const courseIds = enrollments.map(e => e.course_id);
+    const courses = await db.collection("courses")
+      .find({ id: { $in: courseIds } }, { projection: { _id: 0 } })
+      .toArray();
+
+    // Merge enrollment status with course info
+    const myCourses = enrollments.map(enrollment => {
+      const course = courses.find(c => c.id === enrollment.course_id) || {};
+      return {
+        ...course,
+        enrollment_id: enrollment.id,
+        enrollment_status: enrollment.status, // 'pending_payment', 'paid', 'active'
+        payment_status: enrollment.payment_status,
+        enrolled_at: enrollment.created_at,
+        tuition_paid_at: enrollment.tuition_paid_at
+      };
+    });
+
+    res.json(myCourses);
+  } catch (error) {
+    console.error("Get my courses error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// Create tuition payment session for a course
+app.post("/api/tuition/pay", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+    const { course_id, origin_url } = req.body;
+
+    if (!course_id) {
+      return res.status(422).json({ detail: "Course ID is required" });
+    }
+
+    // Get user
+    const user = await db.collection("users").findOne({ id: userId });
+    if (!user) {
+      return res.status(404).json({ detail: "User not found" });
+    }
+
+    // Check enrollment exists and is pending payment
+    let enrollment = await db.collection("enrollments").findOne({
+      user_id: userId,
+      course_id: course_id
+    });
+
+    // If no enrollment, check if user has approved application for this course
+    if (!enrollment) {
+      const application = await db.collection("applications").findOne({
+        email: user.email,
+        course_id: course_id,
+        status: "approved"
+      });
+
+      if (!application) {
+        return res.status(400).json({ detail: "No approved application found for this course" });
+      }
+
+      // Create enrollment with pending_payment status
+      enrollment = {
+        id: uuidv4(),
+        user_id: userId,
+        course_id: course_id,
+        application_id: application.id,
+        status: "pending_payment",
+        payment_status: "unpaid",
+        created_at: new Date().toISOString()
+      };
+      await db.collection("enrollments").insertOne(enrollment);
+    }
+
+    if (enrollment.payment_status === "paid") {
+      return res.status(400).json({ detail: "Tuition already paid for this course" });
+    }
+
+    // Get course details
+    const course = await db.collection("courses").findOne({ id: course_id });
+    if (!course) {
+      return res.status(404).json({ detail: "Course not found" });
+    }
+
+    if (!stripe) {
+      return res.status(503).json({ detail: "Payment service not available" });
+    }
+
+    // Create Stripe checkout session for tuition
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: `Tuition Fee - ${course.title}`,
+            description: `Full tuition for ${course.title} at GITB - Lifetime access`
+          },
+          unit_amount: Math.round(course.price * 100)
+        },
+        quantity: 1
+      }],
+      mode: "payment",
+      success_url: `${origin_url || FRONTEND_URL}/dashboard/student?payment=success&course=${course_id}`,
+      cancel_url: `${origin_url || FRONTEND_URL}/dashboard/student?payment=cancelled`,
+      customer_email: user.email,
+      metadata: {
+        type: "tuition",
+        enrollment_id: enrollment.id,
+        course_id: course_id,
+        user_id: userId,
+        user_email: user.email
+      }
+    });
+
+    // Update enrollment with stripe session
+    await db.collection("enrollments").updateOne(
+      { id: enrollment.id },
+      { $set: { stripe_session_id: session.id } }
+    );
+
+    res.json({
+      checkout_url: session.url,
+      session_id: session.id,
+      enrollment_id: enrollment.id,
+      course_title: course.title,
+      amount: course.price
+    });
+  } catch (error) {
+    console.error("Create tuition payment error:", error);
+    res.status(500).json({ detail: error.message || "Internal server error" });
+  }
+});
+
+// Check tuition payment status
+app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Find enrollment by stripe session
+    const enrollment = await db.collection("enrollments").findOne({ stripe_session_id: sessionId });
+    
+    if (!enrollment) {
+      // Check Stripe directly
+      if (stripe) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          return res.json({ 
+            status: session.payment_status === "paid" ? "paid" : "pending",
+            payment_status: session.payment_status
+          });
+        } catch (e) {
+          return res.status(404).json({ detail: "Payment session not found" });
+        }
+      }
+      return res.status(404).json({ detail: "Enrollment not found" });
+    }
+
+    // Verify payment with Stripe
+    if (stripe && enrollment.stripe_session_id) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(enrollment.stripe_session_id);
+        
+        if (session.payment_status === "paid" && enrollment.payment_status !== "paid") {
+          // Update enrollment to paid
+          await db.collection("enrollments").updateOne(
+            { id: enrollment.id },
+            { 
+              $set: { 
+                status: "active",
+                payment_status: "paid",
+                tuition_paid_at: new Date().toISOString()
+              }
+            }
+          );
+
+          // Update user payment status
+          await db.collection("users").updateOne(
+            { id: enrollment.user_id },
+            { $set: { payment_status: "paid" } }
+          );
+
+          // Send confirmation email
+          const user = await db.collection("users").findOne({ id: enrollment.user_id });
+          const course = await db.collection("courses").findOne({ id: enrollment.course_id });
+          
+          if (user && course) {
+            const html = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                ${getEmailHeader("Enrollment Confirmed")}
+                <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+                  <h2 style="color: #3d7a4a; margin-top: 0;">Payment Confirmed!</h2>
+                  <p>Dear ${user.first_name},</p>
+                  <p>Your tuition payment for <strong>${course.title}</strong> has been successfully processed.</p>
+                  <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                    <p style="margin: 0; color: #2e7d32; font-size: 18px;">✓ Course Unlocked</p>
+                    <p style="margin: 10px 0 0 0; color: #666;">Amount: €${course.price}</p>
+                  </div>
+                  <p>You now have <strong>lifetime access</strong> to this course. Log in to start learning!</p>
+                  <div style="text-align: center; margin: 25px 0;">
+                    <a href="${FRONTEND_URL}/dashboard/student" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
+                      Go to Dashboard
+                    </a>
+                  </div>
+                  <p>Best regards,<br><strong>GITB Team</strong></p>
+                </div>
+              </div>
+            `;
+            await sendEmail(user.email, `Enrollment Confirmed - ${course.title}`, html);
+          }
+
+          return res.json({ 
+            status: "paid",
+            payment_status: "paid",
+            message: "Course unlocked successfully"
+          });
+        }
+      } catch (e) {
+        console.error("Stripe check error:", e);
+      }
+    }
+
+    res.json({
+      status: enrollment.status,
+      payment_status: enrollment.payment_status
+    });
+  } catch (error) {
+    console.error("Check tuition status error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// Stripe webhook for tuition payments
+app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    let event;
+    
+    if (webhookSecret && sig) {
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      } catch (err) {
+        console.error("Webhook signature verification failed:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    } else {
+      // For testing without webhook secret
+      event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const metadata = session.metadata || {};
+
+      if (metadata.type === 'tuition' && metadata.enrollment_id) {
+        // Update enrollment to paid
+        await db.collection("enrollments").updateOne(
+          { id: metadata.enrollment_id },
+          { 
+            $set: { 
+              status: "active",
+              payment_status: "paid",
+              tuition_paid_at: new Date().toISOString()
+            }
+          }
+        );
+
+        // Update user payment status
+        if (metadata.user_id) {
+          await db.collection("users").updateOne(
+            { id: metadata.user_id },
+            { $set: { payment_status: "paid" } }
+          );
+        }
+
+        console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
+      } else if (metadata.application_id) {
+        // Application fee payment
+        await db.collection("applications").updateOne(
+          { id: metadata.application_id },
+          { 
+            $set: { 
+              status: "pending",
+              payment_status: "paid",
+              paid_at: new Date().toISOString()
+            }
+          }
+        );
+
+        console.log(`Application fee paid for ${metadata.application_id}`);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(500).json({ detail: "Webhook processing failed" });
+  }
+});
+
 // ============ DASHBOARD ROUTES ============
 app.get("/api/dashboard/admin", authenticate, requireRoles(["admin"]), async (req, res) => {
   try {
