@@ -257,10 +257,7 @@ const sendEmail = async (to, subject, html) => {
 const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
-      <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); color: white; border-radius: 10px 10px 0 0;">
-        <h1 style="margin: 0; font-size: 28px;">GITB</h1>
-        <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Global Institute of Tech and Business</p>
-      </div>
+      ${getEmailHeader()}
       
       <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
         <h2 style="color: #3d7a4a; margin-top: 0;">Welcome to Global Institute of Tech and Business!</h2>
