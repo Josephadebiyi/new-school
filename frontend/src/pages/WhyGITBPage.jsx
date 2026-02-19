@@ -215,6 +215,7 @@ const WhyGITBPage = () => {
         </div>
       </section>
     </div>
+    </>
   );
 };
 
