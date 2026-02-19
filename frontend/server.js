@@ -4,10 +4,11 @@ const path = require('path');
 
 const app = express();
 const PORT = 3000;
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8001';
 
 // Proxy all /api requests to the backend
 app.use('/api', createProxyMiddleware({
-  target: 'http://localhost:8001',
+  target: BACKEND_URL,
   changeOrigin: true,
 }));
 
