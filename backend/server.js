@@ -1514,8 +1514,16 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(400).json({ detail: "Tuition already paid for this course" });
     }
 
-    // Get course details
-    const course = await db.collection("courses").findOne({ id: course_id });
+    // Get course details - try multiple lookup methods
+    let course = await db.collection("courses").findOne({ id: course_id });
+    if (!course) {
+      course = await db.collection("courses").findOne({ slug: course_id });
+    }
+    if (!course) {
+      course = await db.collection("courses").findOne({ 
+        title: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+    }
     if (!course) {
       return res.status(404).json({ detail: "Course not found" });
     }
