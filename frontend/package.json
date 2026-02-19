@@ -2,7 +2,7 @@
   "name": "gitb-frontend",
   "version": "1.0.0",
   "scripts": {
-    "start": "serve -s ../. -l 3000"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^5.2.1",
