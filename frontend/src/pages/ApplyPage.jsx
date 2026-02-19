@@ -279,7 +279,7 @@ const ApplyPage = () => {
             <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
             <Input
               id="firstName"
-              placeholder="John"
+              placeholder="First Name"
               className="pl-10"
               value={formData.firstName}
               onChange={(e) => handleInputChange('firstName', e.target.value)}
@@ -291,7 +291,7 @@ const ApplyPage = () => {
           <Label htmlFor="lastName">Last Name *</Label>
           <Input
             id="lastName"
-            placeholder="Doe"
+            placeholder="Last Name"
             value={formData.lastName}
             onChange={(e) => handleInputChange('lastName', e.target.value)}
             data-testid="apply-last-name"
@@ -306,7 +306,7 @@ const ApplyPage = () => {
           <Input
             id="email"
             type="email"
-            placeholder="john.doe@example.com"
+            placeholder="your.email@example.com"
             className="pl-10"
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
