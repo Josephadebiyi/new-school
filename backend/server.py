@@ -882,10 +882,13 @@ class ChangePasswordRequest(BaseModel):
 @api_router.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
     """Request password reset email"""
-    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    user = await db.users.find_one({"email": request.email})
     if not user:
         # Return success even if user not found (security)
         return {"message": "If an account exists with that email, a reset link has been sent."}
+    
+    # Use _id as string or id field if exists
+    user_id = str(user.get("_id")) if user.get("_id") else user.get("id", "")
     
     # Generate reset token
     reset_token = secrets.token_urlsafe(32)
@@ -893,9 +896,9 @@ async def forgot_password(request: ForgotPasswordRequest):
     
     # Store reset token in database
     await db.password_resets.update_one(
-        {"user_id": user["id"]},
+        {"user_id": user_id},
         {"$set": {
-            "user_id": user["id"],
+            "user_id": user_id,
             "token": reset_token,
             "expires_at": expiry.isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat()
