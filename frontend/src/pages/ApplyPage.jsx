@@ -119,8 +119,8 @@ const ApplyPage = () => {
       return;
     }
     
-    if (!formData.highSchoolCert || !formData.idDocument) {
-      toast.error("Please upload all required documents");
+    if (!formData.idDocument) {
+      toast.error("Please upload your ID document (required)");
       return;
     }
 
