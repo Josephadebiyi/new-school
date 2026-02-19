@@ -25,7 +25,7 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS || "*";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "noreply@gitb.lt";
 const APPLICATION_FEE = parseFloat(process.env.APPLICATION_FEE_EUR || "50");
 
-// Initialize services with error handling
+// Initialize services
 let stripe = null;
 let resend = null;
 
@@ -52,6 +52,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// Trust proxy for IP detection
+app.set("trust proxy", true);
 
 // Static files
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
@@ -84,12 +87,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check - root route
+// Health check
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
 
-// API health check
 app.get("/api", (req, res) => {
   res.json({ 
     status: "ok", 
@@ -128,9 +130,7 @@ const authenticate = async (req, res, next) => {
           user.id = user._id.toString();
           delete user._id;
         }
-      } catch (e) {
-        // Invalid ObjectId
-      }
+      } catch (e) {}
     }
 
     if (!user) {
@@ -199,6 +199,31 @@ const generatePassword = () => {
   return password;
 };
 
+const getClientIP = (req) => {
+  return req.ip || 
+         req.headers["x-forwarded-for"]?.split(",")[0] || 
+         req.headers["x-real-ip"] || 
+         req.connection?.remoteAddress || 
+         "Unknown";
+};
+
+const getLocationFromIP = async (ip) => {
+  try {
+    // Skip for local/private IPs
+    if (ip === "127.0.0.1" || ip === "::1" || ip.startsWith("192.168") || ip.startsWith("10.") || ip === "Unknown") {
+      return "Local Network";
+    }
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=city,country`);
+    const data = await response.json();
+    if (data.city && data.country) {
+      return `${data.city}, ${data.country}`;
+    }
+    return "Unknown Location";
+  } catch (error) {
+    return "Unknown Location";
+  }
+};
+
 // ============ EMAIL FUNCTIONS ============
 const sendEmail = async (to, subject, html) => {
   if (!resend) {
@@ -217,6 +242,156 @@ const sendEmail = async (to, subject, html) => {
     console.error("Email error:", error.message);
     return false;
   }
+};
+
+// Welcome email when application is approved
+const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); color: white; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0; font-size: 28px;">GITB</h1>
+        <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Global Institute of Tech and Business</p>
+      </div>
+      
+      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: #3d7a4a; margin-top: 0;">Welcome to Global Institute of Tech and Business!</h2>
+        
+        <p>Dear ${firstName} ${lastName},</p>
+        
+        <p><strong>Congratulations on your admission!</strong> You've taken a bold step toward building real skills in technology and business, and we're excited to have you join our academic community.</p>
+        
+        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #3d7a4a;">
+          <h3 style="margin: 0 0 10px 0; color: #2d5a3a;">Your Program</h3>
+          <p style="margin: 0; font-size: 18px; color: #333;"><strong>${courseTitle}</strong></p>
+        </div>
+        
+        <h3 style="color: #333;">Here's what to do next:</h3>
+        
+        <p>Please proceed to the student portal and log in using the credentials below. These login details were created specifically for you and will give you access to:</p>
+        
+        <ul style="color: #555; line-height: 1.8;">
+          <li>Your courses</li>
+          <li>Class schedules</li>
+          <li>Learning materials</li>
+          <li>Announcements</li>
+          <li>Student dashboard</li>
+        </ul>
+        
+        <div style="background: #f5f5f5; padding: 25px; border-radius: 8px; margin: 25px 0;">
+          <h3 style="margin: 0 0 15px 0; color: #333;">Your Login Credentials</h3>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #fff3e0; padding: 5px 10px; border-radius: 4px; color: #e65100; font-size: 16px;">${tempPassword}</code></p>
+        </div>
+        
+        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <p style="margin: 0; color: #e65100;">
+            <strong>Important:</strong> We strongly recommend updating your password and completing your profile information to activate your account fully.
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Access Student Portal
+          </a>
+        </div>
+        
+        <p style="color: #666; font-size: 14px;">If you experience any difficulty accessing your account, contact the admin team immediately for assistance.</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        
+        <p style="color: #333;"><strong>Welcome once again — your journey starts now.</strong></p>
+        
+        <p style="color: #666; margin-bottom: 0;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+      </div>
+    </div>
+  `;
+  
+  return await sendEmail(email, `🎓 Welcome to GITB - Your Admission is Confirmed!`, html);
+};
+
+// Login notification email with IP and location
+const sendLoginNotificationEmail = async (email, firstName, ip, location, timestamp) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="text-align: center; padding: 20px; background: #3d7a4a; color: white; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0;">GITB</h1>
+        <p style="margin: 5px 0 0 0; font-size: 12px;">Security Alert</p>
+      </div>
+      
+      <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+        <h2 style="color: #333; margin-top: 0;">New Login Detected</h2>
+        
+        <p>Hello ${firstName},</p>
+        
+        <p>We detected a new login to your GITB account. Here are the details:</p>
+        
+        <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ddd;">
+          <p style="margin: 5px 0;"><strong>Time:</strong> ${timestamp}</p>
+          <p style="margin: 5px 0;"><strong>IP Address:</strong> ${ip}</p>
+          <p style="margin: 5px 0;"><strong>Location:</strong> ${location}</p>
+        </div>
+        
+        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #e65100;">
+            <strong>Don't recognize this login?</strong><br>
+            If this wasn't you, please reset your password immediately and contact our support team.
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 12px 30px; background: #d32f2f; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px;">
+            Reset Password
+          </a>
+        </div>
+        
+        <p style="color: #666; font-size: 12px;">If this was you, no action is needed. This email is for your security.</p>
+      </div>
+    </div>
+  `;
+  
+  return await sendEmail(email, `Security Alert: New Login to Your GITB Account`, html);
+};
+
+// Password change confirmation email
+const sendPasswordChangedEmail = async (email, firstName) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="text-align: center; padding: 20px; background: #3d7a4a; color: white; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0;">GITB</h1>
+        <p style="margin: 5px 0 0 0; font-size: 12px;">Security Notification</p>
+      </div>
+      
+      <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+        <h2 style="color: #3d7a4a; margin-top: 0;">Password Changed Successfully</h2>
+        
+        <p>Hello ${firstName},</p>
+        
+        <p>Your GITB account password has been successfully changed.</p>
+        
+        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0; color: #2e7d32; font-size: 18px;">✓ Password Updated</p>
+          <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">${new Date().toLocaleString()}</p>
+        </div>
+        
+        <div style="background: #ffebee; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #c62828;">
+            <strong>Didn't make this change?</strong><br>
+            If you did not change your password, your account may be compromised. Please contact our support team immediately and reset your password.
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
+            Go to Login
+          </a>
+        </div>
+        
+        <p style="color: #666; font-size: 12px;">For your security, never share your password with anyone.</p>
+      </div>
+    </div>
+  `;
+  
+  return await sendEmail(email, `Your GITB Password Has Been Changed`, html);
 };
 
 // ============ SYSTEM CONFIG ROUTES ============
@@ -278,20 +453,42 @@ app.post("/api/auth/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
+    // Get IP and location for login notification
+    const clientIP = getClientIP(req);
+    const location = await getLocationFromIP(clientIP);
+    const timestamp = new Date().toLocaleString("en-US", { 
+      weekday: "long", year: "numeric", month: "long", day: "numeric", 
+      hour: "2-digit", minute: "2-digit", timeZoneName: "short" 
+    });
+
+    // Send login notification email (async, don't wait)
+    sendLoginNotificationEmail(user.email, user.first_name, clientIP, location, timestamp);
+
+    // Log the login
+    await db.collection("login_logs").insertOne({
+      user_id: userId,
+      email: user.email,
+      ip: clientIP,
+      location,
+      timestamp: new Date().toISOString(),
+      user_agent: req.headers["user-agent"] || "Unknown"
+    });
+
     const userResponse = {
       id: userId,
       email: user.email,
       first_name: user.first_name,
       last_name: user.last_name,
       role: user.role,
+      permissions: user.permissions || [],
       department: user.department || null,
       program: user.program || null,
-      level: user.level || null,
       student_id: user.student_id || null,
       phone: user.phone || null,
       is_active: user.is_active,
       account_status: user.account_status || "active",
-      payment_status: user.payment_status || "unpaid"
+      payment_status: user.payment_status || "unpaid",
+      must_change_password: user.must_change_password || false
     };
 
     const systemConfig = await getSystemConfig();
@@ -346,11 +543,21 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Password Reset Request</h2>
-        <p>Hello ${user.first_name},</p>
-        <p>Click the link below to reset your password:</p>
-        <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
-        <p>This link expires in 1 hour.</p>
+        <div style="text-align: center; padding: 20px; background: #3d7a4a; color: white; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">GITB</h1>
+        </div>
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <h2>Password Reset Request</h2>
+          <p>Hello ${user.first_name},</p>
+          <p>We received a request to reset your password. Click the button below to create a new password:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+              Reset Password
+            </a>
+          </div>
+          <p>This link will expire in 1 hour.</p>
+          <p style="color: #666;">If you didn't request this, please ignore this email or contact support if you're concerned.</p>
+        </div>
       </div>
     `;
 
@@ -386,14 +593,29 @@ app.post("/api/auth/reset-password", async (req, res) => {
       return res.status(400).json({ detail: "Reset token has expired" });
     }
 
+    // Find user
+    let user = await db.collection("users").findOne({ id: resetRecord.user_id });
+    if (!user) {
+      try {
+        user = await db.collection("users").findOne({ _id: new ObjectId(resetRecord.user_id) });
+      } catch (e) {}
+    }
+
+    if (!user) {
+      return res.status(400).json({ detail: "User not found" });
+    }
+
     const hashedPassword = await bcrypt.hash(new_password, 12);
     
     await db.collection("users").updateOne(
-      { $or: [{ id: resetRecord.user_id }, { _id: new ObjectId(resetRecord.user_id) }] },
+      { $or: [{ id: resetRecord.user_id }, { _id: user._id }] },
       { $set: { password: hashedPassword, must_change_password: false } }
     );
 
     await db.collection("password_resets").deleteOne({ token });
+
+    // Send password changed confirmation email
+    await sendPasswordChangedEmail(user.email, user.first_name);
 
     res.json({ message: "Password reset successfully" });
   } catch (error) {
@@ -426,6 +648,9 @@ app.post("/api/auth/change-password", authenticate, async (req, res) => {
       { $set: { password: hashedPassword, must_change_password: false } }
     );
 
+    // Send password changed confirmation email
+    await sendPasswordChangedEmail(user.email, user.first_name);
+
     res.json({ message: "Password changed successfully" });
   } catch (error) {
     console.error("Change password error:", error);
@@ -457,22 +682,88 @@ app.get("/api/auth/me", authenticate, async (req, res) => {
   }
 });
 
-app.get("/api/auth/check-access", authenticate, (req, res) => {
-  let access = { allowed: true, reason: null, message: null };
-
-  if (req.user.account_status === "expelled") {
-    access = { allowed: false, reason: "expelled", message: "Your account has been expelled." };
-  } else if (req.user.account_status === "locked") {
-    access = { allowed: false, reason: "locked", message: "Limited Access." };
-  } else if (req.user.role === "student" && req.user.payment_status === "unpaid") {
-    access = { allowed: false, reason: "unpaid", message: "Please complete your payment." };
+// ============ ROLES & PERMISSIONS ============
+// Get available roles
+app.get("/api/roles", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const roles = [
+      { 
+        id: "admin", 
+        name: "Administrator", 
+        description: "Full access to all features",
+        permissions: ["all"]
+      },
+      { 
+        id: "registrar", 
+        name: "Registrar", 
+        description: "Manage students, enrollments, and applications",
+        permissions: ["view_users", "manage_students", "manage_applications", "view_courses"]
+      },
+      { 
+        id: "lecturer", 
+        name: "Lecturer", 
+        description: "Manage courses and grade students",
+        permissions: ["view_courses", "manage_own_courses", "grade_students", "view_students"]
+      },
+      { 
+        id: "staff", 
+        name: "Staff", 
+        description: "Limited administrative access",
+        permissions: ["view_users", "view_courses", "view_applications"]
+      },
+      { 
+        id: "student", 
+        name: "Student", 
+        description: "Access to enrolled courses",
+        permissions: ["view_own_courses", "view_own_grades"]
+      }
+    ];
+    res.json(roles);
+  } catch (error) {
+    console.error("Get roles error:", error);
+    res.status(500).json({ detail: "Internal server error" });
   }
+});
 
-  res.json(access);
+// Update user role and permissions
+app.put("/api/users/:userId/role", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role, permissions } = req.body;
+
+    if (!role) {
+      return res.status(422).json({ detail: "Role is required" });
+    }
+
+    const validRoles = ["admin", "registrar", "lecturer", "staff", "student"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ detail: "Invalid role" });
+    }
+
+    const updateData = { role };
+    if (permissions && Array.isArray(permissions)) {
+      updateData.permissions = permissions;
+    }
+
+    const result = await db.collection("users").updateOne(
+      { id: userId },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ detail: "User not found" });
+    }
+
+    const user = await db.collection("users").findOne({ id: userId }, { projection: { password: 0, _id: 0 } });
+    res.json(user);
+  } catch (error) {
+    console.error("Update user role error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
 });
 
 // ============ USER ROUTES ============
-app.get("/api/users", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
+app.get("/api/users", authenticate, requireRoles(["admin", "registrar", "staff"]), async (req, res) => {
   try {
     const { role } = req.query;
     const query = role ? { role } : {};
@@ -488,7 +779,7 @@ app.get("/api/users", authenticate, requireRoles(["admin", "registrar"]), async 
 
 app.post("/api/users", authenticate, requireRoles(["admin"]), async (req, res) => {
   try {
-    const { email, password, first_name, last_name, role, department, program, level, phone } = req.body;
+    const { email, password, first_name, last_name, role, department, program, phone, permissions } = req.body;
 
     const existing = await db.collection("users").findOne({ email });
     if (existing) {
@@ -504,13 +795,13 @@ app.post("/api/users", authenticate, requireRoles(["admin"]), async (req, res) =
       first_name,
       last_name,
       role,
+      permissions: permissions || [],
       department: department || null,
       program: program || null,
-      level: level || null,
       phone: phone || null,
       is_active: true,
       account_status: "active",
-      payment_status: "unpaid",
+      payment_status: role === "student" ? "unpaid" : "paid",
       enrolled_courses: [],
       completed_lessons: [],
       created_at: new Date().toISOString()
@@ -536,7 +827,7 @@ app.get("/api/users/:userId", authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!["admin", "registrar"].includes(req.user.role) && req.user.id !== userId) {
+    if (!["admin", "registrar", "staff"].includes(req.user.role) && req.user.id !== userId) {
       return res.status(403).json({ detail: "Access denied" });
     }
 
@@ -684,8 +975,6 @@ app.post("/api/courses", authenticate, requireRoles(["admin"]), async (req, res)
       overview: courseData.overview || "",
       department: courseData.department,
       category: courseData.category || courseData.department,
-      level: courseData.level || 100,
-      level_text: courseData.level_text || "Beginner",
       duration_value: courseData.duration_value || 3,
       duration_unit: courseData.duration_unit || "months",
       price: courseData.price || 0,
@@ -772,20 +1061,6 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
   }
 });
 
-app.get("/api/courses/:courseId/modules", authenticate, async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    const modules = await db.collection("modules")
-      .find({ course_id: courseId }, { projection: { _id: 0 } })
-      .sort({ order: 1 })
-      .toArray();
-    res.json(modules);
-  } catch (error) {
-    console.error("Get course modules error:", error);
-    res.status(500).json({ detail: "Internal server error" });
-  }
-});
-
 // ============ APPLICATION ROUTES ============
 app.post("/api/applications/create", async (req, res) => {
   try {
@@ -815,7 +1090,7 @@ app.post("/api/applications/create", async (req, res) => {
     const existingApp = await db.collection("applications").findOne({
       email,
       course_id: course.id,
-      status: { $in: ["pending", "approved"] }
+      status: { $in: ["pending", "approved", "pending_payment"] }
     });
 
     if (existingApp) {
@@ -920,7 +1195,7 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
           return res.json({
             status: "pending",
             payment_status: "paid",
-            message: "Application submitted successfully!"
+            message: "Application submitted successfully! Our admissions team will review your application."
           });
         }
 
@@ -945,7 +1220,7 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
   }
 });
 
-app.get("/api/applications", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
+app.get("/api/applications", authenticate, requireRoles(["admin", "registrar", "staff"]), async (req, res) => {
   try {
     const { status } = req.query;
     const query = status ? { status } : {};
@@ -962,7 +1237,7 @@ app.get("/api/applications", authenticate, requireRoles(["admin", "registrar"]),
   }
 });
 
-app.get("/api/applications/:applicationId", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
+app.get("/api/applications/:applicationId", authenticate, requireRoles(["admin", "registrar", "staff"]), async (req, res) => {
   try {
     const { applicationId } = req.params;
 
@@ -982,6 +1257,7 @@ app.get("/api/applications/:applicationId", authenticate, requireRoles(["admin",
   }
 });
 
+// Approve application - creates user account and sends welcome email
 app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
   try {
     const { applicationId } = req.params;
@@ -1020,11 +1296,11 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
         first_name: application.first_name,
         last_name: application.last_name,
         role: "student",
+        permissions: ["view_own_courses", "view_own_grades"],
         student_id: generateStudentId(),
         phone: application.phone,
         department: null,
         program: application.course_title,
-        level: 100,
         is_active: true,
         account_status: "active",
         payment_status: "paid",
@@ -1041,7 +1317,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
 
     const enrollment = {
       id: uuidv4(),
-      student_id: studentUser.id,
+      student_id: studentUser.id || studentUser._id.toString(),
       course_id: application.course_id,
       enrolled_at: new Date().toISOString(),
       status: "active",
@@ -1061,23 +1337,18 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       }
     );
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #3d7a4a;">Congratulations, ${application.first_name}!</h2>
-        <p>Your application to <strong>${application.course_title}</strong> has been approved!</p>
-        <p><strong>Login Credentials:</strong></p>
-        <p>Email: ${application.email}<br>Temporary Password: <strong>${tempPassword}</strong></p>
-        <p>Please change your password after first login.</p>
-        <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 12px 24px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">Login Now</a>
-      </div>
-    `;
-
-    await sendEmail(application.email, `Welcome to GITB - ${application.course_title}`, html);
+    // Send welcome email with credentials
+    await sendWelcomeEmail(
+      application.email,
+      application.first_name,
+      application.last_name,
+      application.course_title,
+      tempPassword
+    );
 
     res.json({
-      message: "Application approved successfully",
-      student_email: application.email,
-      temp_password: tempPassword
+      message: "Application approved successfully. Welcome email sent to student.",
+      student_email: application.email
     });
   } catch (error) {
     console.error("Approve application error:", error);
@@ -1085,6 +1356,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
   }
 });
 
+// Reject application
 app.post("/api/applications/:applicationId/reject", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
   try {
     const { applicationId } = req.params;
@@ -1109,11 +1381,19 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Application Update</h2>
-        <p>Dear ${application.first_name},</p>
-        <p>We regret to inform you that your application to <strong>${application.course_title}</strong> was not successful.</p>
-        ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
-        <p>We encourage you to apply again in the future.</p>
+        <div style="text-align: center; padding: 20px; background: #333; color: white; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">GITB</h1>
+        </div>
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <h2>Application Update</h2>
+          <p>Dear ${application.first_name},</p>
+          <p>Thank you for your interest in <strong>${application.course_title}</strong> at GITB.</p>
+          <p>After careful review of your application and submitted documents, we regret to inform you that we are unable to offer you admission at this time.</p>
+          ${reason ? `<div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;"><p style="margin: 0;"><strong>Reason:</strong> ${reason}</p></div>` : ""}
+          <p>We encourage you to apply again in the future or consider our other programs.</p>
+          <p>If you have any questions, please contact our admissions team.</p>
+          <p>Best regards,<br><strong>GITB Admissions Team</strong></p>
+        </div>
       </div>
     `;
 
@@ -1246,6 +1526,25 @@ app.get("/api/enrollments/my", authenticate, async (req, res) => {
   }
 });
 
+// ============ LOGIN LOGS ============
+app.get("/api/login-logs", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const { user_id, limit = 50 } = req.query;
+    const query = user_id ? { user_id } : {};
+    
+    const logs = await db.collection("login_logs")
+      .find(query, { projection: { _id: 0 } })
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .toArray();
+    
+    res.json(logs);
+  } catch (error) {
+    console.error("Get login logs error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
 // ============ ERROR HANDLING ============
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
@@ -1254,7 +1553,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle 404
 app.use((req, res) => {
   res.status(404).json({ detail: "Not found" });
 });
@@ -1274,7 +1572,6 @@ async function startServer() {
   }
 }
 
-// Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
 });
@@ -1283,7 +1580,6 @@ process.on("unhandledRejection", (err) => {
   console.error("Unhandled Rejection:", err);
 });
 
-// Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down...");
   if (mongoClient) {
