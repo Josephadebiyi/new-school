@@ -260,6 +260,7 @@ const SchoolDetailPage = () => {
         </div>
       </section>
     </div>
+    </>
   );
 };
 
