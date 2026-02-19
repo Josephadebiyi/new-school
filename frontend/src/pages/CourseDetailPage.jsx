@@ -14,6 +14,7 @@ import {
   FileCheck
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import PublicHeader from "../components/PublicHeader";
 
 const CourseDetailPage = () => {
   const { courseId } = useParams();
