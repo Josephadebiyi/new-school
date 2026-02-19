@@ -1032,16 +1032,72 @@ app.put("/api/courses/:courseId", authenticate, requireRoles(["admin"]), async (
     delete updates.id;
     updates.updated_at = new Date().toISOString();
 
-    const result = await db.collection("courses").updateOne({ id: courseId }, { $set: updates });
-
-    if (result.matchedCount === 0) {
+    // Find course by ID, slug, or title
+    let course = await db.collection("courses").findOne({ id: courseId });
+    if (!course) {
+      course = await db.collection("courses").findOne({ slug: courseId });
+    }
+    if (!course) {
+      course = await db.collection("courses").findOne({ 
+        title: { $regex: new RegExp(`^${courseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+    }
+    
+    if (!course) {
       return res.status(404).json({ detail: "Course not found" });
     }
 
-    const course = await db.collection("courses").findOne({ id: courseId }, { projection: { _id: 0 } });
-    res.json(course);
+    const result = await db.collection("courses").updateOne({ id: course.id }, { $set: updates });
+
+    const updatedCourse = await db.collection("courses").findOne({ id: course.id }, { projection: { _id: 0 } });
+    res.json(updatedCourse);
   } catch (error) {
     console.error("Update course error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// Set tuition fee for a course (admin only)
+app.put("/api/courses/:courseId/tuition", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { price } = req.body;
+
+    if (price === undefined || price === null) {
+      return res.status(422).json({ detail: "Price is required" });
+    }
+
+    if (typeof price !== 'number' || price < 0) {
+      return res.status(422).json({ detail: "Price must be a positive number" });
+    }
+
+    // Find course by ID, slug, or title
+    let course = await db.collection("courses").findOne({ id: courseId });
+    if (!course) {
+      course = await db.collection("courses").findOne({ slug: courseId });
+    }
+    if (!course) {
+      course = await db.collection("courses").findOne({ 
+        title: { $regex: new RegExp(`^${courseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+    }
+    
+    if (!course) {
+      return res.status(404).json({ detail: "Course not found" });
+    }
+
+    await db.collection("courses").updateOne(
+      { id: course.id }, 
+      { $set: { price: price, updated_at: new Date().toISOString() } }
+    );
+
+    const updatedCourse = await db.collection("courses").findOne({ id: course.id }, { projection: { _id: 0 } });
+    res.json({
+      message: `Tuition fee for "${updatedCourse.title}" updated to €${price}`,
+      course: updatedCourse
+    });
+  } catch (error) {
+    console.error("Update tuition error:", error);
     res.status(500).json({ detail: "Internal server error" });
   }
 });
