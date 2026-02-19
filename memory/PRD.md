@@ -8,30 +8,29 @@ GITB (Global Institute of Technology and Business) - Europe's Best Innovative On
 
 ## Architecture
 
-### Frontend (Port 3000)
+### Frontend
 - React + Create-React-App
 - Tailwind CSS + Shadcn UI
-- Public pages with shared header component
+- Hosted at: gitb.lt
 
-### Backend (Port 8001)
-- FastAPI + Python
-- MongoDB Atlas database
-- Stripe for payments (live keys configured)
-- Resend for emails (API key configured)
+### Backend (Node.js - MIGRATED)
+- **Runtime**: Node.js/Express
+- **Database**: MongoDB Atlas
+- **Deployed URL**: https://new-school-vam1.onrender.com
 
 ## Key Features
 
-### Public Pages (with Header)
-- Landing Page - All sections including "Keep Growing With Us"
+### Public Pages
+- Landing Page with all sections
 - Course Detail Pages - `/course/:slug`
 - School Detail Pages - `/schools/:schoolId`
-- Why GITB Page - `/why-gitb`
 - Apply Page - `/apply`
 
 ### Authentication
+- JWT-based authentication
 - Login with Forgot Password modal
 - Reset Password page
-- JWT-based auth with role-based access
+- Role-based access (admin, student, lecturer, registrar)
 
 ### Application Flow
 1. User fills application form
@@ -39,9 +38,7 @@ GITB (Global Institute of Technology and Business) - Europe's Best Innovative On
 3. Admin reviews application
 4. On approval: student account created, email sent
 
-## Courses in Database
-
-All 10 courses are now stored in MongoDB with complete information:
+## Courses (10 in Database)
 
 | Course | Category | Duration | Price |
 |--------|----------|----------|-------|
@@ -56,126 +53,128 @@ All 10 courses are now stored in MongoDB with complete information:
 | Software Engineering | Engineering | 6 months | €2,500 |
 | Business Strategy | Business | 3 months | €1,800 |
 
-Each course includes:
-- Full curriculum (8 modules)
-- Learning outcomes
-- Certifications awarded
-- Requirements/prerequisites
-- Category badges
-- Duration and pricing
+## User Credentials
 
-## Files Structure for Deployment
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | taiwojos2@yahoo.com | Passw0rd@1 |
+| Student | student@gitb.lt | Student123! |
+| Lecturer | lecturer@gitb.lt | Lecturer123! |
+| Registrar | registrar@gitb.lt | Registrar123! |
 
+## Backend Migration (Feb 19, 2026)
+
+### Changed
+- **FROM**: Python/FastAPI
+- **TO**: Node.js/Express
+
+### Why
+- Python dependency conflicts were blocking Render deployment
+- Node.js provides simpler deployment with no build conflicts
+
+### New Backend Structure
 ```
-├── render.yaml           # Render auto-deploy
-├── README.md             # Deployment guide
-├── backend/
-│   ├── server.py
-│   ├── requirements.txt  # Clean, minimal dependencies
-│   └── .env.example
-└── frontend/
-    ├── package.json
-    ├── src/
-    │   └── components/
-    │       └── PublicHeader.jsx  # Shared header
-    └── .env.example
+/app/backend/
+├── package.json
+├── .env
+├── .env.example
+├── README.md
+├── src/
+│   ├── index.js          # Main server
+│   ├── middleware/
+│   │   └── auth.js       # JWT authentication
+│   ├── routes/
+│   │   ├── auth.js       # Login, forgot/reset password
+│   │   ├── users.js      # User CRUD
+│   │   ├── courses.js    # Course CRUD
+│   │   ├── applications.js # Application + Stripe
+│   │   ├── enrollments.js
+│   │   ├── dashboard.js
+│   │   ├── modules.js
+│   │   ├── grades.js
+│   │   ├── transactions.js
+│   │   ├── uploads.js
+│   │   └── system.js
+│   └── services/
+│       └── email.js      # Resend email service
+└── uploads/              # File uploads
 ```
-
-## Render Deployment Settings
-
-### Backend Service
-- **Root Directory:** `backend`
-- **Build Command:** `pip install -r requirements.txt`
-- **Start Command:** `uvicorn server:app --host 0.0.0.0 --port $PORT`
-
-### Frontend Service
-- **Root Directory:** `frontend`
-- **Build Command:** `yarn install && yarn build`
-- **Publish Directory:** `build`
-
-## Environment Variables
-
-### Backend
-```
-MONGO_URL=mongodb+srv://user:pass@cluster.mongodb.net/
-DB_NAME=gitb_lms
-STRIPE_SECRET_KEY=sk_live_xxxx
-STRIPE_PUBLIC_KEY=pk_live_xxxx
-RESEND_API_KEY=re_xxxx
-ADMIN_EMAIL=noreply@gitb.lt
-FRONTEND_URL=https://your-frontend.com
-APPLICATION_FEE_EUR=50.00
-DEFAULT_CURRENCY=EUR
-```
-
-### Frontend
-```
-REACT_APP_BACKEND_URL=https://your-backend.com
-```
-
-## Admin Credentials
-- Email: taiwojos2@yahoo.com
-- Password: Passw0rd@1
-
-## What's Been Implemented (Feb 19, 2026)
-
-### Completed Features
-1. Full landing page with all sections (Hero, Programs, Testimonials, Blog, etc.)
-2. Authentication system (Login, Forgot Password, Reset Password)
-3. Admin dashboard with course management
-4. Application form with Stripe payment integration
-5. Email notifications via Resend
-6. Public course/school detail pages
-7. Shared header component across all public pages
-8. **All 10 courses seeded in database with complete information**
-
-### Technical Fixes Applied
-1. Cleaned `requirements.txt` - removed all unnecessary packages, minimal dependencies only
-2. Fixed user authentication to handle both `id` and `_id` fields from MongoDB
-3. Stripe integration using official `stripe` SDK (v11.4.1)
-4. MongoDB Atlas connection with proper SSL/TLS handling
-
-### Verified Working (100% Test Pass Rate)
-- All 21 backend API endpoints tested
-- Frontend landing page, login, and admin dashboard
-- Stripe checkout session creation (live keys)
-- Admin login with taiwojos2@yahoo.com
-- All courses displayed from database
 
 ## API Endpoints
 
-### Public (No Auth)
+### Public
+- `GET /api` - Health check
 - `GET /api/system-config` - System configuration
-- `GET /api/courses/public` - List all public courses (10 courses)
-- `GET /api/courses/public/{id}` - Single course details
-- `POST /api/applications/create` - Submit application (creates Stripe checkout)
-- `GET /api/applications/status/{session_id}` - Check application status
+- `GET /api/courses/public` - List public courses
+- `POST /api/applications/create` - Submit application + Stripe
 
 ### Auth
-- `POST /api/auth/login` - User login
-- `POST /api/auth/forgot-password` - Request password reset
-- `POST /api/auth/reset-password` - Reset password with token
-- `POST /api/auth/change-password` - Change password (authenticated)
-- `GET /api/auth/me` - Current user info
+- `POST /api/auth/login`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/auth/me`
 
-### Admin Protected
-- `GET /api/users` - List users
-- `POST /api/users` - Create user
-- `GET /api/courses` - List courses
-- `POST /api/courses` - Create course
-- `GET /api/applications` - List applications
-- `POST /api/applications/{id}/approve` - Approve application
-- `POST /api/applications/{id}/reject` - Reject application
+### Protected
+- `GET /api/users` - List users (admin)
+- `GET /api/applications` - List applications (admin)
+- `POST /api/applications/:id/approve`
+- `POST /api/applications/:id/reject`
+- `GET /api/dashboard/admin` - Admin stats
+- `GET /api/dashboard/student` - Student stats
 
-## Remaining/Future Tasks
+## Render Deployment
 
-### P1 - High Priority
-- Backend refactoring: Move endpoint logic from monolithic `server.py` into `/app/backend/routes/` directory
+### Backend (Web Service)
+- **URL**: https://new-school-vam1.onrender.com
+- **Runtime**: Node
+- **Build**: `npm install`
+- **Start**: `npm start`
+- **Root Dir**: `backend`
 
-### P2 - Medium Priority
-- Admin Payment Tracking dashboard
-- PDF Generation enhancements (admin interface for admission letter template)
-- Graduation Features (confetti on course completion)
+### Frontend (Static Site)
+- **URL**: https://gitb.lt
+- **Build**: `npm install && npm run build`
+- **Publish**: `build`
+- **Root Dir**: `frontend`
+
+### Environment Variables (Backend)
+```
+MONGO_URL=mongodb+srv://...
+DB_NAME=gitb_lms
+JWT_SECRET=lumina-lms-secure-jwt-secret-key-2025-production
+RESEND_API_KEY=re_8cmfKRen_Gwha2MhfgD2P1DaMLQCsUup3
+ADMIN_EMAIL=noreply@gitb.lt
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLIC_KEY=pk_live_...
+APPLICATION_FEE_EUR=50.00
+FRONTEND_URL=https://gitb.lt
+CORS_ORIGINS=*
+```
+
+### Environment Variables (Frontend)
+```
+REACT_APP_BACKEND_URL=https://new-school-vam1.onrender.com
+REACT_APP_STRIPE_KEY=pk_live_...
+```
+
+## Completed (Feb 19, 2026)
+1. ✅ Migrated backend from Python to Node.js
+2. ✅ All API endpoints working
+3. ✅ Stripe integration working
+4. ✅ Resend email integration working
+5. ✅ MongoDB connection working
+6. ✅ All user logins working (admin, student, lecturer, registrar)
+7. ✅ 10 courses in database
+8. ✅ Render deployment configuration ready
+
+## Files Created
+- `/app/backend/package.json`
+- `/app/backend/src/index.js`
+- `/app/backend/src/routes/*.js`
+- `/app/backend/src/middleware/auth.js`
+- `/app/backend/src/services/email.js`
+- `/app/render.yaml`
+- `/app/RENDER_DEPLOYMENT.md`
 
 ---
 Last Updated: February 19, 2026
