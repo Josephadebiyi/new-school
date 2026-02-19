@@ -23,7 +23,7 @@ GITB (Global Institute of Technology and Business) - Europe's Best Innovative On
 
 ### Public Pages (with Header)
 - Landing Page - All sections including "Keep Growing With Us"
-- Course Detail Pages - `/course/:courseId`
+- Course Detail Pages - `/course/:slug`
 - School Detail Pages - `/schools/:schoolId`
 - Why GITB Page - `/why-gitb`
 - Apply Page - `/apply`
@@ -38,6 +38,31 @@ GITB (Global Institute of Technology and Business) - Europe's Best Innovative On
 2. Stripe checkout for EUR 50 fee
 3. Admin reviews application
 4. On approval: student account created, email sent
+
+## Courses in Database
+
+All 10 courses are now stored in MongoDB with complete information:
+
+| Course | Category | Duration | Price |
+|--------|----------|----------|-------|
+| UI/UX & Webflow Design | Design | 3 months | €1,200 |
+| KYC & Compliance | Finance | 2 months | €900 |
+| Cyber-Security Vulnerability Tester | Security | 4 months | €1,800 |
+| French \| Spanish \| Lithuanian | Languages | 3 months | €800 |
+| Identity & Access Management (IAM) | Security | 3 months | €1,400 |
+| Data Analytics | Data | 4 months | €1,500 |
+| Product Management | Product | 3 months | €1,600 |
+| Digital Marketing | Marketing | 3 months | €1,100 |
+| Software Engineering | Engineering | 6 months | €2,500 |
+| Business Strategy | Business | 3 months | €1,800 |
+
+Each course includes:
+- Full curriculum (8 modules)
+- Learning outcomes
+- Certifications awarded
+- Requirements/prerequisites
+- Category badges
+- Duration and pricing
 
 ## Files Structure for Deployment
 
@@ -102,6 +127,7 @@ REACT_APP_BACKEND_URL=https://your-backend.com
 5. Email notifications via Resend
 6. Public course/school detail pages
 7. Shared header component across all public pages
+8. **All 10 courses seeded in database with complete information**
 
 ### Technical Fixes Applied
 1. Cleaned `requirements.txt` - removed all unnecessary packages, minimal dependencies only
@@ -114,12 +140,13 @@ REACT_APP_BACKEND_URL=https://your-backend.com
 - Frontend landing page, login, and admin dashboard
 - Stripe checkout session creation (live keys)
 - Admin login with taiwojos2@yahoo.com
+- All courses displayed from database
 
 ## API Endpoints
 
 ### Public (No Auth)
 - `GET /api/system-config` - System configuration
-- `GET /api/courses/public` - List all public courses
+- `GET /api/courses/public` - List all public courses (10 courses)
 - `GET /api/courses/public/{id}` - Single course details
 - `POST /api/applications/create` - Submit application (creates Stripe checkout)
 - `GET /api/applications/status/{session_id}` - Check application status
