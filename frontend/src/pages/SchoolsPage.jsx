@@ -123,7 +123,9 @@ const SchoolsPage = () => {
   const selectedSchool = schoolId ? schools.find(s => s.id === schoolId) : null;
 
   return (
-    <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="schools-page">
+    <>
+      <PublicHeader />
+      <div ref={sectionRef} className="min-h-screen bg-white pt-[72px]" data-testid="schools-page">
       {/* Hero */}
       <section className="relative bg-[#314a06] text-white py-16 lg:py-24">
         <div className="absolute inset-0 overflow-hidden">
