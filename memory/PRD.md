@@ -79,12 +79,18 @@ All endpoints are functional and tested:
 - `GET /api/auth/me` - Get current user profile
 
 #### Applications
-- `POST /api/applications/create` - Create application with Stripe payment
+- `POST /api/applications/create` - Create application with Stripe payment (€50 registration fee)
 - `GET /api/applications/status/:sessionId` - Check payment/application status
 - `GET /api/applications` - List all applications (admin/registrar)
 - `GET /api/applications/:id` - Get single application
-- `POST /api/applications/:id/approve` - Approve and create user account
+- `POST /api/applications/:id/approve` - Approve and create user account with pending_payment enrollment
 - `POST /api/applications/:id/reject` - Reject application
+
+#### Tuition Payments (NEW)
+- `GET /api/my-courses` - Get student's courses with enrollment status
+- `POST /api/tuition/pay` - Create Stripe checkout for tuition fee
+- `GET /api/tuition/status/:sessionId` - Check tuition payment status
+- `POST /api/webhooks/stripe` - Stripe webhook for payment confirmations
 
 #### Users
 - `GET /api/users` - List users
