@@ -847,7 +847,11 @@ app.put("/api/users/:userId", authenticate, requireRoles(["admin", "registrar"])
     const { userId } = req.params;
     const updates = req.body;
 
-    delete updates.password;
+    // Handle password update separately (hash it)
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 12);
+    }
+    
     delete updates.id;
     delete updates._id;
     delete updates.email;
