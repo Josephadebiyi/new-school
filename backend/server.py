@@ -1240,10 +1240,11 @@ async def update_course(
 
 # ============== STRIPE APPLICATION ENDPOINTS ==============
 
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+import stripe
 
 APPLICATION_FEE_EUR = float(os.environ.get('APPLICATION_FEE_EUR', '50.00'))
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+stripe.api_key = STRIPE_SECRET_KEY
 
 class ApplicationCreate(BaseModel):
     first_name: str
@@ -1274,7 +1275,6 @@ async def create_application(app_data: ApplicationCreate):
     
     # Create application record
     application_id = str(uuid.uuid4())
-    session_id = str(uuid.uuid4())
     
     application = {
         "id": application_id,
@@ -1296,19 +1296,26 @@ async def create_application(app_data: ApplicationCreate):
     
     # Create Stripe checkout session
     try:
-        stripe_checkout = StripeCheckout(
-            api_key=STRIPE_SECRET_KEY,
-            webhook_url=f"{app_data.origin_url}/api/webhook/stripe"
-        )
-        
         success_url = f"{app_data.origin_url}/application/success?session_id={{CHECKOUT_SESSION_ID}}"
-        cancel_url = f"{app_data.origin_url}/course/{app_data.course_id}"
+        cancel_url = f"{app_data.origin_url}/apply"
         
-        checkout_request = CheckoutSessionRequest(
-            amount=APPLICATION_FEE_EUR,
-            currency="eur",
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'eur',
+                    'product_data': {
+                        'name': f'GITB Application Fee - {course.get("title", "Course")}',
+                        'description': f'Application fee for {app_data.first_name} {app_data.last_name}',
+                    },
+                    'unit_amount': int(APPLICATION_FEE_EUR * 100),  # Stripe uses cents
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
             success_url=success_url,
             cancel_url=cancel_url,
+            customer_email=app_data.email,
             metadata={
                 "application_id": application_id,
                 "email": app_data.email,
@@ -1317,10 +1324,8 @@ async def create_application(app_data: ApplicationCreate):
             }
         )
         
-        session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
-        
         # Update application with session ID
-        application["session_id"] = session.session_id
+        application["session_id"] = session.id
         
         # Save to database
         await db.applications.insert_one(application)
@@ -1328,7 +1333,7 @@ async def create_application(app_data: ApplicationCreate):
         # Also save to payment_transactions
         payment_transaction = {
             "id": str(uuid.uuid4()),
-            "session_id": session.session_id,
+            "session_id": session.id,
             "application_id": application_id,
             "email": app_data.email,
             "amount": APPLICATION_FEE_EUR,
