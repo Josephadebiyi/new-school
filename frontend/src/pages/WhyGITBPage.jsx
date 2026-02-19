@@ -9,6 +9,7 @@ import {
   Award,
   BookOpen
 } from "lucide-react";
+import PublicHeader from "../components/PublicHeader";
 
 const WhyGITBPage = () => {
   const sectionRef = useRef(null);
