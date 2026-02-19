@@ -1,0 +1,42 @@
+# Render Blueprint - Deploy both backend and frontend
+# Deploy via: render.com → New Blueprint Instance → Connect Repo
+
+services:
+  # Backend API Service
+  - type: web
+    name: gitb-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false  # Set manually in dashboard
+      - key: DB_NAME
+        value: gitb_lms
+      - key: RESEND_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+  # Frontend Static Site
+  - type: web
+    name: gitb-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: yarn install && yarn build
+    staticPublishPath: build
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=31536000
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
