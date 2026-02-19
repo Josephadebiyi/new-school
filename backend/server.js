@@ -1347,12 +1347,14 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       application.first_name,
       application.last_name,
       application.course_title,
-      tempPassword
+      tempPassword,
+      course ? course.price : 0
     );
 
     res.json({
       message: "Application approved successfully. Welcome email sent to student.",
-      student_email: application.email
+      student_email: application.email,
+      tuition_amount: course ? course.price : 0
     });
   } catch (error) {
     console.error("Approve application error:", error);
