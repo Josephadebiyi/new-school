@@ -15,7 +15,7 @@ app.use('/api', createProxyMiddleware({
 app.use(express.static(path.join(__dirname, '..')));
 
 // Handle React Router - serve index.html for any non-API, non-static routes
-app.get('*', (req, res) => {
+app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
