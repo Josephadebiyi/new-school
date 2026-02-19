@@ -1075,16 +1075,29 @@ app.post("/api/applications/create", async (req, res) => {
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
+      console.log("Missing fields:", { first_name: !!first_name, last_name: !!last_name, email: !!email, course_id: !!course_id });
       return res.status(422).json({ detail: "Missing required fields" });
     }
 
+    console.log("Looking up course:", course_id);
     let course = await db.collection("courses").findOne({ id: course_id });
     if (!course) {
       course = await db.collection("courses").findOne({ slug: course_id });
     }
     if (!course) {
+      // Try case-insensitive slug search
+      course = await db.collection("courses").findOne({ 
+        slug: { $regex: new RegExp(`^${course_id}$`, 'i') }
+      });
+    }
+    if (!course) {
+      console.log("Course not found for:", course_id);
+      // List available courses for debugging
+      const courses = await db.collection("courses").find({}, { projection: { id: 1, slug: 1 } }).limit(5).toArray();
+      console.log("Available courses:", courses.map(c => c.slug || c.id));
       return res.status(404).json({ detail: "Course not found" });
     }
+    console.log("Found course:", course.title);
 
     const existingApp = await db.collection("applications").findOne({
       email,
