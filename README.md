@@ -1,95 +1,68 @@
 # GITB LMS - Learning Management System
 
-A white-label Learning Management System for Global Institute of Technology and Business.
-
 ## Project Structure
 
 ```
-├── backend/              # FastAPI Backend
-│   ├── server.py         # Main API server
-│   ├── requirements.txt  # Python dependencies
-│   ├── services/         # Business logic
-│   └── .env.example      # Environment template
-├── frontend/             # React Frontend
-│   ├── src/              # Source code
-│   ├── public/           # Static assets
-│   └── package.json      # Node dependencies
-└── render.yaml           # Render deployment config
+├── public_html/          # Frontend build (deploy to gitb.lt)
+│   ├── index.html
+│   ├── .htaccess
+│   ├── static/
+│   └── images/
+├── backend/              # Node.js API (deploy to api subdomain or Render)
+│   ├── server.js
+│   ├── package.json
+│   └── .env.example
+└── frontend/             # React source code
+    ├── src/
+    ├── package.json
+    └── build/
 ```
 
-## Deployment to Render
+## Hostinger Deployment
 
-### Option 1: Blueprint (Recommended)
-1. Push code to GitHub
-2. Go to [render.com](https://render.com) → New Blueprint Instance
-3. Connect your GitHub repository
-4. Render will use `render.yaml` to deploy both services
+### For gitb.lt (Frontend)
+1. Point gitb.lt to the `public_html` folder
+2. Or set the deployment path to `/public_html`
+3. The `.htaccess` file handles React routing
 
-### Option 2: Manual Setup
+### For API (Backend)
+**Option A: Use Render (Recommended)**
+- Backend is already deployed at: `https://new-school-vam1.onrender.com`
+- Frontend is configured to use this URL
 
-#### Backend Service
-1. Create new Web Service on Render
-2. Connect your GitHub repo
-3. Settings:
-   - **Root Directory:** `backend`
-   - **Runtime:** Python 3
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `uvicorn server:app --host 0.0.0.0 --port $PORT`
-4. Add Environment Variables (see backend/.env.example)
-
-#### Frontend Service
-1. Create new Static Site on Render
-2. Connect your GitHub repo
-3. Settings:
-   - **Root Directory:** `frontend`
-   - **Build Command:** `yarn install && yarn build`
-   - **Publish Directory:** `build`
-4. Add Environment Variable:
-   - `REACT_APP_BACKEND_URL` = Your backend URL (e.g., https://gitb-backend.onrender.com)
+**Option B: Hostinger Node.js Hosting**
+1. Create a subdomain `api.gitb.lt`
+2. Set up Node.js app pointing to `/backend` folder
+3. Set startup file: `server.js`
+4. Add environment variables (see backend/.env.example)
 
 ## Environment Variables
 
-### Backend (.env)
+### Backend (server.js)
 ```
-MONGO_URL=mongodb+srv://user:pass@cluster.mongodb.net/
+MONGO_URL=mongodb+srv://...
 DB_NAME=gitb_lms
-RESEND_API_KEY=re_xxxx
-STRIPE_SECRET_KEY=sk_xxxx
-FRONTEND_URL=https://your-frontend.com
 JWT_SECRET=your-secret-key
+RESEND_API_KEY=re_...
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLIC_KEY=pk_live_...
+FRONTEND_URL=https://gitb.lt
+CORS_ORIGINS=*
 ```
 
-### Frontend (.env)
+### Frontend (already built with)
 ```
-REACT_APP_BACKEND_URL=https://your-backend.com
-```
-
-## Local Development
-
-### Backend
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn server:app --reload --port 8001
+REACT_APP_BACKEND_URL=https://new-school-vam1.onrender.com
 ```
 
-### Frontend
-```bash
-cd frontend
-yarn install
-yarn start
-```
+## Test Credentials
+- **Admin**: taiwojos2@yahoo.com / Passw0rd@1
+- **Student**: student@gitb.lt / Student123!
+- **Lecturer**: lecturer@gitb.lt / Lecturer123!
 
-## Default Admin Account
-- Email: taiwojos2@yahoo.com
-- Password: Passw0rd@1
-
-## Features
-- Student/Lecturer/Admin dashboards
-- Course management
-- Application & admissions system
-- Stripe payment integration
-- Email notifications (Resend)
-- EAHEA accreditation badges
+## Tech Stack
+- **Frontend**: React, Tailwind CSS, Shadcn UI
+- **Backend**: Node.js, Express
+- **Database**: MongoDB Atlas
+- **Payments**: Stripe
+- **Email**: Resend
