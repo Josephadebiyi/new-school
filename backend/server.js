@@ -1455,22 +1455,17 @@ app.get("/api/my-courses", authenticate, async (req, res) => {
 // Create tuition payment session for a course
 app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
-    const userId = req.user.sub;
+    const userId = req.user.id;
+    const user = req.user;
     const { course_id, origin_url } = req.body;
 
     if (!course_id) {
       return res.status(422).json({ detail: "Course ID is required" });
     }
 
-    // Get user
-    const user = await db.collection("users").findOne({ id: userId });
-    if (!user) {
-      return res.status(404).json({ detail: "User not found" });
-    }
-
     // Check enrollment exists and is pending payment
     let enrollment = await db.collection("enrollments").findOne({
-      user_id: userId,
+      $or: [{ user_id: userId }, { student_id: userId }],
       course_id: course_id
     });
 
