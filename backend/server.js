@@ -543,9 +543,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="text-align: center; padding: 20px; background: #3d7a4a; color: white; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0;">GITB</h1>
-        </div>
+        ${getEmailHeader("Password Reset")}
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <h2>Password Reset Request</h2>
           <p>Hello ${user.first_name},</p>
