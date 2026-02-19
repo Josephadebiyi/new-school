@@ -599,6 +599,7 @@ const CourseDetailPage = () => {
         </div>
       </section>
     </div>
+    </>
   );
 };
 
