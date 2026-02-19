@@ -24,3 +24,7 @@ Thumbs.db
 # Lock files (let each platform generate its own)
 yarn.lock
 package-lock.json
+-e 
+# Environment files
+*.env
+*.env.*
