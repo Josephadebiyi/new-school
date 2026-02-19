@@ -458,8 +458,8 @@ app.post("/api/auth/login", async (req, res) => {
       hour: "2-digit", minute: "2-digit", timeZoneName: "short" 
     });
 
-    // Send login notification email (async, don't wait)
-    sendLoginNotificationEmail(user.email, user.first_name, clientIP, location, timestamp);
+    // Security email disabled per user request
+    // sendLoginNotificationEmail(user.email, user.first_name, clientIP, location, timestamp);
 
     // Log the login
     await db.collection("login_logs").insertOne({
