@@ -319,10 +319,7 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
 const sendLoginNotificationEmail = async (email, firstName, ip, location, timestamp) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="text-align: center; padding: 20px; background: #3d7a4a; color: white; border-radius: 10px 10px 0 0;">
-        <h1 style="margin: 0;">GITB</h1>
-        <p style="margin: 5px 0 0 0; font-size: 12px;">Security Alert</p>
-      </div>
+      ${getEmailHeader("Security Alert")}
       
       <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
         <h2 style="color: #333; margin-top: 0;">New Login Detected</h2>
