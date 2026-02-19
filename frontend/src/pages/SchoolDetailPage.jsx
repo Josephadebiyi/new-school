@@ -14,6 +14,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import PublicHeader from "../components/PublicHeader";
 
 const SchoolDetailPage = () => {
   const { schoolId } = useParams();
