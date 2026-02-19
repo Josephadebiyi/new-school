@@ -16,7 +16,7 @@ require("dotenv").config();
 const app = express();
 
 // Configuration with fallbacks
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8001;
 const MONGO_URL = process.env.MONGO_URL || process.env.MONGO_URI || "";
 const DB_NAME = process.env.DB_NAME || "gitb_lms";
 const JWT_SECRET = process.env.JWT_SECRET || "default-jwt-secret-change-in-production";
