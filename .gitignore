@@ -1,17 +1,18 @@
-# Dependencies (in source folders)
+# Dependencies
 node_modules/
-_source/frontend/node_modules/
-_source/backend/node_modules/
 
 # Environment files
 .env
 .env.local
 !.env.example
 
+# Cache
+.pytest_cache/
+__pycache__/
+
 # IDE
 .idea/
 .vscode/
-*.swp
 
 # OS
 .DS_Store
@@ -19,10 +20,7 @@ Thumbs.db
 
 # Logs
 *.log
-_source/frontend/node_modules/.cache/default-development/0.pack
-_source/frontend/node_modules/.cache/default-development/6.pack
-_source/frontend/node_modules/.cache/default-development/4.pack
--e 
-# Environment files
-*.env
-*.env.*
+
+# Lock files (let each platform generate its own)
+yarn.lock
+package-lock.json
