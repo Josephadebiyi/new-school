@@ -1087,14 +1087,17 @@ app.post("/api/applications/create", async (req, res) => {
     if (!course) {
       // Try case-insensitive slug search
       course = await db.collection("courses").findOne({ 
-        slug: { $regex: new RegExp(`^${course_id}$`, 'i') }
+        slug: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+    }
+    if (!course) {
+      // Try finding by title (case-insensitive)
+      course = await db.collection("courses").findOne({ 
+        title: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       });
     }
     if (!course) {
       console.log("Course not found for:", course_id);
-      // List available courses for debugging
-      const courses = await db.collection("courses").find({}, { projection: { id: 1, slug: 1 } }).limit(5).toArray();
-      console.log("Available courses:", courses.map(c => c.slug || c.id));
       return res.status(404).json({ detail: "Course not found" });
     }
     console.log("Found course:", course.title);
