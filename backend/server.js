@@ -166,6 +166,15 @@ app.get("/api", (req, res) => {
   });
 });
 
+// Public config endpoint (safe to expose)
+app.get("/api/config", (req, res) => {
+  res.json({
+    stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
+    applicationFee: APPLICATION_FEE,
+    currency: process.env.DEFAULT_CURRENCY || "EUR"
+  });
+});
+
 // ============ AUTH MIDDLEWARE ============
 const authenticate = async (req, res, next) => {
   try {
