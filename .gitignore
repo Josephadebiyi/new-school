@@ -1,14 +1,20 @@
 # Dependencies
 node_modules/
 
-# Environment files
+# Environment files (NEVER commit secrets)
 .env
 .env.local
+.env.production
+.env.development
+backend/.env
+frontend/.env
 !.env.example
+!backend/.env.example
 
 # Cache
 .pytest_cache/
 __pycache__/
+.cache/
 
 # IDE
 .idea/
@@ -20,43 +26,15 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
-# Lock files (let each platform generate its own)
+# Build outputs
+dist/
+build/
+
+# Lock files
 yarn.lock
 package-lock.json
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
+
+# Uploads
+uploads/
