@@ -1990,10 +1990,34 @@ app.get("/api/login-logs", authenticate, requireRoles(["admin"]), async (req, re
 });
 
 // ============ ERROR HANDLING ============
+// Sanitize error messages to prevent secret leakage
+function sanitizeError(error) {
+  const message = error.message || "Internal server error";
+  // List of patterns that might contain secrets
+  const secretPatterns = [
+    /sk_live_[a-zA-Z0-9]+/g,
+    /sk_test_[a-zA-Z0-9]+/g,
+    /mongodb\+srv:\/\/[^@]+@/g,
+    /re_[a-zA-Z0-9]+/g,
+    /Bearer [a-zA-Z0-9._-]+/g
+  ];
+  
+  let sanitized = message;
+  for (const pattern of secretPatterns) {
+    sanitized = sanitized.replace(pattern, "[REDACTED]");
+  }
+  return sanitized;
+}
+
 app.use((err, req, res, next) => {
+  // Log the full error internally
   console.error("Unhandled error:", err);
-  res.status(err.status || 500).json({
-    detail: err.message || "Internal server error"
+  
+  // Return sanitized message to client
+  const statusCode = err.status || err.statusCode || 500;
+  res.status(statusCode).json({
+    detail: sanitizeError(err),
+    ...(process.env.NODE_ENV !== "production" && { stack: err.stack })
   });
 });
 
