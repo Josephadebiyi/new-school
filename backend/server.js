@@ -13,13 +13,76 @@ const Stripe = require("stripe");
 // Load environment variables
 require("dotenv").config();
 
+// ============ ENVIRONMENT VALIDATION ============
+const REQUIRED_ENV_VARS = [
+  "MONGO_URL",
+  "JWT_SECRET",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_PUBLIC_KEY"
+];
+
+const OPTIONAL_ENV_VARS = [
+  "RESEND_API_KEY",
+  "FRONTEND_URL",
+  "CORS_ORIGINS",
+  "ADMIN_EMAIL",
+  "APPLICATION_FEE_EUR",
+  "DB_NAME"
+];
+
+function validateEnvironment() {
+  const missing = [];
+  const warnings = [];
+  
+  for (const varName of REQUIRED_ENV_VARS) {
+    if (!process.env[varName]) {
+      missing.push(varName);
+    }
+  }
+  
+  for (const varName of OPTIONAL_ENV_VARS) {
+    if (!process.env[varName]) {
+      warnings.push(varName);
+    }
+  }
+  
+  if (missing.length > 0) {
+    console.error("========================================");
+    console.error("FATAL: Missing required environment variables:");
+    missing.forEach(v => console.error(`  - ${v}`));
+    console.error("========================================");
+    console.error("Please set these variables in your .env file or hosting environment.");
+    process.exit(1);
+  }
+  
+  if (warnings.length > 0) {
+    console.warn("Warning: Optional environment variables not set (using defaults):");
+    warnings.forEach(v => console.warn(`  - ${v}`));
+  }
+  
+  // Validate Stripe keys format
+  if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.startsWith("sk_")) {
+    console.error("FATAL: STRIPE_SECRET_KEY must start with 'sk_'");
+    process.exit(1);
+  }
+  
+  if (process.env.STRIPE_PUBLIC_KEY && !process.env.STRIPE_PUBLIC_KEY.startsWith("pk_")) {
+    console.error("FATAL: STRIPE_PUBLIC_KEY must start with 'pk_'");
+    process.exit(1);
+  }
+  
+  console.log("Environment validation passed");
+}
+
+validateEnvironment();
+
 const app = express();
 
-// Configuration with fallbacks
+// Configuration (no fallbacks for critical secrets)
 const PORT = process.env.PORT || 8001;
-const MONGO_URL = process.env.MONGO_URL || process.env.MONGO_URI || "";
+const MONGO_URL = process.env.MONGO_URL;
 const DB_NAME = process.env.DB_NAME || "gitb_lms";
-const JWT_SECRET = process.env.JWT_SECRET || "default-jwt-secret-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://gitb.lt";
 const CORS_ORIGINS = process.env.CORS_ORIGINS || "*";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "noreply@gitb.lt";
@@ -30,16 +93,19 @@ let stripe = null;
 let resend = null;
 
 try {
-  if (process.env.STRIPE_SECRET_KEY) {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  }
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  console.log("Stripe initialized successfully");
 } catch (err) {
-  console.warn("Stripe initialization failed:", err.message);
+  console.error("FATAL: Stripe initialization failed:", err.message);
+  process.exit(1);
 }
 
 try {
   if (process.env.RESEND_API_KEY) {
     resend = new Resend(process.env.RESEND_API_KEY);
+    console.log("Resend initialized successfully");
+  } else {
+    console.warn("Resend not configured - emails will be disabled");
   }
 } catch (err) {
   console.warn("Resend initialization failed:", err.message);
