@@ -2131,9 +2131,27 @@ process.on("unhandledRejection", (err) => {
 });
 
 process.on("SIGTERM", async () => {
-  console.log("SIGTERM received, shutting down...");
+  console.log("SIGTERM received, shutting down gracefully...");
   if (mongoClient) {
-    await mongoClient.close();
+    try {
+      await mongoClient.close();
+      console.log("MongoDB connection closed");
+    } catch (err) {
+      console.error("Error closing MongoDB:", err);
+    }
+  }
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("SIGINT received, shutting down gracefully...");
+  if (mongoClient) {
+    try {
+      await mongoClient.close();
+      console.log("MongoDB connection closed");
+    } catch (err) {
+      console.error("Error closing MongoDB:", err);
+    }
   }
   process.exit(0);
 });
