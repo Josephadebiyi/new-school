@@ -38,3 +38,7 @@ package-lock.json
 
 # Uploads
 uploads/
+-e 
+# Environment files
+*.env
+*.env.*
