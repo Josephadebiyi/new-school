@@ -207,39 +207,6 @@ app.get("/api/config", (req, res) => {
   });
 });
 
-// ============ ROUTE ALIASING FOR FLEXIBLE DEPLOYMENT ============
-// This middleware allows routes to work with or without /api prefix
-// Useful for different hosting configurations (Hostinger, Render, etc.)
-app.use((req, res, next) => {
-  // If the path doesn't start with /api but matches an API route pattern, redirect internally
-  const apiPatterns = [
-    '/applications',
-    '/auth',
-    '/courses',
-    '/users',
-    '/dashboard',
-    '/enrollments',
-    '/tuition',
-    '/roles',
-    '/login-logs',
-    '/system-config',
-    '/config',
-    '/admin',
-    '/my-courses',
-    '/webhooks'
-  ];
-  
-  if (!req.path.startsWith('/api')) {
-    for (const pattern of apiPatterns) {
-      if (req.path.startsWith(pattern) || req.path === pattern) {
-        req.url = '/api' + req.url;
-        break;
-      }
-    }
-  }
-  next();
-});
-
 // ============ AUTH MIDDLEWARE ============
 const authenticate = async (req, res, next) => {
   try {
