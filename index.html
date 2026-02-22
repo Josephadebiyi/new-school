@@ -7,14 +7,171 @@
   <meta name="description" content="Europe's Best Innovative Online School"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <title>GITB - Global Institute of Tech & Business</title>
+  
+  <!-- Critical Error Recovery Styles -->
+  <style>
+    .gitb-crash-recovery {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: white;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      z-index: 999999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .gitb-crash-recovery.show { display: flex; }
+    .gitb-crash-recovery h2 { color: #e94560; margin-bottom: 16px; font-size: 24px; }
+    .gitb-crash-recovery p { color: #ccc; margin-bottom: 24px; max-width: 400px; }
+    .gitb-crash-recovery button {
+      padding: 14px 28px;
+      background: #3d7a4a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .gitb-crash-recovery button:hover { background: #4a9559; }
+    .gitb-crash-recovery .secondary-btn {
+      background: transparent;
+      border: 1px solid #666;
+      margin-top: 12px;
+    }
+    .gitb-crash-recovery .secondary-btn:hover { background: rgba(255,255,255,0.1); }
+    
+    /* Loading spinner */
+    .gitb-loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 99998;
+    }
+    .gitb-loading.hidden { display: none; }
+    .gitb-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #3d7a4a;
+      border-radius: 50%;
+      animation: gitb-spin 0.8s linear infinite;
+    }
+    .gitb-loading p { color: #888; margin-top: 20px; font-family: 'Inter', sans-serif; }
+    @keyframes gitb-spin { to { transform: rotate(360deg); } }
+  </style>
+  
+  <!-- Safe Stripe Wrapper - Load BEFORE main app -->
+  <script src="/static/js/safe-stripe.js"></script>
+  
+  <!-- Stripe.js - Load async -->
   <script src="https://js.stripe.com/v3/" async></script>
+  
+  <!-- Main App -->
   <script defer="defer" src="/static/js/main.549fbcc6.js"></script>
   <link href="/static/css/main.66997efd.css" rel="stylesheet"/>
 </head>
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
+  
+  <!-- Loading Screen -->
+  <div id="gitb-loading" class="gitb-loading">
+    <div class="gitb-spinner"></div>
+    <p>Loading...</p>
+  </div>
+  
+  <!-- Crash Recovery UI (hidden by default) -->
+  <div id="gitb-crash" class="gitb-crash-recovery">
+    <h2>Something went wrong</h2>
+    <p>The application encountered an error. This might be due to cached data or a temporary issue.</p>
+    <button onclick="gitbClearAndReload()">Clear Cache & Reload</button>
+    <button class="secondary-btn" onclick="location.reload()">Try Again</button>
+  </div>
+  
+  <!-- React App Root -->
   <div id="root"></div>
+  
+  <!-- Critical Error Handler -->
+  <script>
+    (function() {
+      var crashCount = 0;
+      var maxCrashes = 3;
+      var loadingEl = document.getElementById('gitb-loading');
+      var crashEl = document.getElementById('gitb-crash');
+      var rootEl = document.getElementById('root');
+      
+      // Track crashes in sessionStorage
+      try {
+        crashCount = parseInt(sessionStorage.getItem('gitb_crash_count') || '0');
+      } catch(e) {}
+      
+      // Show crash UI function
+      window.gitbShowCrash = function() {
+        if (crashEl) crashEl.classList.add('show');
+        if (loadingEl) loadingEl.classList.add('hidden');
+      };
+      
+      // Clear and reload function
+      window.gitbClearAndReload = function() {
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+        } catch(e) {}
+        location.href = location.pathname;
+      };
+      
+      // Hide loading when app renders
+      var checkLoaded = setInterval(function() {
+        if (rootEl && rootEl.children.length > 0) {
+          if (loadingEl) loadingEl.classList.add('hidden');
+          // Reset crash count on successful load
+          try { sessionStorage.setItem('gitb_crash_count', '0'); } catch(e) {}
+          clearInterval(checkLoaded);
+        }
+      }, 100);
+      
+      // Timeout - if app doesn't load in 15 seconds
+      setTimeout(function() {
+        clearInterval(checkLoaded);
+        if (rootEl && rootEl.children.length === 0) {
+          console.error('[GITB] App failed to render');
+          crashCount++;
+          try { sessionStorage.setItem('gitb_crash_count', crashCount.toString()); } catch(e) {}
+          
+          if (crashCount >= maxCrashes) {
+            // Auto-clear on repeated crashes
+            window.gitbClearAndReload();
+          } else {
+            window.gitbShowCrash();
+          }
+        }
+      }, 15000);
+      
+      // Catch fatal errors
+      window.onerror = function(msg, url, line, col, error) {
+        console.error('[GITB] Error:', msg, url, line);
+        // Only show crash UI for truly fatal errors after timeout
+        return false;
+      };
+      
+    })();
+  </script>
 </body>
 </html>
