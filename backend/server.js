@@ -1303,10 +1303,13 @@ app.post("/api/applications/create", async (req, res) => {
 
     await db.collection("applications").insertOne(application);
 
+    // Wrap in `data` object - frontend expects response.data.checkout_url
     res.json({
-      checkout_url: session.url,
-      session_id: session.id,
-      application_id: applicationId
+      data: {
+        checkout_url: session.url,
+        session_id: session.id,
+        application_id: applicationId
+      }
     });
   } catch (error) {
     console.error("Create application error:", error);
@@ -1701,12 +1704,15 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       { $set: { stripe_session_id: session.id } }
     );
 
+    // Wrap in `data` object - frontend expects response.data.checkout_url
     res.json({
-      checkout_url: session.url,
-      session_id: session.id,
-      enrollment_id: enrollment.id,
-      course_title: course.title,
-      amount: course.price
+      data: {
+        checkout_url: session.url,
+        session_id: session.id,
+        enrollment_id: enrollment.id,
+        course_title: course.title,
+        amount: course.price
+      }
     });
   } catch (error) {
     console.error("Create tuition payment error:", error);
