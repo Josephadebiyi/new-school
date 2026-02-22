@@ -191,12 +191,15 @@ app.use((req, res, next) => {
     '/roles',
     '/login-logs',
     '/system-config',
-    '/config'
+    '/config',
+    '/admin',
+    '/my-courses',
+    '/webhooks'
   ];
   
   if (!req.path.startsWith('/api')) {
     for (const pattern of apiPatterns) {
-      if (req.path.startsWith(pattern)) {
+      if (req.path.startsWith(pattern) || req.path === pattern) {
         req.url = '/api' + req.url;
         break;
       }
