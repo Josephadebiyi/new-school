@@ -2095,12 +2095,27 @@ app.use((req, res) => {
 // ============ START SERVER ============
 async function startServer() {
   try {
+    console.log(`Starting server on port ${PORT}...`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    
     await connectDB();
     
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Database: ${db ? "connected" : "not connected"}`);
+    // Use 0.0.0.0 to bind to all interfaces (required for Render/Docker)
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`✓ Server running on port ${PORT}`);
+      console.log(`✓ Database: ${db ? "connected" : "not connected"}`);
+      console.log(`✓ Stripe: ${stripe ? "initialized" : "not initialized"}`);
+      console.log(`✓ Resend: ${resend ? "initialized" : "disabled"}`);
     });
+
+    // Graceful shutdown handling
+    server.on('error', (err) => {
+      console.error('Server error:', err);
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use`);
+      }
+    });
+
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
