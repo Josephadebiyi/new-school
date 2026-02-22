@@ -205,9 +205,18 @@ February 22, 2026
 - MongoDB Atlas is the production database
 - **FIXED (Feb 22):** White Screen of Death on payment - changed backend response format from `{ checkout_url: ... }` to `{ data: { checkout_url: ... } }` to match frontend expectations
 - **FIXED (Feb 22):** Removed fragile `safe-stripe.js` injection from `index.html`
-- **NOTE:** Stripe API key has expired in preview environment - user needs to update keys in their Hostinger deployment
+- **FIXED (Feb 22):** Updated Stripe API key to new live key
+- **FIXED (Feb 22):** Added Render/deployment stability improvements:
+  - Health check endpoints (`/health`, `/api/health`)
+  - MongoDB connection pooling with proper options
+  - Graceful shutdown handling (SIGTERM, SIGINT)
+  - Better startup logging
+- **FIXED (Feb 22):** Changed enrollment text to "Now Enrolling for 2025 Cohort 2026"
+- **NOTE:** Login notification email is intentionally DISABLED per user request. All other emails (welcome, password reset, password changed) are active.
 
-## Deployment Files to Update on Hostinger
+## Deployment Files to Update on Hostinger/Render
 After this session, deploy these updated files:
-1. `/app/backend/server.js` - Contains the fixed payment response format
-2. `/app/index.html` - Cleaned up (removed injected scripts)
+1. `/app/backend/server.js` - Contains payment fix, health checks, connection pooling
+2. `/app/backend/.env` - Updated Stripe key (copy the key value, not the file)
+3. `/app/index.html` - Cleaned up (removed injected scripts)
+4. `/app/static/js/main.549fbcc6.js` - Updated enrollment text
