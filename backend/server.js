@@ -119,6 +119,38 @@ app.use(cors({
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// ============ ROUTE ALIASING FOR FLEXIBLE DEPLOYMENT ============
+// This middleware allows routes to work with or without /api prefix
+// Must be placed BEFORE all route definitions
+app.use((req, res, next) => {
+  const apiPatterns = [
+    '/applications',
+    '/auth',
+    '/courses',
+    '/users',
+    '/dashboard',
+    '/enrollments',
+    '/tuition',
+    '/roles',
+    '/login-logs',
+    '/system-config',
+    '/config',
+    '/admin',
+    '/my-courses',
+    '/webhooks'
+  ];
+  
+  if (!req.path.startsWith('/api')) {
+    for (const pattern of apiPatterns) {
+      if (req.path.startsWith(pattern) || req.path === pattern) {
+        req.url = '/api' + req.url;
+        break;
+      }
+    }
+  }
+  next();
+});
+
 // Trust proxy for IP detection
 app.set("trust proxy", true);
 
