@@ -196,11 +196,18 @@ All endpoints are functional and tested:
 ---
 
 ## Last Updated
-February 19, 2026
+February 22, 2026
 
 ## Session Notes
 - Backend migration from Python/FastAPI to Node.js/Express completed
 - All backend tests passing (100% success rate)
 - Frontend is pre-built (no React source available for modifications)
 - MongoDB Atlas is the production database
-- "Dashboard failed to load" likely caused by incorrect API URL in frontend build
+- **FIXED (Feb 22):** White Screen of Death on payment - changed backend response format from `{ checkout_url: ... }` to `{ data: { checkout_url: ... } }` to match frontend expectations
+- **FIXED (Feb 22):** Removed fragile `safe-stripe.js` injection from `index.html`
+- **NOTE:** Stripe API key has expired in preview environment - user needs to update keys in their Hostinger deployment
+
+## Deployment Files to Update on Hostinger
+After this session, deploy these updated files:
+1. `/app/backend/server.js` - Contains the fixed payment response format
+2. `/app/index.html` - Cleaned up (removed injected scripts)
