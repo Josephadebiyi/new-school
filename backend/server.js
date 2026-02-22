@@ -190,6 +190,25 @@ app.get("/", (req, res) => {
   res.send("Server is running");
 });
 
+// Health check endpoint for Render/deployment platforms
+app.get("/health", (req, res) => {
+  res.status(200).json({ 
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    database: db ? "connected" : "disconnected",
+    uptime: process.uptime()
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ 
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    database: db ? "connected" : "disconnected",
+    uptime: process.uptime()
+  });
+});
+
 app.get("/api", (req, res) => {
   res.json({ 
     status: "ok", 
