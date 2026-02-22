@@ -157,7 +157,7 @@ app.set("trust proxy", true);
 // Static files
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Database connection
+// Database connection with connection pooling
 let db = null;
 let mongoClient = null;
 
@@ -168,10 +168,20 @@ async function connectDB() {
   }
 
   try {
-    mongoClient = new MongoClient(MONGO_URL);
+    // MongoDB connection with pooling options for stability
+    mongoClient = new MongoClient(MONGO_URL, {
+      maxPoolSize: 10,           // Maximum connections in pool
+      minPoolSize: 2,            // Minimum connections to keep open
+      maxIdleTimeMS: 30000,      // Close idle connections after 30 seconds
+      connectTimeoutMS: 10000,   // Connection timeout
+      socketTimeoutMS: 45000,    // Socket timeout
+      serverSelectionTimeoutMS: 10000,  // Server selection timeout
+      retryWrites: true,
+      retryReads: true
+    });
     await mongoClient.connect();
     db = mongoClient.db(DB_NAME);
-    console.log("Connected to MongoDB successfully");
+    console.log("Connected to MongoDB successfully with connection pooling");
     return db;
   } catch (error) {
     console.error("MongoDB connection error:", error.message);
