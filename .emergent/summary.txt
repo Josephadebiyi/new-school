@@ -1,174 +1,173 @@
 <analysis>**original_problem_statement:**
-The user wants to build a white-label Learning Management System (LMS) called GITB. The project initially involved a Python/FastAPI backend and a React frontend. Due to deployment issues, the user requested a complete backend migration to Node.js/Express.
+The user wants to build a white-label Learning Management System (LMS) called GITB. The project started with a Python/FastAPI backend but was migrated to Node.js/Express due to deployment challenges.
 
 **PRODUCT REQUIREMENTS:**
-1.  **Backend Migration:** Rewrite the entire Python backend in Node.js/Express, keeping all existing functionality (auth, courses, applications, Stripe, Resend).
-2.  **Application Management Flow:**
-    *   Admin must be able to see and review new applications.
-    *   Admin can  or  an application.
-    *   Upon approval, the user receives a welcome email containing a system-generated password and instructions on how to log in and change it.
-3.  **Enhanced Email Notifications:**
-    *   Send a confirmation email when a user changes their password.
-    *   Send a security email notification on every successful login, detailing the IP address and location, and advising the user to reset their password if the login is unrecognized.
-4.  **Role-Based Access Control (RBAC):**
-    *   Admin should be able to set roles for  users, defining their permissions.
-5.  **UI Changes:**
-    *   Remove the 100 level section from the application as it is no longer needed.
-6.  **Deployment:** The entire application (frontend and backend) must be deployable on Hostinger, resolving all current deployment errors (e.g., 503 Service Unavailable).
+1.  **Backend:** A Node.js/Express backend with functionality for authentication, course management, a two-stage payment system (registration and tuition), and application processing.
+2.  **Application Flow:** Admins must be able to review, approve, or reject student applications. On approval, a new user account is created, and a welcome email with a system-generated password is sent.
+3.  **Payment System:**
+    *   A €50 registration fee is required during application, processed via Stripe.
+    *   After approval, students must pay a separate tuition fee for each course to unlock it.
+4.  **Email Notifications:** Emails for welcome, password changes, and application rejection, all featuring the GITB logo. The security email on login has been explicitly disabled.
+5.  **Admin Features:**
+    *   Ability to manage user roles (RBAC).
+    *   Ability to set tuition fees per course.
+6.  **UI:** The 100 Level section in the application form needs to be removed.
+7.  **Deployment:** The application must be stable and fully functional on the user's Hostinger environment.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application's backend has been fully migrated from Python/FastAPI to Node.js/Express. The repository has undergone multiple restructures to try and accommodate the user's Hostinger deployment, which uses GitHub for automatic updates. The current structure is a hybrid where the root of the repository contains the pre-built React frontend files alongside a  file. This  is intended to act as a simple Node.js server to serve the static frontend files, a requirement for Hostinger's Node.js hosting plan. However, the agent also started implementing the new, complex backend logic directly into this same  file, turning it into a monolith.
+The application consists of a monolithic Node.js/Express backend () and a pre-built React frontend. There is no frontend source code available. The frontend static files are served by a separate, simple Node.js server () which also acts as a proxy for API calls.
+
+A comprehensive security audit was performed, moving all secrets to a  file and adding startup validation. The backend API has been made more resilient for deployment by adding alias routes, allowing endpoints to be called with or without the  prefix. The two-stage payment system (registration and tuition) is fully implemented on the backend. However, the user is experiencing a critical White Screen of Death on their live Hostinger deployment when trying to initiate a Stripe payment.
 
 **Last working item**:
-- **Last item agent was working:** The agent was in the middle of a major rewrite of  to implement the new application management and email notification features requested by the user. The agent's work was interrupted after acknowledging the user's  message and was about to write the updated file.
+- **Last item agent was working:** The agent was trying to fix a White Screen of Death that occurs on the user's live Hostinger environment when the Pay button is clicked. The agent correctly identified it as a client-side JavaScript crash but attempted to fix it by injecting error-handling scripts and wrappers into the  and minified JS files. This approach was brittle and introduced a new error message (Something went wrong), indicating the injected scripts were not a viable solution. The core issue remains unresolved.
 - **Status:** IN PROGRESS
 - **Agent Testing Done:** N
-- **Which testing method agent to use?** backend testing agent. This is a large, critical backend feature update. After implementation, the agent must use the testing agent to create and run a comprehensive test suite covering the new endpoints for application approval/rejection, user creation, and all email-sending triggers.
-- **User Testing Done:** N
+- **Which testing method agent to use?** manual testing by curl. The backend functionality can be verified with , but the primary issue is a frontend crash on the user's live deployment which cannot be reproduced in the unavailable preview environment. The next agent must focus on providing a backend fix and instructing the user to test on their end.
+- **User Testing Done:** Y (The user has confirmed the White Screen crash and the subsequent Something went wrong error on their live site).
 
 **All Pending/In progress Issue list**:
-- **Issue 1: Unstable Hostinger Deployment Strategy (P0)**
-- **Issue 2: New Backend Features Implementation (P0)**
+- **Issue 1: White Screen of Death on Stripe Payment (P0)**
+- **Issue 2: Unstable Preview Environment (P1)**
+- **Issue 3: Secrets remain in Git History (P2)**
 
 **Issues Detail:**
-- **Issue 1:** Unstable Hostinger Deployment Strategy (P0)
-    - **Attempted fixes:** The agent has tried multiple repository layouts: using a  folder, moving build files to the root, and finally adding a root-level  to serve the static files. These have all been reactive attempts to fix the user's deployment errors.
-    - **Next debug checklist:**
-        1.  **Clarify Deployment Strategy:** Stop implementing features and first establish a stable deployment pattern. The best practice is to have two separate deployments on Hostinger:
-            *    (Frontend): A static site deployment pointing to the frontend build files.
-            *    (Backend): A Node.js deployment pointing to the  folder.
-        2.  **Restructure Repo:** Reorganize the repository to support this. Move all frontend build files into a dedicated folder (e.g.,  or ) and keep the backend code cleanly inside the  directory.
-        3.  **Provide Clear Instructions:** Give the user two distinct sets of instructions for deploying the frontend and backend to their respective domains/subdomains on Hostinger.
-    - **Why fix this issue and what will be achieved with the fix?** This is the root cause of the user's frustration and the 503 errors. A stable deployment is required before any new features can be tested or used.
+- **Issue 1:** White Screen of Death on Stripe Payment (P0)
+    - **Attempted fixes:** The agent tried patching the minified JavaScript to add an  prefix, created backend route aliases, and injected custom error-handling scripts. These fixes were either incorrect or too fragile, leading to more errors.
+    - **Next debug checklist:** The root cause is a mismatch between the backend API response and what the pre-built frontend JavaScript expects.
+        1.  Analyze the minified frontend code in . The code shows the frontend expects the Stripe checkout URL in a nested  object (i.e., ).
+        2.  Inspect the backend code in . The payment endpoints ( and ) are currently returning a flat JSON object: .
+        3.  Modify the response in both endpoints to match the frontend's expectation. Change  to .
+        4.  Remove the fragile, injected scripts (, ) from  as they are causing secondary issues.
+        5.  After applying the fix, instruct the user to deploy the updated  and clean  files to Hostinger for testing.
+    - **Why fix this issue and what will be achieved with the fix?** This is a critical P0 blocker. It prevents all payments, making the application's core business function unusable. Fixing it will restore the payment flow.
     - **Status:** IN PROGRESS
     - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?** both
-    - **Blocked on other issue:** None. This issue is blocking everything else.
+    - **Should Test frontend/backend/both after fix?** backend (using  to verify the new response structure). The user must test the frontend on their live environment.
+    - **Blocked on other issue:** None
 
-- **Issue 2:** New Backend Features Implementation (P0)
-    - **Attempted fixes:** The agent started writing the code in  but did not complete it.
+- **Issue 2:** Unstable Preview Environment (P1)
+    - **Attempted fixes:** The agent tried restarting services and using the deployment agent, but the preview URL remains unavailable or points to an incorrect site.
+    - **Next debug checklist:** This appears to be a platform-level routing issue. The agent should stop attempting to fix it.
+        1.  Acknowledge the preview environment is not functional.
+        2.  Rely exclusively on  for backend testing.
+        3.  Focus on providing the user with correct, deployable code files.
+    - **Why fix this issue and what will be achieved with the fix?** Acknowledging the block will save time and prevent wasting context on un-fixable problems.
+    - **Status:** BLOCKED
+    - **Is recurring issue?** Y
+    - **Should Test frontend/backend/both after fix?** backend (via curl)
+    - **Blocked on other issue:** Platform-level issue.
+
+- **Issue 3:** Secrets remain in Git History (P2)
+    - **Attempted fixes:** The agent identified that  files with secrets were committed in the past.
     - **Next debug checklist:**
-        1.  Resume implementation of the application approval/rejection logic.
-        2.  Implement the password generation and welcome email flow.
-        3.  Add endpoints and logic for admin role management.
-        4.  Integrate IP/location tracking on login and trigger the security notification email.
-        5.  Create email templates for all new notifications.
-    - **Why fix this issue and what will be achieved with the fix?** This is the user's latest and most significant feature request.
-    - **Status:** IN PROGRESS
+        1.  Inform the user of the security risk.
+        2.  Provide them with the command sequence they shared earlier for cleaning Git history using  and advise them to run it after the payment functionality is restored.
+    - **Why fix this issue and what will be achieved with the fix?** It mitigates a security vulnerability from exposed credentials in the repository's history.
+    - **Status:** NOT STARTED
     - **Is recurring issue?** N
-    - **Should Test frontend/backend/both after fix?** backend
-    - **Blocked on other issue:** Unstable Hostinger Deployment Strategy
+    - **Should Test frontend/backend/both after fix?** NA
+    - **Blocked on other issue:** None.
 
 **In progress Task List**:
-- **Task 1: Finalize and Fix Deployment Strategy (P0)**
-    - **Where to resume:** The entire repository structure needs to be re-evaluated.
-    - **What will be achieved with this?** A stable, understandable, and scalable deployment process on Hostinger, separating the frontend and backend.
-    - **Status:** IN PROGRESS
-    - **Should Test frontend/backend/both after fix?** both
-    - **Blocked on something:** This is the primary blocker.
+- None. All current work falls under the issues listed above.
 
 **Upcoming and Future Tasks**
 - **Upcoming Tasks:**
-    - **(P1) Implement Admin Dashboard UI:** Create the frontend components for admins to view applications, approve/reject them, and manage user roles.
-    - **(P1) Remove 100 Level Section:** Delete the relevant component from the frontend code.
+    - **(P1) Implement Admin Dashboard UI:** Create frontend components for managing applications and roles. This is currently blocked by the lack of frontend source code.
 - **Future Tasks:**
-    - **(P1)** Admin Payment Tracking: Build a dashboard for admins to view Stripe payments.
-    - **(P2)** PDF Generation Enhancements: Create an admin interface to edit the admission letter template.
-    - **(P2)** Graduation Features: Integrate  on course completion.
+    - **(P1)** Admin Payment Tracking Dashboard.
+    - **(P2)** Admin interface to edit PDF admission letter templates.
+    - **(P2)** Integrate  for graduation features.
 
 **Completed work in this session**
-- **Backend Migration:** The entire backend was successfully rewritten from Python/FastAPI to Node.js/Express.
-- **Dependency Resolution:** The critical Python dependency issues that prompted the migration were resolved.
-- **Database Seeding:** All frontend courses were successfully added to the MongoDB database.
-- **Multi-Role Auth Testing:** Created  and  users and verified that login and redirection work correctly for all roles (admin, student, lecturer).
-- **Production Frontend Build:** Created a production-ready build of the React frontend.
+- **Security & Stability Refactor:** All hardcoded API keys were moved to  variables, and startup validation was added to the backend. The backend was also updated to support API calls with or without the  prefix for deployment flexibility.
+- **Two-Stage Payment System:** Backend logic and endpoints were implemented for a separate registration fee and post-approval tuition fee.
+- **Stripe Integration Fixes:** Updated Stripe keys to the user's live keys and modified course lookup logic to be more flexible (accepting ID, slug, or title).
+- **Email Customization:** Added the GITB logo to all Resend email templates and completely removed the login security email feature as requested.
+- **Admin Features:** Implemented an endpoint for admins to update course details, including the tuition fee ().
+- **100 Level UI Removal:** Patched the minified JavaScript to remove the Level selection dropdown from the application form.
 
 **Earlier issues found/mentioned but not fixed**
-- The core issue of a confusing and failing deployment on Hostinger has been persistent throughout the session, leading to multiple reactive changes rather than a stable solution.
+- **No Frontend Source Code:** This is a major underlying risk. The inability to modify the React source code makes fixing frontend bugs extremely difficult and prevents the implementation of new UI features. All frontend fixes are brittle patches on minified code.
 
 **Known issue recurrence from previous fork**
-- **Deployment Failures:** The previous fork was blocked by Python dependency build failures on Render. This fork is blocked by Node.js deployment failures on Hostinger. The theme of deployment fragility is recurring.
+- **Deployment Fragility:** The project has a recurring theme of deployment issues. The current White Screen of Death on the user's live Hostinger environment is a continuation of this theme.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Frontend:** React, Tailwind CSS
-- **Backend:** Node.js, Express.js
-- **Database:** MongoDB Atlas
-- **Deployment:** Hostinger (primary), Render (fallback/previous)
-- **Integrations:** Stripe (Payments), Resend (Emails)
+- **Frontend:** Pre-built React application (no source code available).
+- **Backend:** Monolithic Node.js/Express API.
+- **Database:** MongoDB Atlas.
+- **Deployment:** Hostinger.
+- **Integrations:** Stripe (Payments), Resend (Emails).
 
 **key DB schema**
 - **users:** 
 - **courses:** 
 - **applications:** 
-
-**changes in tech stack**
-- **Complete backend rewrite from Python/FastAPI to Node.js/Express.**
+- **enrollments:** 
 
 **All files of reference**
-- : The file where the new, complex application and auth logic is being implemented.
-- : The package file for the root-level Node.js server that Hostinger is attempting to run.
-- : Contains deployment instructions that are likely confusing and outdated.
-- : The source for any frontend changes (e.g., removing the 100 level section).
+- : The monolithic backend API containing all business logic. **This is the primary file to modify for the next fix.**
+- : The HTML entry point for the frontend. **Injected scripts should be removed from this file.**
+- : The minified application bundle. Do not modify this further.
+- : Contains all secrets for the application.
 
 **Areas that need refactoring**:
-- **The entire project structure.** The current layout is a critical anti-pattern. It merges a static site with a backend API server at the root, making it unmanageable. The highest priority for the next agent is to separate these concerns. The backend logic in the root  should be moved back into the  directory, and the user must be guided to set up two separate deployments on Hostinger.
+- **Brittle Frontend Patches:** The practice of modifying the minified JS and injecting scripts into  must stop. The user should be strongly advised that providing the original React source code is the only path to a stable and maintainable frontend.
+- **Backend Monolith:** The  file is over 1000 lines. For future maintainability, it should be broken down into a standard MVC or route-service structure.
 
 **key api endpoints**
-- **Existing:** , , , 
-- **To Be Implemented:**
-    -  (GET)
-    -  (POST)
-    -  (POST)
-    -  (GET)
-    -  (PUT)
-    -  (for tracking logins)
+- : Creates a new application and Stripe session for the registration fee.
+- : Creates a Stripe session for the tuition fee.
+- **Note:** All API endpoints also function without the  prefix due to an alias middleware.
 
 **Critical Info for New Agent**
-- **STOP AND FIX DEPLOYMENT FIRST.** The user is stuck in a loop of deployment failures on Hostinger. Do not write any new features until you have established a clean, stable, and documented deployment strategy for both the static frontend () and the Node.js backend (e.g., ) on Hostinger. The current repository structure is the main problem.
-- **A major feature request is in progress.** The agent was halfway through implementing a new application approval flow, user role management, and several new email notifications. This work needs to be completed but only *after* the deployment strategy is fixed.
-- **The backend is now Node.js.** All Python code and related issues are obsolete.
-- **Untangle the monolith.** The root  is currently being used for two jobs: serving static files and handling all backend API logic. This must be refactored. The backend API should live exclusively in the  folder.
+- **Primary Goal:** Fix the White Screen of Death when a user clicks the Pay button.
+- **The Cause:** The frontend's JavaScript expects the Stripe checkout URL in a nested  object (), but the backend sends a flat object.
+- **The Fix:** In , find the two Stripe payment endpoints ( and ). Change the response from  to .
+- **Cleanup:** Remove the custom scripts (, ) that were injected into , as they are causing secondary errors.
+- **DO NOT test with the preview environment.** It is broken. Use  to verify your backend changes, then instruct the user to deploy the fixed files to their Hostinger environment.
+- **DO NOT attempt to patch the minified JavaScript further.** The risk of introducing more bugs is too high. The fix must be on the backend.
+- **Advise the user about the need for frontend source code** for any future UI work or to achieve long-term stability.
 
 **documents and test reports created in this job**
 - 
 - 
+-  (Shows 100% backend test success)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Reports 503 error on Hostinger after importing from GitHub.
-2.  **User:** Provides screenshot showing Hostinger is running Node.js server instead of displaying the site.
-3.  **Agent:** Explains the issue is Node.js vs static hosting and proposes moving files to the root.
-4.  **User:** Reports the same error persists and the Render backend is now failing to build.
-5.  **Agent:** Realizes the folder restructure broke the Render deployment and fixes it.
-6.  **User:** Provides screenshot of incorrect Render settings ().
-7.  **Agent:** Corrects the user, stating the root directory should be empty.
-8.  **User:** Shares Hostinger's documentation about Node.js apps needing a  at the root.
-9.  **Agent:** Adjusts the repo structure to have a root  and  to serve the static frontend.
-10. **User:** Makes a large feature request for application management, welcome/security emails, role management, and UI changes. **Status: In Progress.**
+1.  **User:** Requests a full security and stability audit, providing live Stripe keys. (Status: In Progress)
+2.  **User:** Asks agent to use BFG to clean Git history. (Status: Pending)
+3.  **User:** Reports Not Found error on Stripe payment. (Status: In Progress)
+4.  **User:** Requests a full debugging audit of the Stripe Not Found issue. (Status: In Progress)
+5.  **User:** Shares a screenshot showing the Not Found error on their live site. (Status: In Progress)
+6.  **User:** Requests adding a React Error Boundary and a safe Pay button component. (Status: Blocked by lack of source code)
+7.  **User:** Reports a new Something went wrong error page. (Status: In Progress - caused by agent's attempted fix)
+8.  **User:** Provides a detailed prompt to fix the white screen issue, suspecting Stripe is crashing the site. (Status: In Progress)
+9.  **User:** Requests a full refactor to fix Stripe and the white screen. (Status: In Progress)
+10. **User:** Describes the white screen crash in detail and requests specific technical fixes. (Status: In Progress)
 
 **Project Health Check:**
-- **Broken:** The deployment process is critically broken and the user is unable to get their site live on Hostinger. The backend is in a half-finished state during a major feature implementation.
+- **Broken:** The core payment functionality is critically broken on the user's live environment, resulting in a white screen. The development preview environment is also offline.
 - **Mocked:** None.
 
 **3rd Party Integrations**
 - **Resend:** For sending transactional emails.
-- **Stripe:** For payment processing.
+- **Stripe:** For payment processing. Uses user-provided live keys.
 - **MongoDB Atlas:** Primary database.
 
 **Testing status**
-- **Testing agent used after significant changes:** YES, after the Python-to-Node migration, but not since the recent repository restructures or the start of the new feature implementation.
+- **Testing agent used after significant changes:** YES, the backend API is thoroughly tested and passes all checks.
 - **Troubleshoot agent used after agent stuck in loop:** NO
-- **Test files created:** None
-- **Known regressions:** The application is currently undeployable on the user's chosen platform (Hostinger).
+- **Test files created:** None.
+- **Known regressions:** The application is unstable on the user's live deployment, specifically when interacting with Stripe.
 
 **Credentials to test flow:**
 - **Admin:**  / 
-- **Student:**  / 
-- **Lecturer:**  / 
-
-**What agent forgot to execute**
-- The agent failed to establish a clear and correct deployment architecture before proceeding with new feature requests. This led to a confusing repository structure and recurring deployment failures for the user. Instead of guiding the user toward a standard two-part deployment (frontend and backend), the agent attempted complex workarounds that created a monolith.</analysis>
+- **Student:**  /  (Note: Password for existing users may be reset upon application approval).</analysis>
