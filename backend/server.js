@@ -7,6 +7,30 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
+const fs = require("fs");
+
+// Multer storage config for document uploads
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const documentStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const documentUpload = multer({
+  storage: documentStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.webp', '.mp4', '.webm'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error('File type not allowed. Please upload an image, PDF, or common video format.'));
+  }
+});
 const { Resend } = require("resend");
 const Stripe = require("stripe");
 
@@ -33,19 +57,19 @@ const OPTIONAL_ENV_VARS = [
 function validateEnvironment() {
   const missing = [];
   const warnings = [];
-  
+
   for (const varName of REQUIRED_ENV_VARS) {
     if (!process.env[varName]) {
       missing.push(varName);
     }
   }
-  
+
   for (const varName of OPTIONAL_ENV_VARS) {
     if (!process.env[varName]) {
       warnings.push(varName);
     }
   }
-  
+
   if (missing.length > 0) {
     console.error("========================================");
     console.error("FATAL: Missing required environment variables:");
@@ -54,23 +78,23 @@ function validateEnvironment() {
     console.error("Please set these variables in your .env file or hosting environment.");
     process.exit(1);
   }
-  
+
   if (warnings.length > 0) {
     console.warn("Warning: Optional environment variables not set (using defaults):");
     warnings.forEach(v => console.warn(`  - ${v}`));
   }
-  
+
   // Validate Stripe keys format
   if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.startsWith("sk_")) {
     console.error("FATAL: STRIPE_SECRET_KEY must start with 'sk_'");
     process.exit(1);
   }
-  
+
   if (process.env.STRIPE_PUBLIC_KEY && !process.env.STRIPE_PUBLIC_KEY.startsWith("pk_")) {
     console.error("FATAL: STRIPE_PUBLIC_KEY must start with 'pk_'");
     process.exit(1);
   }
-  
+
   console.log("Environment validation passed");
 }
 
@@ -87,6 +111,23 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "https://gitb.lt";
 const CORS_ORIGINS = process.env.CORS_ORIGINS || "*";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "noreply@gitb.lt";
 const APPLICATION_FEE = parseFloat(process.env.APPLICATION_FEE_EUR || "50");
+
+// System Settings Cache (simple)
+let systemSettings = {
+  application_fee: APPLICATION_FEE,
+  admission_fee: 2500,
+  admission_letter_template: "Dear {{name}},\n\nCongratulations! You have been accepted into {{course}} at GITB Academy.\n\nBest regards,\nGITB Admissions"
+};
+
+const refreshSystemSettings = async () => {
+  if (!db) return;
+  const settings = await db.collection("system_settings").findOne({ type: "config" });
+  if (settings) {
+    systemSettings = { ...systemSettings, ...settings };
+  } else {
+    await db.collection("system_settings").insertOne({ type: "config", ...systemSettings });
+  }
+};
 
 // Initialize services
 let stripe = null;
@@ -137,25 +178,66 @@ app.use((req, res, next) => {
     '/config',
     '/admin',
     '/my-courses',
-    '/webhooks'
+    '/webhooks',
+    '/upload',
+    '/public'
   ];
-  
+
   if (!req.path.startsWith('/api')) {
-    for (const pattern of apiPatterns) {
-      if (req.path.startsWith(pattern) || req.path === pattern) {
-        req.url = '/api' + req.url;
-        break;
+    // Prevent rewriting browser navigation requests (HTML requests)
+    const isHtmlRequest = req.headers.accept && req.headers.accept.includes('text/html');
+    
+    if (!isHtmlRequest) {
+      for (const pattern of apiPatterns) {
+        if (req.path.startsWith(pattern) || req.path === pattern) {
+          console.log(`Rewriting ${req.path} to /api${req.url}`);
+          req.url = '/api' + req.url;
+          break;
+        }
       }
     }
   }
+  if (req.method === 'POST') console.log(`POST Request to: ${req.url}`);
   next();
 });
 
 // Trust proxy for IP detection
 app.set("trust proxy", true);
 
-// Static files
+// Static files (uploads)
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Generic File Upload Endpoint
+app.post("/api/upload", documentUpload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ detail: "No file uploaded" });
+    const fileUrl = `${req.protocol}://${req.get('host')}/api/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl, filename: req.file.filename });
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
+// ============ DOCUMENT UPLOAD ENDPOINT (Legacy Support) ============
+app.post("/api/upload/document", documentUpload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ detail: "No file uploaded" });
+    }
+    const fileUrl = `/api/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl, filename: req.file.filename });
+  } catch (error) {
+    console.error("Document upload error:", error);
+    res.status(500).json({ detail: error.message || "Upload failed" });
+  }
+});
+
+// Serve static frontend from the static directory
+app.use(express.static(path.join(__dirname, "..", "static")));
+// Also handle /static requests from index.html
+app.use("/static", express.static(path.join(__dirname, "..", "static")));
+// Serve images directory (now moved inside static)
+app.use("/images", express.static(path.join(__dirname, "..", "static", "images")));
 
 // Database connection with connection pooling
 let db = null;
@@ -202,7 +284,7 @@ app.get("/", (req, res) => {
 
 // Health check endpoint for Render/deployment platforms
 app.get("/health", (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     database: db ? "connected" : "disconnected",
@@ -211,7 +293,7 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     database: db ? "connected" : "disconnected",
@@ -220,8 +302,8 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api", (req, res) => {
-  res.json({ 
-    status: "ok", 
+  res.json({
+    status: "ok",
     message: "GITB LMS API is running",
     database: db ? "connected" : "disconnected"
   });
@@ -266,7 +348,7 @@ const authenticate = async (req, res, next) => {
           user.id = user._id.toString();
           delete user._id;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!user) {
@@ -281,6 +363,7 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error("Auth error:", error);
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({ detail: "Token expired" });
     }
@@ -303,7 +386,7 @@ const requireRoles = (allowedRoles) => {
 // ============ HELPER FUNCTIONS ============
 const getSystemConfig = async () => {
   if (!db) return { university_name: "GITB - Student LMS" };
-  
+
   let config = await db.collection("system_config").findOne({}, { projection: { _id: 0 } });
   if (!config) {
     config = {
@@ -336,11 +419,11 @@ const generatePassword = () => {
 };
 
 const getClientIP = (req) => {
-  return req.ip || 
-         req.headers["x-forwarded-for"]?.split(",")[0] || 
-         req.headers["x-real-ip"] || 
-         req.connection?.remoteAddress || 
-         "Unknown";
+  return req.ip ||
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.headers["x-real-ip"] ||
+    req.connection?.remoteAddress ||
+    "Unknown";
 };
 
 const getLocationFromIP = async (ip) => {
@@ -429,8 +512,8 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
         </div>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${FRONTEND_URL}/login" style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-            Login & Pay Tuition
+          <a href="${FRONTEND_URL}/student-login" style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Login to Student Portal
           </a>
         </div>
         
@@ -444,12 +527,37 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
       </div>
     </div>
   `;
-  
+
   return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html);
 };
 
 // Login notification email - DISABLED per user request
 // const sendLoginNotificationEmail = async (email, firstName, ip, location, timestamp) => { ... };
+
+// Application received confirmation email (sent after payment of application fee)
+const sendApplicationReceivedEmail = async (email, firstName, courseTitle) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      ${getEmailHeader("Application Received")}
+      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: #3d7a4a; margin-top: 0;">We've Received Your Application!</h2>
+        <p>Dear ${firstName},</p>
+        <p>Thank you for applying to <strong>${courseTitle}</strong> at the Global Institute of Tech and Business. Your application fee has been received and your application is now under review by our admissions team.</p>
+        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #3d7a4a;">
+          <h3 style="margin: 0 0 8px 0; color: #2d5a3a;">What Happens Next?</h3>
+          <ol style="margin: 0; padding-left: 20px; color: #444; line-height: 1.8;">
+            <li>Our admissions team will review your application and documents.</li>
+            <li>You will receive a decision by email within <strong>3–5 working days</strong>.</li>
+            <li>If approved, you'll receive your login credentials and next steps by email.</li>
+          </ol>
+        </div>
+        <p style="color: #555;">If you have any questions in the meantime, please don't hesitate to reach out to our admissions team at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
+        <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(email, `Application Received – ${courseTitle} | GITB`, html);
+};
 
 // Password change confirmation email
 const sendPasswordChangedEmail = async (email, firstName) => {
@@ -486,8 +594,67 @@ const sendPasswordChangedEmail = async (email, firstName) => {
       </div>
     </div>
   `;
-  
+
   return await sendEmail(email, `Your GITB Password Has Been Changed`, html);
+};
+
+const sendStaffWelcomeEmail = async (email, firstName, lastName, role, password) => {
+  const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+  const loginUrl = role === 'admin' ? `${FRONTEND_URL}/admin` : `${FRONTEND_URL}/login`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      ${getEmailHeader(`${roleLabel} Account Created`)}
+      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: #0B3B2C; margin-top: 0;">Welcome to GITB, ${firstName}!</h2>
+        <p>Dear ${firstName} ${lastName},</p>
+        <p>An account has been created for you at the <strong>Global Institute of Technology and Business</strong> with the role of <strong>${roleLabel}</strong>.</p>
+        <div style="background: #f0fdf4; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #0B3B2C;">
+          <h3 style="margin: 0 0 15px 0; color: #0B3B2C;">Your Login Credentials</h3>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 5px 0;"><strong>Password:</strong> <code style="background: #fff3e0; padding: 4px 10px; border-radius: 4px; color: #e65100; font-size: 15px;">${password}</code></p>
+          <p style="margin: 5px 0;"><strong>Role:</strong> ${roleLabel}</p>
+        </div>
+        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <p style="margin: 0; color: #e65100;"><strong>Action required:</strong> Please log in and change your password immediately for security.</p>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${loginUrl}" style="display: inline-block; padding: 15px 40px; background: #0B3B2C; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Login to GITB Portal
+          </a>
+        </div>
+        <p style="color: #666; font-size: 14px;">If you did not expect this email, please contact <a href="mailto:admissions@gitb.lt" style="color: #0B3B2C;">admissions@gitb.lt</a> immediately.</p>
+        <p style="color: #666; margin-bottom: 0;">Best regards,<br><strong>GITB Administration</strong></p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(email, `Welcome to GITB — Your ${roleLabel} Account`, html);
+};
+
+const sendCourseAssignmentEmail = async (teacher, course) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      ${getEmailHeader("Course Assignment")}
+      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: #0B3B2C; margin-top: 0;">You have been assigned to a course</h2>
+        <p>Dear ${teacher.first_name} ${teacher.last_name},</p>
+        <p>You have been assigned as the instructor for the following course on the GITB platform:</p>
+        <div style="background: #f0fdf4; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #0B3B2C;">
+          <h3 style="margin: 0 0 10px 0; color: #0B3B2C;">${course.title}</h3>
+          ${course.description ? `<p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">${course.description}</p>` : ''}
+          ${course.duration ? `<p style="margin: 8px 0 0 0; color: #555;"><strong>Duration:</strong> ${course.duration}</p>` : ''}
+        </div>
+        <p>You can now view enrolled students, upload course materials, manage quizzes, and more from your instructor portal.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${FRONTEND_URL}/teacher/dashboard" style="display: inline-block; padding: 15px 40px; background: #0B3B2C; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Open Instructor Portal
+          </a>
+        </div>
+        <p style="color: #666; font-size: 14px;">Questions? Contact <a href="mailto:admissions@gitb.lt" style="color: #0B3B2C;">admissions@gitb.lt</a></p>
+        <p style="color: #666; margin-bottom: 0;">Best regards,<br><strong>GITB Administration</strong></p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(teacher.email, `Course Assignment — ${course.title} | GITB`, html);
 };
 
 // ============ SYSTEM CONFIG ROUTES ============
@@ -511,6 +678,25 @@ app.put("/api/system-config", authenticate, requireRoles(["admin"]), async (req,
   } catch (error) {
     console.error("Update system config error:", error);
     res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// ============ NEWSLETTER ROUTES ============
+app.post("/api/newsletter/subscribe", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: "Valid email required" });
+    }
+    await db.collection("newsletter").updateOne(
+      { email },
+      { $set: { email, subscribed_at: new Date() } },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Newsletter subscribe error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -683,7 +869,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
     if (!user) {
       try {
         user = await db.collection("users").findOne({ _id: new ObjectId(resetRecord.user_id) });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!user) {
@@ -691,7 +877,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(new_password, 12);
-    
+
     await db.collection("users").updateOne(
       { $or: [{ id: resetRecord.user_id }, { _id: user._id }] },
       { $set: { password: hashedPassword, must_change_password: false } }
@@ -772,33 +958,33 @@ app.get("/api/auth/me", authenticate, async (req, res) => {
 app.get("/api/roles", authenticate, requireRoles(["admin"]), async (req, res) => {
   try {
     const roles = [
-      { 
-        id: "admin", 
-        name: "Administrator", 
+      {
+        id: "admin",
+        name: "Administrator",
         description: "Full access to all features",
         permissions: ["all"]
       },
-      { 
-        id: "registrar", 
-        name: "Registrar", 
+      {
+        id: "registrar",
+        name: "Registrar",
         description: "Manage students, enrollments, and applications",
         permissions: ["view_users", "manage_students", "manage_applications", "view_courses"]
       },
-      { 
-        id: "lecturer", 
-        name: "Lecturer", 
+      {
+        id: "lecturer",
+        name: "Lecturer",
         description: "Manage courses and grade students",
         permissions: ["view_courses", "manage_own_courses", "grade_students", "view_students"]
       },
-      { 
-        id: "staff", 
-        name: "Staff", 
+      {
+        id: "staff",
+        name: "Staff",
         description: "Limited administrative access",
         permissions: ["view_users", "view_courses", "view_applications"]
       },
-      { 
-        id: "student", 
-        name: "Student", 
+      {
+        id: "student",
+        name: "Student",
         description: "Access to enrolled courses",
         permissions: ["view_own_courses", "view_own_grades"]
       }
@@ -898,6 +1084,11 @@ app.post("/api/users", authenticate, requireRoles(["admin"]), async (req, res) =
 
     await db.collection("users").insertOne(newUser);
 
+    // Send welcome email with credentials (non-blocking)
+    sendStaffWelcomeEmail(email, first_name, last_name, role, password).catch((e) =>
+      console.warn("Staff welcome email failed:", e.message)
+    );
+
     delete newUser.password;
     delete newUser._id;
 
@@ -941,7 +1132,7 @@ app.put("/api/users/:userId", authenticate, requireRoles(["admin", "registrar"])
     if (updates.password) {
       updates.password = await bcrypt.hash(updates.password, 12);
     }
-    
+
     delete updates.id;
     delete updates._id;
     delete updates.email;
@@ -1005,8 +1196,12 @@ app.delete("/api/users/:userId", authenticate, requireRoles(["admin"]), async (r
 // ============ COURSE ROUTES ============
 app.get("/api/courses", authenticate, async (req, res) => {
   try {
-    const courses = await db.collection("courses").find({}, { projection: { _id: 0 } }).toArray();
-    res.json(courses);
+    const courses = await db.collection("courses").find({}).toArray();
+    const result = courses.map(c => {
+      const { _id, ...rest } = c;
+      return { ...rest, id: c.id || _id.toString() };
+    });
+    res.json(result);
   } catch (error) {
     console.error("Get courses error:", error);
     res.status(500).json({ detail: "Internal server error" });
@@ -1020,7 +1215,7 @@ app.get("/api/admin/courses/tuition", authenticate, requireRoles(["admin"]), asy
       .find({}, { projection: { _id: 0, id: 1, title: 1, slug: 1, price: 1, is_active: 1 } })
       .sort({ title: 1 })
       .toArray();
-    
+
     res.json({
       courses: courses,
       total: courses.length,
@@ -1041,6 +1236,17 @@ app.get("/api/courses/public", async (req, res) => {
     res.json(courses);
   } catch (error) {
     console.error("Get public courses error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+app.get("/api/public/stats", async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ detail: "Database not available" });
+    const studentsCount = await db.collection("users").countDocuments({ role: "student" });
+    const coursesCount = await db.collection("courses").countDocuments({ is_active: true });
+    res.json({ graduates: studentsCount, countries: 27, courses: coursesCount });
+  } catch (error) {
     res.status(500).json({ detail: "Internal server error" });
   }
 });
@@ -1147,11 +1353,11 @@ app.put("/api/courses/:courseId", authenticate, requireRoles(["admin"]), async (
       course = await db.collection("courses").findOne({ slug: courseId });
     }
     if (!course) {
-      course = await db.collection("courses").findOne({ 
+      course = await db.collection("courses").findOne({
         title: { $regex: new RegExp(`^${courseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       });
     }
-    
+
     if (!course) {
       return res.status(404).json({ detail: "Course not found" });
     }
@@ -1186,17 +1392,17 @@ app.put("/api/courses/:courseId/tuition", authenticate, requireRoles(["admin"]),
       course = await db.collection("courses").findOne({ slug: courseId });
     }
     if (!course) {
-      course = await db.collection("courses").findOne({ 
+      course = await db.collection("courses").findOne({
         title: { $regex: new RegExp(`^${courseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       });
     }
-    
+
     if (!course) {
       return res.status(404).json({ detail: "Course not found" });
     }
 
     await db.collection("courses").updateOne(
-      { id: course.id }, 
+      { id: course.id },
       { $set: { price: price, updated_at: new Date().toISOString() } }
     );
 
@@ -1222,6 +1428,48 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
   } catch (error) {
     console.error("Delete course error:", error);
     res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// ============ COURSE MATERIALS ROUTES ============
+app.get("/api/courses/:courseId/materials", authenticate, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const materials = await db.collection("course_materials")
+      .find({ course_id: courseId })
+      .sort({ created_at: -1 })
+      .toArray();
+    res.json(materials);
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
+app.post("/api/courses/:courseId/materials", authenticate, requireRoles(["admin", "lecturer", "teacher"]), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { title, type, url, description, week } = req.body;
+
+    if (!title || !type || !url) {
+      return res.status(400).json({ detail: "Missing required fields" });
+    }
+
+    const material = {
+      id: uuidv4(),
+      course_id: courseId,
+      title,
+      type, // 'video', 'pdf', 'document', 'link'
+      url,
+      description: description || "",
+      week: week ?? 1,
+      created_at: new Date().toISOString(),
+      created_by: req.user.id
+    };
+
+    await db.collection("course_materials").insertOne(material);
+    res.json(material);
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
   }
 });
 
@@ -1251,13 +1499,13 @@ app.post("/api/applications/create", async (req, res) => {
     }
     if (!course) {
       // Try case-insensitive slug search
-      course = await db.collection("courses").findOne({ 
+      course = await db.collection("courses").findOne({
         slug: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       });
     }
     if (!course) {
       // Try finding by title (case-insensitive)
-      course = await db.collection("courses").findOne({ 
+      course = await db.collection("courses").findOne({
         title: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       });
     }
@@ -1303,6 +1551,7 @@ app.post("/api/applications/create", async (req, res) => {
       metadata: {
         application_id: applicationId,
         course_id: course.id,
+        course_title: course.title,
         first_name,
         last_name,
         email
@@ -1523,7 +1772,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       {
         $set: {
           status: "approved",
-          approved_by: req.user.sub,
+          approved_by: req.user.id,
           approved_at: new Date().toISOString()
         }
       }
@@ -1574,17 +1823,30 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
     );
 
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        ${getEmailHeader("Application Update")}
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2>Application Update</h2>
+      <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+        ${getEmailHeader("Admissions Decision")}
+        <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h2 style="color: #333; margin-top: 0;">An Update on Your Application</h2>
           <p>Dear ${application.first_name},</p>
-          <p>Thank you for your interest in <strong>${application.course_title}</strong> at GITB.</p>
-          <p>After careful review of your application and submitted documents, we regret to inform you that we are unable to offer you admission at this time.</p>
-          ${reason ? `<div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;"><p style="margin: 0;"><strong>Reason:</strong> ${reason}</p></div>` : ""}
-          <p>We encourage you to apply again in the future or consider our other programs.</p>
-          <p>If you have any questions, please contact our admissions team.</p>
-          <p>Best regards,<br><strong>GITB Admissions Team</strong></p>
+          <p>Thank you sincerely for taking the time to apply to <strong>${application.course_title}</strong> at the <strong>Global Institute of Tech and Business</strong>. We truly appreciate your interest in furthering your education with us, and we know that applying to a programme takes real effort and courage.</p>
+          <p>After careful review of your application and the documents you submitted, our admissions committee has given your file thorough consideration. It is with deep regret that we must inform you that we are <strong>unable to offer you a place on this programme at this time</strong>.</p>
+          ${reason ? `
+          <div style="background: #fff8e1; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+            <h4 style="margin: 0 0 8px 0; color: #f57c00;">Reason for this decision:</h4>
+            <p style="margin: 0; color: #555;">${reason}</p>
+          </div>` : ""}
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 25px 0;">
+            <h3 style="margin: 0 0 10px 0; color: #333;">What You Can Do Next</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #555; line-height: 1.9;">
+              <li>You are welcome to <strong>reapply in the next intake</strong> after strengthening your application.</li>
+              <li>Explore our other programmes — there may be a better fit for your goals and background.</li>
+              <li>Reach out to our admissions team for personalised guidance on next steps.</li>
+            </ul>
+          </div>
+          <p style="color: #555;">Please know that this decision does not diminish your potential or your value. Many successful people have faced setbacks and gone on to achieve great things. We genuinely hope this is not the end of your journey with GITB, and we encourage you to keep pursuing your ambitions.</p>
+          <p style="color: #555;">If you would like feedback on your application or wish to discuss alternative options, please don't hesitate to contact us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
+          <p style="color: #555;">We wish you every success in your future endeavours.</p>
+          <p style="color: #333;">Warm regards,<br><strong>GITB Admissions Team</strong><br><em>Global Institute of Tech and Business</em></p>
         </div>
       </div>
     `;
@@ -1604,7 +1866,7 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
 app.get("/api/my-courses", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     // Get enrollments for this user
     const enrollments = await db.collection("enrollments")
       .find({ $or: [{ user_id: userId }, { student_id: userId }] }, { projection: { _id: 0 } })
@@ -1641,7 +1903,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = req.user;
-    const { course_id, origin_url } = req.body;
+    const { course_id, origin_url, payment_plan } = req.body;
 
     if (!course_id) {
       return res.status(422).json({ detail: "Course ID is required" });
@@ -1688,13 +1950,21 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       course = await db.collection("courses").findOne({ slug: course_id });
     }
     if (!course) {
-      course = await db.collection("courses").findOne({ 
+      course = await db.collection("courses").findOne({
         title: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       });
     }
     if (!course) {
       return res.status(404).json({ detail: "Course not found" });
     }
+
+
+    const isMonthly = payment_plan === 'monthly';
+    const monthlyAmount = course.monthly_price || Math.ceil(course.price / 12);
+    const chargeAmount = isMonthly ? monthlyAmount : course.price;
+    const paymentDescription = isMonthly 
+      ? `Monthly installment 1 of 12 - ${course.title}`
+      : `Full tuition - ${course.title}`;
 
     if (!stripe) {
       return res.status(503).json({ detail: "Payment service not available" });
@@ -1708,9 +1978,9 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
           currency: "eur",
           product_data: {
             name: `Tuition Fee - ${course.title}`,
-            description: `Full tuition for ${course.title} at GITB - Lifetime access`
+            description: paymentDescription
           },
-          unit_amount: Math.round(course.price * 100)
+          unit_amount: Math.round(chargeAmount * 100)
         },
         quantity: 1
       }],
@@ -1730,7 +2000,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
     // Update enrollment with stripe session
     await db.collection("enrollments").updateOne(
       { id: enrollment.id },
-      { $set: { stripe_session_id: session.id } }
+      { $set: { stripe_session_id: session.id, payment_plan: isMonthly ? 'monthly' : 'one_time', installments_paid: isMonthly ? 1 : null, total_installments: isMonthly ? 12 : null } }
     );
 
     // Wrap in `data` object - frontend expects response.data.checkout_url
@@ -1740,7 +2010,8 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         session_id: session.id,
         enrollment_id: enrollment.id,
         course_title: course.title,
-        amount: course.price
+        amount: chargeAmount,
+        payment_plan: isMonthly ? 'monthly' : 'one_time'
       }
     });
   } catch (error) {
@@ -1756,13 +2027,13 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
 
     // Find enrollment by stripe session
     const enrollment = await db.collection("enrollments").findOne({ stripe_session_id: sessionId });
-    
+
     if (!enrollment) {
       // Check Stripe directly
       if (stripe) {
         try {
           const session = await stripe.checkout.sessions.retrieve(sessionId);
-          return res.json({ 
+          return res.json({
             status: session.payment_status === "paid" ? "paid" : "pending",
             payment_status: session.payment_status
           });
@@ -1777,13 +2048,13 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
     if (stripe && enrollment.stripe_session_id) {
       try {
         const session = await stripe.checkout.sessions.retrieve(enrollment.stripe_session_id);
-        
+
         if (session.payment_status === "paid" && enrollment.payment_status !== "paid") {
           // Update enrollment to paid
           await db.collection("enrollments").updateOne(
             { id: enrollment.id },
-            { 
-              $set: { 
+            {
+              $set: {
                 status: "active",
                 payment_status: "paid",
                 tuition_paid_at: new Date().toISOString()
@@ -1800,7 +2071,7 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
           // Send confirmation email
           const user = await db.collection("users").findOne({ id: enrollment.user_id });
           const course = await db.collection("courses").findOne({ id: enrollment.course_id });
-          
+
           if (user && course) {
             const html = `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -1826,7 +2097,7 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
             await sendEmail(user.email, `Enrollment Confirmed - ${course.title}`, html);
           }
 
-          return res.json({ 
+          return res.json({
             status: "paid",
             payment_status: "paid",
             message: "Course unlocked successfully"
@@ -1852,9 +2123,9 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
   try {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    
+
     let event;
-    
+
     if (webhookSecret && sig) {
       try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
@@ -1875,8 +2146,8 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
         // Update enrollment to paid
         await db.collection("enrollments").updateOne(
           { id: metadata.enrollment_id },
-          { 
-            $set: { 
+          {
+            $set: {
               status: "active",
               payment_status: "paid",
               tuition_paid_at: new Date().toISOString()
@@ -1894,17 +2165,26 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
 
         console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
       } else if (metadata.application_id) {
-        // Application fee payment
+        // Application fee payment - update status and notify applicant
         await db.collection("applications").updateOne(
           { id: metadata.application_id },
-          { 
-            $set: { 
+          {
+            $set: {
               status: "pending",
               payment_status: "paid",
               paid_at: new Date().toISOString()
             }
           }
         );
+
+        // Send confirmation email to the applicant
+        if (metadata.email && metadata.first_name) {
+          const courseTitle = metadata.course_title ||
+            (await db.collection("courses").findOne({ id: metadata.course_id }))?.title ||
+            "your chosen programme";
+          await sendApplicationReceivedEmail(metadata.email, metadata.first_name, courseTitle);
+          console.log(`Confirmation email sent to ${metadata.email}`);
+        }
 
         console.log(`Application fee paid for ${metadata.application_id}`);
       }
@@ -1918,7 +2198,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
 });
 
 // ============ DASHBOARD ROUTES ============
-app.get("/api/dashboard/admin", authenticate, requireRoles(["admin"]), async (req, res) => {
+app.get("/api/dashboard/admin", authenticate, requireRoles(["admin", "super_admin", "sub_admin", "staff"]), async (req, res) => {
   try {
     const [
       totalStudents,
@@ -2011,6 +2291,54 @@ app.get("/api/enrollments", authenticate, requireRoles(["admin", "registrar"]), 
   }
 });
 
+// Admin manually enroll a student in a course
+app.post("/api/enrollments", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
+  try {
+    const { user_id, course_id } = req.body;
+    if (!user_id || !course_id) return res.status(400).json({ detail: "user_id and course_id are required" });
+
+    // Multi-step course lookup: UUID id → ObjectId _id → slug
+    let course = await db.collection("courses").findOne({ id: course_id });
+    if (!course) {
+      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch {}
+    }
+    if (!course) course = await db.collection("courses").findOne({ slug: course_id });
+    if (!course) return res.status(404).json({ detail: "Course not found" });
+
+    const student = await db.collection("users").findOne({ id: user_id });
+    if (!student) return res.status(404).json({ detail: "Student not found" });
+
+    const normalizedCourseId = course.id || course._id.toString();
+
+    const existing = await db.collection("enrollments").findOne({
+      $or: [
+        { user_id, course_id: normalizedCourseId },
+        { student_id: user_id, course_id: normalizedCourseId }
+      ]
+    });
+    if (existing) return res.status(400).json({ detail: "Student is already enrolled in this course" });
+
+    const enrollment = {
+      id: uuidv4(),
+      user_id,
+      student_id: user_id,
+      course_id: normalizedCourseId,
+      course_title: course.title,
+      enrolled_at: new Date().toISOString(),
+      status: "active",
+      payment_status: "paid",
+      enrolled_by: req.user.id,
+      created_at: new Date().toISOString()
+    };
+
+    await db.collection("enrollments").insertOne(enrollment);
+    res.json(enrollment);
+  } catch (err) {
+    console.error("Manual enroll error:", err);
+    res.status(500).json({ detail: "Failed to create enrollment" });
+  }
+});
+
 app.get("/api/enrollments/my", authenticate, async (req, res) => {
   try {
     const enrollments = await db.collection("enrollments")
@@ -2042,13 +2370,13 @@ app.get("/api/login-logs", authenticate, requireRoles(["admin"]), async (req, re
   try {
     const { user_id, limit = 50 } = req.query;
     const query = user_id ? { user_id } : {};
-    
+
     const logs = await db.collection("login_logs")
       .find(query, { projection: { _id: 0 } })
       .sort({ timestamp: -1 })
       .limit(parseInt(limit))
       .toArray();
-    
+
     res.json(logs);
   } catch (error) {
     console.error("Get login logs error:", error);
@@ -2068,7 +2396,7 @@ function sanitizeError(error) {
     /re_[a-zA-Z0-9]+/g,
     /Bearer [a-zA-Z0-9._-]+/g
   ];
-  
+
   let sanitized = message;
   for (const pattern of secretPatterns) {
     sanitized = sanitized.replace(pattern, "[REDACTED]");
@@ -2079,7 +2407,7 @@ function sanitizeError(error) {
 app.use((err, req, res, next) => {
   // Log the full error internally
   console.error("Unhandled error:", err);
-  
+
   // Return sanitized message to client
   const statusCode = err.status || err.statusCode || 500;
   res.status(statusCode).json({
@@ -2088,8 +2416,701 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ============ SYSTEM SETTINGS ENDPOINTS ============
+app.get("/api/system/settings", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    await refreshSystemSettings();
+    res.json(systemSettings);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch settings" });
+  }
+});
+
+app.put("/api/system/settings", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const updates = req.body;
+    await db.collection("system_settings").updateOne(
+      { type: "config" },
+      { $set: updates },
+      { upsert: true }
+    );
+    await refreshSystemSettings();
+    res.json({ message: "Settings updated", settings: systemSettings });
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to update settings" });
+  }
+});
+
+app.post("/api/users/profile", authenticate, async (req, res) => {
+  try {
+    const { first_name, last_name, profilePicture, phone } = req.body;
+    await db.collection("users").updateOne(
+      { id: req.user.id },
+      { $set: { first_name, last_name, profilePicture, phone } }
+    );
+    const updatedUser = await db.collection("users").findOne({ id: req.user.id }, { projection: { password: 0 } });
+    res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to update profile" });
+  }
+});
+
+
+// ============ QUIZ ROUTES ============
+
+// Get quizzes for a course
+app.get("/api/courses/:courseId/quizzes", authenticate, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const quizzes = await db.collection("quizzes").find({
+      course_id: courseId,
+      is_active: true
+    }, { projection: { questions: 0 } }).toArray();
+    res.json(quizzes);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch quizzes" });
+  }
+});
+
+// Admin: get all quizzes for a course (with questions)
+app.get("/api/admin/courses/:courseId/quizzes", authenticate, requireRoles(["admin","super_admin","teacher","lecturer"]), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const quizzes = await db.collection("quizzes").find({ course_id: courseId }).toArray();
+    res.json(quizzes);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch quizzes" });
+  }
+});
+
+// Admin: create quiz
+app.post("/api/admin/quizzes", authenticate, requireRoles(["admin","super_admin","teacher","lecturer"]), async (req, res) => {
+  try {
+    const { course_id, title, description, questions, time_limit_minutes } = req.body;
+    if (!course_id || !title || !questions || !Array.isArray(questions)) {
+      return res.status(422).json({ detail: "course_id, title, and questions array required" });
+    }
+    const quiz = {
+      id: uuidv4(),
+      course_id,
+      title,
+      description: description || "",
+      time_limit_minutes: time_limit_minutes || 30,
+      questions: questions.map((q, idx) => ({
+        id: uuidv4(),
+        order: idx + 1,
+        question: q.question,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        points: q.points || 1
+      })),
+      total_points: questions.reduce((sum, q) => sum + (q.points || 1), 0),
+      is_active: true,
+      created_at: new Date().toISOString(),
+      created_by: req.user.id
+    };
+    await db.collection("quizzes").insertOne(quiz);
+    res.json(quiz);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to create quiz" });
+  }
+});
+
+// Admin: update quiz
+app.put("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin","super_admin","teacher","lecturer"]), async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const update = req.body;
+    if (update.questions) {
+      update.questions = update.questions.map((q, idx) => ({
+        id: q.id || uuidv4(),
+        order: idx + 1,
+        question: q.question,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        points: q.points || 1
+      }));
+      update.total_points = update.questions.reduce((sum, q) => sum + (q.points || 1), 0);
+    }
+    update.updated_at = new Date().toISOString();
+    await db.collection("quizzes").updateOne({ id: quizId }, { $set: update });
+    const quiz = await db.collection("quizzes").findOne({ id: quizId });
+    res.json(quiz);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to update quiz" });
+  }
+});
+
+// Admin: delete quiz
+app.delete("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin","super_admin"]), async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    await db.collection("quizzes").updateOne({ id: quizId }, { $set: { is_active: false } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to delete quiz" });
+  }
+});
+
+// Get quiz for taking (hides correct answers)
+app.get("/api/quizzes/:quizId", authenticate, async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const quiz = await db.collection("quizzes").findOne({ id: quizId, is_active: true });
+    if (!quiz) return res.status(404).json({ detail: "Quiz not found" });
+    // Strip correct answers for student view
+    const safeQuiz = {
+      ...quiz,
+      questions: quiz.questions.map(q => ({
+        id: q.id,
+        order: q.order,
+        question: q.question,
+        options: q.options,
+        points: q.points
+      }))
+    };
+    res.json(safeQuiz);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch quiz" });
+  }
+});
+
+// Submit quiz answers
+app.post("/api/quizzes/:quizId/submit", authenticate, async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const { answers } = req.body; // [{ question_id, selected_answer }]
+    const userId = req.user.id;
+
+    // Check if already submitted
+    const existing = await db.collection("quiz_results").findOne({ user_id: userId, quiz_id: quizId });
+    if (existing) {
+      return res.status(400).json({ detail: "Quiz already submitted", result: existing });
+    }
+
+    const quiz = await db.collection("quizzes").findOne({ id: quizId, is_active: true });
+    if (!quiz) return res.status(404).json({ detail: "Quiz not found" });
+
+    // Grade answers
+    let score = 0;
+    const gradedAnswers = (answers || []).map(a => {
+      const question = quiz.questions.find(q => q.id === a.question_id);
+      if (!question) return { ...a, is_correct: false, correct_answer: null, points_earned: 0 };
+      const is_correct = a.selected_answer === question.correct_answer;
+      if (is_correct) score += question.points || 1;
+      return {
+        question_id: a.question_id,
+        question_text: question.question,
+        selected_answer: a.selected_answer,
+        correct_answer: question.correct_answer,
+        is_correct,
+        points_earned: is_correct ? (question.points || 1) : 0
+      };
+    });
+
+    const total_points = quiz.total_points || quiz.questions.length;
+    const percentage = total_points > 0 ? Math.round((score / total_points) * 100) : 0;
+
+    const result = {
+      id: uuidv4(),
+      user_id: userId,
+      quiz_id: quizId,
+      course_id: quiz.course_id,
+      quiz_title: quiz.title,
+      score,
+      total_points,
+      percentage,
+      passed: percentage >= 60,
+      answers: gradedAnswers,
+      submitted_at: new Date().toISOString()
+    };
+    await db.collection("quiz_results").insertOne(result);
+    res.json(result);
+  } catch (err) {
+    console.error("Submit quiz error:", err);
+    res.status(500).json({ detail: "Failed to submit quiz" });
+  }
+});
+
+// Get student's all quiz results
+app.get("/api/my-quiz-results", authenticate, async (req, res) => {
+  try {
+    const results = await db.collection("quiz_results")
+      .find({ user_id: req.user.id })
+      .sort({ submitted_at: -1 })
+      .toArray();
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch results" });
+  }
+});
+
+// Get result for specific quiz
+app.get("/api/my-quiz-results/:quizId", authenticate, async (req, res) => {
+  try {
+    const result = await db.collection("quiz_results").findOne({
+      user_id: req.user.id,
+      quiz_id: req.params.quizId
+    });
+    if (!result) return res.status(404).json({ detail: "No result found" });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch result" });
+  }
+});
+
+// ============ PROGRESS ROUTES ============
+
+// Mark a material/lesson as complete
+app.post("/api/progress/complete", authenticate, async (req, res) => {
+  try {
+    const { course_id, material_id } = req.body;
+    if (!course_id || !material_id) {
+      return res.status(422).json({ detail: "course_id and material_id required" });
+    }
+    const key = `${course_id}::${material_id}`;
+    await db.collection("users").updateOne(
+      { id: req.user.id },
+      { $addToSet: { completed_lessons: key } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to update progress" });
+  }
+});
+
+// Get progress for a course
+app.get("/api/progress/:courseId", authenticate, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const user = await db.collection("users").findOne({ id: req.user.id }, { projection: { completed_lessons: 1 } });
+    const completedLessons = (user?.completed_lessons || [])
+      .filter(k => k.startsWith(`${courseId}::`))
+      .map(k => k.split("::")[1]);
+
+    const materials = await db.collection("course_materials").find({ course_id: courseId }).toArray();
+    const total = materials.length;
+    const completed = completedLessons.length;
+
+    res.json({
+      course_id: courseId,
+      completed_lesson_ids: completedLessons,
+      completed,
+      total,
+      percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+    });
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch progress" });
+  }
+});
+
+// ============ ENROLLMENT ROUTES ============
+
+// Get student's enrollments with payment details
+app.get("/api/my-enrollments", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const enrollments = await db.collection("enrollments").find({
+      $or: [{ user_id: userId }, { student_id: userId }]
+    }).toArray();
+
+    const enriched = await Promise.all(enrollments.map(async (e) => {
+      const course = await db.collection("courses").findOne({ id: e.course_id });
+      return {
+        ...e,
+        course_title: course?.title || "Unknown Course",
+        course_img: course?.image_url || null,
+        course_price: course?.price || 0,
+        monthly_price: course?.monthly_price || Math.ceil((course?.price || 0) / 12)
+      };
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ detail: "Failed to fetch enrollments" });
+  }
+});
+
+// ============ TEACHER / INSTRUCTOR ROUTES ============
+
+const TEACHER_ROLES = ["admin", "teacher", "lecturer", "staff"];
+
+// Generate employment contract HTML
+function generateEmploymentContract(teacher, signedAt) {
+  const date = new Date(signedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  return `
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #222;">
+  <div style="text-align:center; border-bottom: 2px solid #0B3B2C; padding-bottom: 20px; margin-bottom: 30px;">
+    <h1 style="color:#0B3B2C; margin:0;">GITB — Global Institute of Technology and Business</h1>
+    <p style="color:#555; margin:5px 0;">Vilnius, Lithuania · admissions@gitb.lt</p>
+    <h2 style="color:#0B3B2C; margin-top:20px;">Instructor/Staff Employment Agreement</h2>
+  </div>
+  <p>This Agreement is entered into on <strong>${date}</strong> between:</p>
+  <ul>
+    <li><strong>GITB — Global Institute of Technology and Business</strong> ("the Institution"), and</li>
+    <li><strong>${teacher.first_name} ${teacher.last_name}</strong> (Email: ${teacher.email}) ("the Instructor")</li>
+  </ul>
+  <h3 style="color:#0B3B2C;">1. Role and Responsibilities</h3>
+  <p>The Instructor agrees to fulfil the role of <strong>${(teacher.role || "Instructor").toUpperCase()}</strong> and shall:</p>
+  <ul>
+    <li>Deliver course content as assigned by the Administration</li>
+    <li>Upload learning materials, assessments, and resources via the GITB Instructor Portal</li>
+    <li>Grade student work fairly and within agreed timeframes</li>
+    <li>Maintain accurate records of student attendance and progress</li>
+    <li>Communicate professionally with students and staff at all times</li>
+    <li>Attend scheduled meetings and training sessions as required</li>
+  </ul>
+  <h3 style="color:#0B3B2C;">2. Confidentiality</h3>
+  <p>The Instructor agrees to maintain strict confidentiality regarding all student data, institutional data, and any proprietary materials shared by GITB. Student personal information shall not be disclosed to any third party under any circumstances.</p>
+  <h3 style="color:#0B3B2C;">3. Intellectual Property</h3>
+  <p>All course materials, assessments, and content created by the Instructor in the course of their duties remain the intellectual property of GITB. The Instructor grants GITB a perpetual, royalty-free licence to use any materials they create for institutional purposes.</p>
+  <h3 style="color:#0B3B2C;">4. Code of Conduct</h3>
+  <p>The Instructor agrees to uphold GITB's Code of Conduct, which includes professional conduct toward students, zero tolerance for discrimination or harassment, and commitment to academic integrity. Violations may result in immediate termination of this agreement.</p>
+  <h3 style="color:#0B3B2C;">5. Data Protection</h3>
+  <p>The Instructor acknowledges their obligations under the GDPR (Regulation (EU) 2016/679) and agrees to process student data only for legitimate educational purposes and in accordance with GITB's data protection policies.</p>
+  <h3 style="color:#0B3B2C;">6. Termination</h3>
+  <p>Either party may terminate this agreement with 14 days written notice. GITB reserves the right to terminate immediately in cases of gross misconduct, breach of confidentiality, or failure to meet performance standards.</p>
+  <h3 style="color:#0B3B2C;">7. Governing Law</h3>
+  <p>This Agreement is governed by the laws of the Republic of Lithuania.</p>
+  <div style="margin-top:40px; padding:20px; background:#f0fdf4; border:1px solid #0B3B2C; border-radius:8px;">
+    <p><strong>Digital Signature:</strong> ${teacher.first_name} ${teacher.last_name}</p>
+    <p><strong>Date:</strong> ${date}</p>
+    <p><strong>Email:</strong> ${teacher.email}</p>
+    <p><strong>IP Timestamp:</strong> ${new Date(signedAt).toISOString()}</p>
+    <p style="color:#0B3B2C; font-size:12px;">This document was digitally signed via the GITB Instructor Portal. This constitutes a legally binding electronic signature under EU Regulation No 910/2014 (eIDAS).</p>
+  </div>
+</body>
+</html>`;
+}
+
+// Get teacher's assigned courses (or all if none assigned)
+app.get("/api/teacher/courses", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const teacher = await db.collection("users").findOne({ id: req.user.id });
+    const assignedIds = teacher?.assigned_courses || [];
+    const query = assignedIds.length > 0 ? { id: { $in: assignedIds } } : {};
+    const courses = await db.collection("courses").find(query, { projection: { _id: 0 } }).toArray();
+    res.json(courses);
+  } catch (err) { res.status(500).json({ detail: "Failed to fetch courses" }); }
+});
+
+// Get students enrolled in a course
+app.get("/api/teacher/courses/:courseId/students", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const enrollments = await db.collection("enrollments").find({ course_id: courseId }).toArray();
+    const userIds = enrollments.map(e => e.user_id || e.student_id);
+    const students = await db.collection("users").find(
+      { id: { $in: userIds } },
+      { projection: { _id: 0, password: 0 } }
+    ).toArray();
+    const enriched = students.map(s => {
+      const enr = enrollments.find(e => e.user_id === s.id || e.student_id === s.id);
+      return { ...s, enrollment: enr || null };
+    });
+    res.json(enriched);
+  } catch (err) { res.status(500).json({ detail: "Failed to fetch students" }); }
+});
+
+// Get all students across all teacher's courses (for messaging/groups)
+app.get("/api/teacher/students", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const teacher = await db.collection("users").findOne({ id: req.user.id });
+    const assignedIds = teacher?.assigned_courses || [];
+    const query = assignedIds.length > 0 ? { course_id: { $in: assignedIds } } : {};
+    const enrollments = await db.collection("enrollments").find(query).toArray();
+    const userIds = [...new Set(enrollments.map(e => e.user_id || e.student_id))];
+    const students = await db.collection("users").find(
+      { id: { $in: userIds } },
+      { projection: { _id: 0, password: 0 } }
+    ).toArray();
+    const enriched = students.map(s => ({
+      ...s,
+      enrollments: enrollments.filter(e => e.user_id === s.id || e.student_id === s.id)
+    }));
+    res.json(enriched);
+  } catch (err) { res.status(500).json({ detail: "Failed to fetch students" }); }
+});
+
+// Update student grade
+app.put("/api/teacher/grades", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { user_id, course_id, grade, grade_notes } = req.body;
+    if (!user_id || !course_id) return res.status(400).json({ detail: "user_id and course_id required" });
+    await db.collection("enrollments").updateOne(
+      { $or: [{ user_id, course_id }, { student_id: user_id, course_id }] },
+      { $set: { grade, grade_notes, graded_by: req.user.id, graded_at: new Date().toISOString() } }
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ detail: "Failed to update grade" }); }
+});
+
+// Create student group
+app.post("/api/teacher/groups", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { name, course_id, student_ids, description } = req.body;
+    if (!name) return res.status(400).json({ detail: "Group name is required" });
+    const group = {
+      id: uuidv4(),
+      name,
+      description: description || "",
+      course_id: course_id || null,
+      student_ids: student_ids || [],
+      created_by: req.user.id,
+      created_at: new Date().toISOString()
+    };
+    await db.collection("teacher_groups").insertOne(group);
+    res.json(group);
+  } catch (err) { res.status(500).json({ detail: "Failed to create group" }); }
+});
+
+// List teacher's groups
+app.get("/api/teacher/groups", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const groups = await db.collection("teacher_groups").find(
+      { created_by: req.user.id }, { projection: { _id: 0 } }
+    ).sort({ created_at: -1 }).toArray();
+    res.json(groups);
+  } catch (err) { res.status(500).json({ detail: "Failed to fetch groups" }); }
+});
+
+// Update group (rename / add/remove students)
+app.put("/api/teacher/groups/:groupId", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name, student_ids, description, course_id } = req.body;
+    const update = {};
+    if (name !== undefined) update.name = name;
+    if (description !== undefined) update.description = description;
+    if (student_ids !== undefined) update.student_ids = student_ids;
+    if (course_id !== undefined) update.course_id = course_id;
+    await db.collection("teacher_groups").updateOne({ id: groupId, created_by: req.user.id }, { $set: update });
+    const updated = await db.collection("teacher_groups").findOne({ id: groupId }, { projection: { _id: 0 } });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ detail: "Failed to update group" }); }
+});
+
+// Delete group
+app.delete("/api/teacher/groups/:groupId", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    await db.collection("teacher_groups").deleteOne({ id: req.params.groupId, created_by: req.user.id });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ detail: "Failed to delete group" }); }
+});
+
+// Send bulk email to course students / group
+app.post("/api/teacher/bulk-email", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { subject, body, course_id, group_id, student_ids } = req.body;
+    if (!subject || !body) return res.status(400).json({ detail: "Subject and body required" });
+
+    let recipients = [];
+    if (student_ids?.length) {
+      const users = await db.collection("users").find({ id: { $in: student_ids } }, { projection: { email: 1, first_name: 1 } }).toArray();
+      recipients = users;
+    } else if (group_id) {
+      const group = await db.collection("teacher_groups").findOne({ id: group_id });
+      if (group?.student_ids?.length) {
+        const users = await db.collection("users").find({ id: { $in: group.student_ids } }, { projection: { email: 1, first_name: 1 } }).toArray();
+        recipients = users;
+      }
+    } else if (course_id) {
+      const enrollments = await db.collection("enrollments").find({ course_id }).toArray();
+      const ids = enrollments.map(e => e.user_id || e.student_id);
+      const users = await db.collection("users").find({ id: { $in: ids } }, { projection: { email: 1, first_name: 1 } }).toArray();
+      recipients = users;
+    }
+
+    if (!recipients.length) return res.status(400).json({ detail: "No recipients found" });
+
+    const teacher = await db.collection("users").findOne({ id: req.user.id });
+    const senderName = `${teacher.first_name} ${teacher.last_name}`;
+    let sent = 0;
+    for (const r of recipients) {
+      const html = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+          ${getEmailHeader("Message from your Instructor")}
+          <div style="background:white;padding:30px;border-radius:0 0 10px 10px;">
+            <p>Dear ${r.first_name || "Student"},</p>
+            <div style="background:#f9f9f9;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #0B3B2C;">
+              ${body.replace(/\n/g, '<br>')}
+            </div>
+            <p style="color:#666;font-size:13px;">— ${senderName}, GITB Instructor</p>
+          </div>
+        </div>`;
+      const ok = await sendEmail(r.email, subject, html);
+      if (ok) sent++;
+    }
+    res.json({ sent, total: recipients.length });
+  } catch (err) { res.status(500).json({ detail: "Failed to send emails" }); }
+});
+
+// Get teacher contract status
+app.get("/api/teacher/contract", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const teacher = await db.collection("users").findOne({ id: req.user.id }, { projection: { _id: 0, password: 0 } });
+    res.json({ has_agreed_terms: teacher?.has_agreed_terms || false, terms_agreed_at: teacher?.terms_agreed_at || null });
+  } catch (err) { res.status(500).json({ detail: "Failed to fetch contract status" }); }
+});
+
+// Sign employment contract
+app.post("/api/teacher/contract/sign", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { signature } = req.body;
+    if (!signature) return res.status(400).json({ detail: "Digital signature required" });
+    const teacher = await db.collection("users").findOne({ id: req.user.id });
+    if (!teacher) return res.status(404).json({ detail: "User not found" });
+    const signedAt = new Date().toISOString();
+    const contractHtml = generateEmploymentContract(teacher, signedAt);
+    await db.collection("users").updateOne(
+      { id: req.user.id },
+      { $set: { has_agreed_terms: true, terms_agreed_at: signedAt, contract_signature: signature } }
+    );
+    await db.collection("teacher_contracts").insertOne({
+      id: uuidv4(), teacher_id: req.user.id, signature, signed_at: signedAt,
+      contract_html: contractHtml, created_at: signedAt
+    });
+    // Email copy to teacher
+    const emailHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
+        ${getEmailHeader("Your Employment Agreement")}
+        <div style="background:white;padding:30px;border-radius:0 0 10px 10px;">
+          <h2 style="color:#0B3B2C;">Employment Agreement — Signed Copy</h2>
+          <p>Dear ${teacher.first_name},</p>
+          <p>Thank you for signing your GITB Instructor Employment Agreement. Please find your signed copy below for your records.</p>
+          <div style="background:#f9f9f9;padding:20px;border-radius:8px;margin:20px 0;border:1px solid #e0e0e0;">
+            ${contractHtml}
+          </div>
+          <p style="color:#666;font-size:13px;">This is an automated record of your digital signature. Keep this email for your records.</p>
+        </div>
+      </div>`;
+    await sendEmail(teacher.email, "Your GITB Employment Agreement — Signed Copy", emailHtml);
+    res.json({ success: true, signed_at: signedAt });
+  } catch (err) { console.error("Contract sign error:", err); res.status(500).json({ detail: "Failed to sign contract" }); }
+});
+
+// Update teacher professional profile
+app.put("/api/teacher/profile", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { first_name, last_name, phone, bio, education, professional_experience, specializations, profilePicture, linkedin_url } = req.body;
+    await db.collection("users").updateOne(
+      { id: req.user.id },
+      { $set: { first_name, last_name, phone, bio, education, professional_experience, specializations, profilePicture, linkedin_url, updated_at: new Date().toISOString() } }
+    );
+    const updated = await db.collection("users").findOne({ id: req.user.id }, { projection: { _id: 0, password: 0 } });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ detail: "Failed to update profile" }); }
+});
+
+// Bulk quiz upload (JSON array of quizzes)
+app.post("/api/teacher/quiz-bulk", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    const { course_id, quizzes } = req.body;
+    if (!course_id || !Array.isArray(quizzes) || !quizzes.length)
+      return res.status(400).json({ detail: "course_id and quizzes array required" });
+    const created = [];
+    for (const q of quizzes) {
+      if (!q.title || !Array.isArray(q.questions)) continue;
+      const quiz = {
+        id: uuidv4(), course_id, title: q.title,
+        description: q.description || "",
+        time_limit_minutes: q.time_limit_minutes || 30,
+        questions: (q.questions || []).map(qq => ({ ...qq, id: qq.id || uuidv4() })),
+        created_by: req.user.id, created_at: new Date().toISOString()
+      };
+      await db.collection("quizzes").insertOne(quiz);
+      created.push(quiz);
+    }
+    res.json({ created: created.length, quizzes: created });
+  } catch (err) { res.status(500).json({ detail: "Failed to bulk upload quizzes" }); }
+});
+
+// Delete material (teacher)
+app.delete("/api/courses/:courseId/materials/:materialId", authenticate, requireRoles(TEACHER_ROLES), async (req, res) => {
+  try {
+    await db.collection("course_materials").deleteOne({ id: req.params.materialId, course_id: req.params.courseId });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ detail: "Failed to delete material" }); }
+});
+
+// Assign a course to a teacher/lecturer
+app.post("/api/admin/teachers/:teacherId/assign-course", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const { course_id } = req.body;
+    if (!course_id) return res.status(400).json({ detail: "course_id is required" });
+
+    const teacher = await db.collection("users").findOne({ id: teacherId });
+    if (!teacher) return res.status(404).json({ detail: "Teacher not found" });
+
+    let course = await db.collection("courses").findOne({ id: course_id });
+    if (!course) {
+      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch {}
+    }
+    if (!course) return res.status(404).json({ detail: "Course not found" });
+
+    const courseIdStr = course.id || course._id.toString();
+    const assigned = teacher.assigned_courses || [];
+    if (!assigned.includes(courseIdStr)) {
+      assigned.push(courseIdStr);
+      await db.collection("users").updateOne({ id: teacherId }, { $set: { assigned_courses: assigned } });
+    }
+
+    sendCourseAssignmentEmail(teacher, course).catch(e => console.error("Assignment email error:", e));
+    res.json({ success: true, assigned_courses: assigned, course_title: course.title });
+  } catch (err) {
+    console.error("Assign course error:", err);
+    res.status(500).json({ detail: "Failed to assign course" });
+  }
+});
+
+// Remove course assignment from a teacher
+app.delete("/api/admin/teachers/:teacherId/courses/:courseId", authenticate, requireRoles(["admin"]), async (req, res) => {
+  try {
+    const { teacherId, courseId } = req.params;
+    const teacher = await db.collection("users").findOne({ id: teacherId });
+    if (!teacher) return res.status(404).json({ detail: "Teacher not found" });
+    const assigned = (teacher.assigned_courses || []).filter(id => id !== courseId);
+    await db.collection("users").updateOne({ id: teacherId }, { $set: { assigned_courses: assigned } });
+    res.json({ success: true, assigned_courses: assigned });
+  } catch (err) { res.status(500).json({ detail: "Failed to remove course assignment" }); }
+});
+
+// Send test emails for all email types
+app.post("/api/admin/test-emails", authenticate, requireRoles(["admin"]), async (req, res) => {
+  const testEmail = req.body.email || "taiwojos2@yahoo.com";
+  const results = {};
+
+  results.student_welcome = await sendWelcomeEmail(
+    testEmail, "Test", "Student", "Cybersecurity Fundamentals", "TestPass123!", 1200
+  );
+  results.teacher_welcome = await sendStaffWelcomeEmail(
+    testEmail, "Test", "Teacher", "teacher", "TeacherPass456!"
+  );
+  results.admin_welcome = await sendStaffWelcomeEmail(
+    testEmail, "Test", "Admin", "admin", "AdminPass789!"
+  );
+  const resetHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">${getEmailHeader("Password Reset")}<div style="background:white;padding:30px;border-radius:0 0 10px 10px;"><h2 style="color:#0B3B2C;">Password Reset Request (TEST)</h2><p>This is a test password reset email from GITB.</p><div style="text-align:center;margin:25px 0;"><a href="${FRONTEND_URL}/reset-password?token=test-token-123" style="background:#0B3B2C;color:white;padding:14px 35px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;">Reset Password</a></div><p style="color:#666;font-size:13px;">This link expires in 1 hour.</p></div></div>`;
+  results.password_reset = await sendEmail(testEmail, "Password Reset Request — GITB (TEST)", resetHtml);
+
+  const appHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">${getEmailHeader("Application Received")}<div style="background:white;padding:30px;border-radius:0 0 10px 10px;"><h2 style="color:#0B3B2C;">Application Received (TEST)</h2><p>Dear Test Student,</p><p>Your application for <strong>Cybersecurity Fundamentals</strong> has been received and is under review. You will receive a decision within 3–5 business days.</p><p style="color:#666;margin-bottom:0;">Best regards,<br><strong>GITB Admissions Team</strong></p></div></div>`;
+  results.application_received = await sendEmail(testEmail, "Application Received — Cybersecurity Fundamentals | GITB (TEST)", appHtml);
+
+  const mockTeacher = { first_name: "Test", last_name: "Teacher", email: testEmail };
+  const mockCourse = { title: "Cybersecurity Fundamentals", description: "Learn ethical hacking and network security.", duration: "6 months" };
+  results.course_assignment = await sendCourseAssignmentEmail(mockTeacher, mockCourse);
+
+  res.json({ message: `Test emails sent to ${testEmail}`, results });
+});
+
 app.use((req, res) => {
-  res.status(404).json({ detail: "Not found" });
+  if (req.path.startsWith("/api")) {
+    res.status(404).json({ detail: "Not found" });
+  } else {
+    res.sendFile(path.join(__dirname, "..", "static", "index.html"));
+  }
 });
 
 // ============ START SERVER ============
@@ -2097,9 +3118,10 @@ async function startServer() {
   try {
     console.log(`Starting server on port ${PORT}...`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    
+
     await connectDB();
-    
+    await refreshSystemSettings();
+
     // Use 0.0.0.0 to bind to all interfaces (required for Render/Docker)
     const server = app.listen(PORT, "0.0.0.0", () => {
       console.log(`✓ Server running on port ${PORT}`);
