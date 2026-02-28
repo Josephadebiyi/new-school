@@ -143,6 +143,10 @@ export default function AdminDashboard() {
   const [testEmailSending, setTestEmailSending] = useState(false);
   const [testEmailMsg, setTestEmailMsg] = useState('');
 
+  // Seed courses
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedMsg, setSeedMsg] = useState('');
+
   // Material upload ref
   const materialFileRef = useRef(null);
   const [materialUploading, setMaterialUploading] = useState(false);
@@ -393,6 +397,24 @@ export default function AdminDashboard() {
       await removeTeacherCourse(token, teacher.id, courseId);
       fetchData();
     } catch (err) { alert(err.message || 'Failed to remove.'); }
+  }
+
+  async function handleSeedCourses(replace = false) {
+    if (replace && !confirm('This will DELETE all existing courses and replace them with the 5 standard GITB courses. Continue?')) return;
+    setSeedLoading(true); setSeedMsg('');
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/seed-courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ replace }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+      setSeedMsg(`✓ ${data.inserted} courses added to database.`);
+      fetchData();
+    } catch (err) {
+      setSeedMsg('Error: ' + (err.message || 'Failed'));
+    } finally { setSeedLoading(false); }
   }
 
   async function handleSendTestEmails() {
@@ -942,6 +964,19 @@ export default function AdminDashboard() {
           <button onClick={() => setIsProfileModalOpen(true)} className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 flex items-center justify-center gap-2">
             <User size={16} /> Edit My Profile
           </button>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-3">
+          <h3 className="font-semibold text-gray-900">Course Database</h3>
+          <p className="text-sm text-gray-500">Seed the database with the 5 standard GITB courses (UI/UX, IAM, Languages, KYC, Cybersecurity). Safe to run if courses are empty.</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => handleSeedCourses(false)} disabled={seedLoading} className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: '#0B3B2C' }}>
+              {seedLoading ? <><RefreshCw size={14} className="inline animate-spin mr-1" />Working…</> : 'Seed Courses (safe)'}
+            </button>
+            <button type="button" onClick={() => handleSeedCourses(true)} disabled={seedLoading} className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
+              Replace All Courses
+            </button>
+          </div>
+          {seedMsg && <p className={`text-sm font-medium px-3 py-2 rounded-lg ${seedMsg.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>{seedMsg}</p>}
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-3">
           <h3 className="font-semibold text-gray-900">Email System Test</h3>

@@ -1232,7 +1232,12 @@ app.get("/api/courses/public", async (req, res) => {
     if (!db) {
       return res.status(503).json({ detail: "Database not available" });
     }
-    const courses = await db.collection("courses").find({ is_active: true }, { projection: { _id: 0 } }).toArray();
+    const raw = await db.collection("courses").find({ is_active: true }).toArray();
+    // Always return a usable `id` — use the uuid `id` field if present, else stringify _id
+    const courses = raw.map(({ _id, ...rest }) => ({
+      ...rest,
+      id: rest.id || _id.toString(),
+    }));
     res.json(courses);
   } catch (error) {
     console.error("Get public courses error:", error);
@@ -3140,6 +3145,112 @@ app.post("/api/admin/test-emails", authenticate, requireRoles(["admin"]), async 
   results.course_assignment = await sendCourseAssignmentEmail(mockTeacher, mockCourse);
 
   res.json({ message: `Test emails sent to ${testEmail}`, results });
+});
+
+// Seed the database with the 5 standard GITB courses
+app.post("/api/admin/seed-courses", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const { replace = false } = req.body;
+    const existing = await db.collection("courses").countDocuments({});
+
+    if (existing > 0 && !replace) {
+      return res.status(400).json({
+        detail: `Database already has ${existing} courses. Send { replace: true } to overwrite them.`,
+        existing
+      });
+    }
+
+    const GITB_COURSES = [
+      {
+        id: uuidv4(), slug: "uiux-webflow-design",
+        title: "UI/UX & Webflow Design", category: "Design", level: "Beginner",
+        duration: "3 Months", image_url: "/images/course-uiux.jpg",
+        description: "Master user experience design and build stunning websites with Webflow. Learn to design from wireframe to pixel-perfect prototype, then bring it to life without writing a single line of code.",
+        outcomes: ["UI/UX design principles", "Wireframing & prototyping", "Webflow website development", "User research & usability testing"],
+        curriculum: [
+          { week: "Week 1–2", title: "Foundations of UX", desc: "Design thinking, user research, and empathy mapping." },
+          { week: "Week 3–4", title: "UI Fundamentals", desc: "Typography, colour theory, grids, and component systems." },
+          { week: "Week 5–6", title: "Figma Prototyping", desc: "High-fidelity wireframes and interactive prototypes." },
+          { week: "Week 7–10", title: "Webflow Development", desc: "CMS, animations, responsiveness, and launch." },
+          { week: "Week 11–12", title: "Portfolio & Capstone", desc: "Ship a real project and prepare your design portfolio." },
+        ],
+        certifications: ["GITB Diploma", "Google UX Design Certificate"],
+        price: 290, monthly_price: 30, payment_options: ["one_time", "monthly"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "identity-access-management",
+        title: "Identity & Access Management", category: "Security", level: "Intermediate",
+        duration: "3 Months", image_url: "/images/course-iam.jpg",
+        description: "Become an IAM specialist. Learn to design and implement identity frameworks, role-based access control, and multi-factor authentication systems used by enterprise organisations globally.",
+        outcomes: ["IAM frameworks & policies", "Role-based access control (RBAC)", "Single sign-on (SSO) & MFA", "Compliance & governance (ISO 27001, NIST)"],
+        curriculum: [
+          { week: "Week 1–2", title: "IAM Foundations", desc: "Core concepts: identity lifecycle, authentication vs authorisation." },
+          { week: "Week 3–4", title: "Directory Services", desc: "Active Directory, LDAP, and Azure AD configuration." },
+          { week: "Week 5–6", title: "SSO & Federation", desc: "SAML, OAuth 2.0, OpenID Connect in production." },
+          { week: "Week 7–9", title: "RBAC & Governance", desc: "Policy design, least-privilege models, compliance auditing." },
+          { week: "Week 10–12", title: "Capstone Project", desc: "Design and document an IAM deployment for a mock enterprise." },
+        ],
+        certifications: ["GITB Diploma", "Certified Identity & Access Manager (CIAM)"],
+        price: 290, monthly_price: 30, payment_options: ["one_time", "monthly"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "french-spanish-lithuanian",
+        title: "French · Spanish · Lithuanian", category: "Language", level: "All Levels",
+        duration: "3–6 Months", image_url: "/images/course-languages.jpg",
+        description: "Gain professional fluency in French, Spanish, or Lithuanian. From business communication to cultural immersion — our instructors guide you from beginner to certified proficiency.",
+        outcomes: ["Beginner to advanced proficiency", "Business & professional communication", "Cultural insights & real-life conversations", "Official language certification prep"],
+        curriculum: [
+          { week: "Month 1", title: "Core Foundations", desc: "Alphabet, pronunciation, everyday vocabulary and phrases." },
+          { week: "Month 2", title: "Grammar & Structure", desc: "Tenses, sentence construction, and reading comprehension." },
+          { week: "Month 3", title: "Professional Communication", desc: "Business writing, presentations, and formal conversation." },
+          { week: "Month 4–6", title: "Fluency & Certification", desc: "Advanced conversation, exam prep (DELF/DELE/LKI)." },
+        ],
+        certifications: ["GITB Diploma", "Official Language Certification (DELF, DELE, LKI)"],
+        price: 220, monthly_price: 25, payment_options: ["one_time", "monthly"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "kyc-compliance",
+        title: "KYC & Compliance", category: "Finance", level: "Intermediate",
+        duration: "2 Months", image_url: "/images/course-kyc.jpg",
+        description: "Master the compliance skills in highest demand across banking and fintech. Learn KYC procedures, AML regulations, and customer due diligence frameworks used by global financial institutions.",
+        outcomes: ["KYC & AML regulations", "Customer due diligence", "Risk-based assessment", "Fraud detection & prevention"],
+        curriculum: [
+          { week: "Week 1–2", title: "Regulatory Landscape", desc: "FATF, EU AMLD, FinCEN — the global compliance framework." },
+          { week: "Week 3–4", title: "KYC Procedures", desc: "CDD, EDD, onboarding workflows, and documentation." },
+          { week: "Week 5–6", title: "AML & Fraud Detection", desc: "Transaction monitoring, red flags, and SAR filing." },
+          { week: "Week 7–8", title: "Capstone & Exam Prep", desc: "Case studies and CKYCA certification preparation." },
+        ],
+        certifications: ["GITB Diploma", "Certified KYC Analyst (CKYCA)"],
+        price: 195, monthly_price: 30, payment_options: ["one_time", "monthly"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "cybersecurity-vulnerability-tester",
+        title: "Cyber-Security Vulnerability Tester", category: "Security", level: "Intermediate",
+        duration: "4 Months", image_url: "/images/course-cybersec.jpg",
+        description: "Become a certified penetration tester. Learn ethical hacking, vulnerability assessment, and web & network security testing skills that land jobs at top cybersecurity firms.",
+        outcomes: ["Ethical hacking & penetration testing", "Security vulnerability assessment", "Web & network security testing", "Compliance & risk management"],
+        curriculum: [
+          { week: "Week 1–3", title: "Security Fundamentals", desc: "CIA triad, threat modelling, and attack surfaces." },
+          { week: "Week 4–6", title: "Network Penetration", desc: "Reconnaissance, scanning, exploitation with Kali Linux." },
+          { week: "Week 7–9", title: "Web App Security", desc: "OWASP Top 10, Burp Suite, and XSS/SQLi labs." },
+          { week: "Week 10–12", title: "Reporting & Compliance", desc: "Writing professional pen-test reports, risk frameworks." },
+          { week: "Week 13–16", title: "Capstone & Certification", desc: "Full assessment of a live-scope environment. CompTIA PenTest+ prep." },
+        ],
+        certifications: ["GITB Diploma", "CompTIA PenTest+"],
+        price: 340, monthly_price: 35, payment_options: ["one_time", "monthly"], is_active: true,
+      },
+    ];
+
+    if (replace) await db.collection("courses").deleteMany({});
+    const ts = new Date().toISOString();
+    for (const c of GITB_COURSES) {
+      await db.collection("courses").insertOne({ ...c, created_at: ts, created_by: "seed" });
+    }
+    res.json({ success: true, inserted: GITB_COURSES.length, courses: GITB_COURSES.map(c => ({ id: c.id, title: c.title })) });
+  } catch (error) {
+    console.error("Seed courses error:", error);
+    res.status(500).json({ detail: error.message });
+  }
 });
 
 app.use((req, res) => {
