@@ -47,7 +47,10 @@ export default function ResetPassword() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.error || 'Reset failed');
       setStatus('success');
-      setMessage('Your password has been reset successfully. You can now log in.');
+      setMessage('Your password has been reset successfully. You will be redirected to the login page in a few seconds.');
+      setTimeout(() => {
+        navigate('/student-login');
+      }, 4000);
     } catch (err) {
       setStatus('error');
       setMessage(err.message || 'Something went wrong. Please try again.');

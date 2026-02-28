@@ -34,7 +34,7 @@ export default function Apply() {
   useEffect(() => {
     fetchCourses()
       .then(setCourses)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const update = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -91,11 +91,10 @@ export default function Apply() {
             const active = i === step;
             return (
               <div key={i} className="flex items-center">
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-                  done ? 'bg-[#D4F542] text-[#0B3B2C]' :
-                  active ? 'bg-[#0B3B2C] text-white' :
-                  'bg-white text-gray-400 border border-gray-200'
-                }`}>
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${done ? 'bg-[#D4F542] text-[#0B3B2C]' :
+                    active ? 'bg-[#0B3B2C] text-white' :
+                      'bg-white text-gray-400 border border-gray-200'
+                  }`}>
                   {done ? <CheckCircle size={14} /> : <Icon size={14} />}
                   <span className="hidden sm:inline">{s.label}</span>
                   <span className="sm:hidden">{i + 1}</span>

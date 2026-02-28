@@ -186,7 +186,7 @@ app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) {
     // Prevent rewriting browser navigation requests (HTML requests)
     const isHtmlRequest = req.headers.accept && req.headers.accept.includes('text/html');
-    
+
     if (!isHtmlRequest) {
       for (const pattern of apiPatterns) {
         if (req.path.startsWith(pattern) || req.path === pattern) {
@@ -444,12 +444,10 @@ const getLocationFromIP = async (ip) => {
 };
 
 // ============ EMAIL FUNCTIONS ============
-const GITB_LOGO_URL = "https://customer-assets.emergentagent.com/job_c38408f7-f182-46c6-9956-2b3ba5b9837c/artifacts/2j37347h_GITB%20Logo-04%202.png";
-
 const getEmailHeader = (subtitle = "Global Institute of Tech and Business") => `
-  <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #3d7a4a 0%, #2d5a3a 100%); border-radius: 10px 10px 0 0;">
-    <img src="${GITB_LOGO_URL}" alt="GITB Logo" style="max-width: 150px; height: auto; margin-bottom: 15px;" />
-    <p style="margin: 0; font-size: 14px; color: white; opacity: 0.9;">${subtitle}</p>
+  <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #0C4E3A 0%, #0a3d2d 100%); border-radius: 10px 10px 0 0;">
+    <img src="cid:gitb-banner-v2" alt="GITB Logo" style="max-width: 350px; height: auto; margin-bottom: 5px; display: block; margin: 0 auto;" />
+    <p style="margin: 0; font-size: 13px; color: #D4F542; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">${subtitle}</p>
   </div>
 `;
 
@@ -459,11 +457,41 @@ const sendEmail = async (to, subject, html) => {
     return false;
   }
   try {
+    const pngPath = path.join(__dirname, "uploads", "gitb-email-logo.png");
+    const jpgPath = path.join(__dirname, "uploads", "gitb-email-logo.jpg");
+    const attachments = [];
+
+    try {
+      let logoData = null;
+      let ext = "png";
+
+      if (fs.existsSync(jpgPath)) {
+        logoData = fs.readFileSync(jpgPath);
+        ext = "jpg";
+      } else if (fs.existsSync(pngPath)) {
+        logoData = fs.readFileSync(pngPath);
+        ext = "png";
+      }
+
+      if (logoData) {
+        attachments.push({
+          content: logoData,
+          filename: `gitb-banner.${ext}`,
+          cid: "gitb-banner-v2",
+          content_id: "gitb-banner-v2",
+          disposition: "inline"
+        });
+      }
+    } catch (err) {
+      console.warn("Logo attachment warning:", err.message);
+    }
+
     await resend.emails.send({
       from: `GITB <${ADMIN_EMAIL}>`,
       to: [to],
       subject,
-      html
+      html,
+      attachments
     });
     return true;
   } catch (error) {
@@ -1488,7 +1516,7 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
     const targetCourse = await db.collection("courses").findOne({ id: courseId }, { projection: { title: 1 } });
     let result = await db.collection("courses").deleteOne({ id: courseId });
     if (result.deletedCount === 0) {
-      try { result = await db.collection("courses").deleteOne({ _id: new ObjectId(courseId) }); } catch {}
+      try { result = await db.collection("courses").deleteOne({ _id: new ObjectId(courseId) }); } catch { }
     }
     if (result.deletedCount === 0) {
       return res.status(404).json({ detail: "Course not found" });
@@ -1506,7 +1534,8 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
 });
 
 // Clear all unpaid/abandoned applications (admin housekeeping)
-app.delete("/api/admin/applications/unpaid", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+app.delete(["/api/admin/applications/unpaid", "/api/admin/admissions/unpaid"], authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  console.log(`Clearing unpaid applications via ${req.path}`);
   try {
     // Delete anything that is not explicitly payment_status="paid"
     const result = await db.collection("applications").deleteMany({
@@ -2051,7 +2080,7 @@ app.post("/api/student/add-course", authenticate, async (req, res) => {
 
     let course = await db.collection("courses").findOne({ id: course_id });
     if (!course) {
-      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch {}
+      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch { }
     }
     if (!course) return res.status(404).json({ detail: "Course not found" });
 
@@ -2138,7 +2167,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
     const isMonthly = payment_plan === 'monthly';
     const monthlyAmount = course.monthly_price || Math.ceil(course.price / 12);
     const chargeAmount = isMonthly ? monthlyAmount : course.price;
-    const paymentDescription = isMonthly 
+    const paymentDescription = isMonthly
       ? `Monthly installment 1 of 12 - ${course.title}`
       : `Full tuition - ${course.title}`;
 
@@ -2476,7 +2505,7 @@ app.post("/api/enrollments", authenticate, requireRoles(["admin", "registrar"]),
     // Multi-step course lookup: UUID id → ObjectId _id → slug
     let course = await db.collection("courses").findOne({ id: course_id });
     if (!course) {
-      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch {}
+      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch { }
     }
     if (!course) course = await db.collection("courses").findOne({ slug: course_id });
     if (!course) return res.status(404).json({ detail: "Course not found" });
@@ -2649,7 +2678,7 @@ app.get("/api/courses/:courseId/quizzes", authenticate, async (req, res) => {
 });
 
 // Admin: get all quizzes for a course (with questions)
-app.get("/api/admin/courses/:courseId/quizzes", authenticate, requireRoles(["admin","super_admin","teacher","lecturer"]), async (req, res) => {
+app.get("/api/admin/courses/:courseId/quizzes", authenticate, requireRoles(["admin", "super_admin", "teacher", "lecturer"]), async (req, res) => {
   try {
     const { courseId } = req.params;
     const quizzes = await db.collection("quizzes").find({ course_id: courseId }).toArray();
@@ -2660,7 +2689,7 @@ app.get("/api/admin/courses/:courseId/quizzes", authenticate, requireRoles(["adm
 });
 
 // Admin: create quiz
-app.post("/api/admin/quizzes", authenticate, requireRoles(["admin","super_admin","teacher","lecturer"]), async (req, res) => {
+app.post("/api/admin/quizzes", authenticate, requireRoles(["admin", "super_admin", "teacher", "lecturer"]), async (req, res) => {
   try {
     const { course_id, title, description, questions, time_limit_minutes } = req.body;
     if (!course_id || !title || !questions || !Array.isArray(questions)) {
@@ -2693,7 +2722,7 @@ app.post("/api/admin/quizzes", authenticate, requireRoles(["admin","super_admin"
 });
 
 // Admin: update quiz
-app.put("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin","super_admin","teacher","lecturer"]), async (req, res) => {
+app.put("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin", "super_admin", "teacher", "lecturer"]), async (req, res) => {
   try {
     const { quizId } = req.params;
     const update = req.body;
@@ -2718,7 +2747,7 @@ app.put("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin","super
 });
 
 // Admin: delete quiz
-app.delete("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin","super_admin"]), async (req, res) => {
+app.delete("/api/admin/quizzes/:quizId", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
   try {
     const { quizId } = req.params;
     await db.collection("quizzes").updateOne({ id: quizId }, { $set: { is_active: false } });
@@ -3223,7 +3252,7 @@ app.post("/api/admin/teachers/:teacherId/assign-course", authenticate, requireRo
 
     let course = await db.collection("courses").findOne({ id: course_id });
     if (!course) {
-      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch {}
+      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch { }
     }
     if (!course) return res.status(404).json({ detail: "Course not found" });
 
@@ -3255,7 +3284,8 @@ app.delete("/api/admin/teachers/:teacherId/courses/:courseId", authenticate, req
 });
 
 // Send test emails for all email types
-app.post("/api/admin/test-emails", authenticate, requireRoles(["admin"]), async (req, res) => {
+// Alias for test-email (singular)
+app.post(["/api/admin/test-emails", "/api/admin/test-email"], authenticate, requireRoles(["admin"]), async (req, res) => {
   const testEmail = req.body.email || "taiwojos2@yahoo.com";
   const results = {};
 
