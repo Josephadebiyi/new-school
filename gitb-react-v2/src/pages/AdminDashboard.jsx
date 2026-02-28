@@ -216,17 +216,38 @@ export default function AdminDashboard() {
   // ─── COURSES ───────────────────────────────────────────────────────────────
 
   function openCourseModal(course = null) {
-    setEditingCourse(course ? { ...course } : { title: '', category: 'Technology', description: '', duration: '', level: '', price: 0, monthly_price: 0, payment_options: ['one_time'], is_active: true, img: '' });
+    setEditingCourse(course ? { ...course } : {
+      title: '', category: 'Technology', description: '', overview: '', duration: '', level: '',
+      price: 0, monthly_price: 0, payment_options: ['one_time'], is_active: true, img: '',
+      cohort_start_date: '', brochure_url: '',
+      modules: '', career_opportunities: '', career_pathways: '', salary_trend: '',
+    });
     setIsCourseModalOpen(true);
   }
 
   async function saveCourse(e) {
     e.preventDefault();
     try {
-      if (editingCourse.id || editingCourse._id) {
-        await updateCourse(token, editingCourse.id || editingCourse._id, editingCourse);
+      const parseJsonField = (val, fallback = []) => {
+        if (Array.isArray(val)) return val;
+        if (!val || !val.trim()) return fallback;
+        try { return JSON.parse(val); } catch { return fallback; }
+      };
+      const parseLines = (val) => {
+        if (Array.isArray(val)) return val.filter(Boolean);
+        return (val || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      };
+      const payload = {
+        ...editingCourse,
+        modules: parseJsonField(editingCourse.modules),
+        career_opportunities: parseLines(editingCourse.career_opportunities),
+        career_pathways: parseLines(editingCourse.career_pathways),
+        salary_trend: parseJsonField(editingCourse.salary_trend),
+      };
+      if (payload.id || payload._id) {
+        await updateCourse(token, payload.id || payload._id, payload);
       } else {
-        await createCourse(token, editingCourse);
+        await createCourse(token, payload);
       }
       setIsCourseModalOpen(false);
       fetchData();
@@ -1240,8 +1261,37 @@ export default function AdminDashboard() {
                 <input value={editingCourse.duration || ''} onChange={(e) => setEditingCourse((p) => ({ ...p, duration: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="e.g. 6 months" />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea rows={3} value={editingCourse.description || ''} onChange={(e) => setEditingCourse((p) => ({ ...p, description: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Short Description (hero)</label>
+                <textarea rows={2} value={editingCourse.description || ''} onChange={(e) => setEditingCourse((p) => ({ ...p, description: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Course Overview (full detail page)</label>
+                <textarea rows={4} value={editingCourse.overview || ''} onChange={(e) => setEditingCourse((p) => ({ ...p, overview: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" placeholder="Detailed overview shown on the course detail page…" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Next Cohort Start Date</label>
+                <input value={editingCourse.cohort_start_date || ''} onChange={(e) => setEditingCourse((p) => ({ ...p, cohort_start_date: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="e.g. April 30th 2026" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Brochure / Curriculum PDF URL</label>
+                <input value={editingCourse.brochure_url || ''} onChange={(e) => setEditingCourse((p) => ({ ...p, brochure_url: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="https://…/brochure.pdf" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Curriculum Modules (JSON)</label>
+                <textarea rows={5} value={typeof editingCourse.modules === 'string' ? editingCourse.modules : JSON.stringify(editingCourse.modules || [], null, 2)} onChange={(e) => setEditingCourse((p) => ({ ...p, modules: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none resize-none" placeholder={'[\n  { "title": "Module 1 - Intro", "topics": ["Topic A", "Topic B"] },\n  { "title": "Module 2 - Advanced", "topics": ["Topic C"] }\n]'} />
+                <p className="text-xs text-gray-400 mt-1">Array of <code>{`{ title, topics[] }`}</code> — shown as collapsible modules on the course page.</p>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Career Opportunities (one per line)</label>
+                <textarea rows={4} value={Array.isArray(editingCourse.career_opportunities) ? editingCourse.career_opportunities.join('\n') : (editingCourse.career_opportunities || '')} onChange={(e) => setEditingCourse((p) => ({ ...p, career_opportunities: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" placeholder={"United States – $105,000 – $155,000 USD\nUnited Kingdom – £65,000 – £95,000 GBP"} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Career Pathways (one per line)</label>
+                <textarea rows={3} value={Array.isArray(editingCourse.career_pathways) ? editingCourse.career_pathways.join('\n') : (editingCourse.career_pathways || '')} onChange={(e) => setEditingCourse((p) => ({ ...p, career_pathways: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" placeholder={"Product Manager\nProduct Owner\nTechnical Product Manager"} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salary Trend (JSON)</label>
+                <textarea rows={4} value={typeof editingCourse.salary_trend === 'string' ? editingCourse.salary_trend : JSON.stringify(editingCourse.salary_trend || [], null, 2)} onChange={(e) => setEditingCourse((p) => ({ ...p, salary_trend: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none resize-none" placeholder={'[\n  { "year": 2020, "salary": "$116,000" },\n  { "year": 2024, "salary": "$146,000" }\n]'} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>

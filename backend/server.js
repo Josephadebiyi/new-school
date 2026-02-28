@@ -446,7 +446,7 @@ const getLocationFromIP = async (ip) => {
 // ============ EMAIL FUNCTIONS ============
 const getEmailHeader = (subtitle = "Global Institute of Tech and Business") => `
   <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #0C4E3A 0%, #0a3d2d 100%); border-radius: 10px 10px 0 0;">
-    <img src="cid:gitb-banner-v2" alt="GITB Logo" style="max-width: 350px; height: auto; margin-bottom: 5px; display: block; margin: 0 auto;" />
+    <img src="https://gitb.lt/images/email.jpg" alt="GITB" style="max-width: 350px; height: auto; display: block; margin: 0 auto 8px;" />
     <p style="margin: 0; font-size: 13px; color: #D4F542; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">${subtitle}</p>
   </div>
 `;
@@ -457,41 +457,11 @@ const sendEmail = async (to, subject, html) => {
     return false;
   }
   try {
-    const pngPath = path.join(__dirname, "uploads", "gitb-email-logo.png");
-    const jpgPath = path.join(__dirname, "uploads", "gitb-email-logo.jpg");
-    const attachments = [];
-
-    try {
-      let logoData = null;
-      let ext = "png";
-
-      if (fs.existsSync(jpgPath)) {
-        logoData = fs.readFileSync(jpgPath);
-        ext = "jpg";
-      } else if (fs.existsSync(pngPath)) {
-        logoData = fs.readFileSync(pngPath);
-        ext = "png";
-      }
-
-      if (logoData) {
-        attachments.push({
-          content: logoData,
-          filename: `gitb-banner.${ext}`,
-          cid: "gitb-banner-v2",
-          content_id: "gitb-banner-v2",
-          disposition: "inline"
-        });
-      }
-    } catch (err) {
-      console.warn("Logo attachment warning:", err.message);
-    }
-
     await resend.emails.send({
       from: `GITB <${ADMIN_EMAIL}>`,
       to: [to],
       subject,
       html,
-      attachments
     });
     return true;
   } catch (error) {
