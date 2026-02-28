@@ -399,6 +399,33 @@ export default function AdminDashboard() {
     } catch (err) { alert(err.message || 'Failed to remove.'); }
   }
 
+  async function handleDeleteCourse(course) {
+    if (!confirm(`Delete "${course.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/courses/${course.id || course._id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Delete failed');
+      fetchData();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function handleClearUnpaidApplications() {
+    if (!confirm('Delete all unpaid/abandoned applications? Only applications where the fee was never paid will be removed.')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/applications/unpaid`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed');
+      alert(`✓ ${data.deleted} unpaid applications cleared.`);
+      fetchData();
+    } catch (err) { alert(err.message); }
+  }
+
   async function handleSeedCourses(replace = false) {
     if (replace && !confirm('This will DELETE all existing courses and replace them with the 5 standard GITB courses. Continue?')) return;
     setSeedLoading(true); setSeedMsg('');
@@ -656,6 +683,7 @@ export default function AdminDashboard() {
               <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search..." className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-700 w-48" />
             </div>
             <button onClick={() => downloadCSV(filteredApps, 'applications')} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"><DownloadIcon size={14} /> CSV</button>
+            <button onClick={handleClearUnpaidApplications} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-red-600 bg-red-50 hover:bg-red-100 font-medium"><Trash2 size={14} /> Clear Unpaid</button>
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -725,6 +753,7 @@ export default function AdminDashboard() {
                   <button onClick={() => openPricingModal(course)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 text-xs font-medium hover:bg-yellow-100"><Tag size={12} /> Pricing</button>
                   <button onClick={() => openMaterialsModal(course)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100"><FileText size={12} /> Materials</button>
                   <button onClick={() => openQuizModal(course)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100"><ClipboardList size={12} /> Quizzes</button>
+                  <button onClick={() => handleDeleteCourse(course)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100"><Trash2 size={12} /> Delete</button>
                 </div>
               </div>
             </div>

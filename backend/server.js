@@ -1425,7 +1425,10 @@ app.put("/api/courses/:courseId/tuition", authenticate, requireRoles(["admin"]),
 app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), async (req, res) => {
   try {
     const { courseId } = req.params;
-    const result = await db.collection("courses").deleteOne({ id: courseId });
+    let result = await db.collection("courses").deleteOne({ id: courseId });
+    if (result.deletedCount === 0) {
+      try { result = await db.collection("courses").deleteOne({ _id: new ObjectId(courseId) }); } catch {}
+    }
     if (result.deletedCount === 0) {
       return res.status(404).json({ detail: "Course not found" });
     }
@@ -1433,6 +1436,19 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
   } catch (error) {
     console.error("Delete course error:", error);
     res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// Clear all unpaid/abandoned applications (admin housekeeping)
+app.delete("/api/admin/applications/unpaid", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const result = await db.collection("applications").deleteMany({
+      payment_status: { $ne: "paid" },
+    });
+    res.json({ deleted: result.deletedCount, message: `Cleared ${result.deletedCount} unpaid applications` });
+  } catch (error) {
+    console.error("Clear unpaid applications error:", error);
+    res.status(500).json({ detail: error.message });
   }
 });
 
@@ -1520,21 +1536,28 @@ app.post("/api/applications/create", async (req, res) => {
     }
     console.log("Found course:", course.title);
 
-    const existingApp = await db.collection("applications").findOne({
+    // Only block if they have a PAID application — failed/abandoned checkouts are deleted so they can retry
+    const paidApp = await db.collection("applications").findOne({
       email,
       course_id: course.id,
-      status: { $in: ["pending", "approved", "pending_payment"] }
+      payment_status: "paid",
     });
-
-    if (existingApp) {
-      return res.status(400).json({ detail: "You already have an application for this course" });
+    if (paidApp) {
+      return res.status(400).json({ detail: "You have already paid the application fee for this course." });
     }
 
-    const applicationId = uuidv4();
+    // Delete any previous unpaid/abandoned application so the student can retry
+    await db.collection("applications").deleteMany({
+      email,
+      course_id: course.id,
+      payment_status: { $ne: "paid" },
+    });
 
     if (!stripe) {
       return res.status(503).json({ detail: "Payment service not available" });
     }
+
+    const applicationId = uuidv4();
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
