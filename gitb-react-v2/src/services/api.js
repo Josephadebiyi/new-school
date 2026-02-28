@@ -72,7 +72,7 @@ export async function createApplication(payload) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || data.detail || 'Submission failed');
-  return data; // { checkout_url, session_id, application_id }
+  return data.data || data; // backend wraps in { data: { checkout_url } }
 }
 
 export async function checkApplicationStatus(sessionId) {
