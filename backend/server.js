@@ -1534,17 +1534,19 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
 });
 
 // Clear all unpaid/abandoned applications (admin housekeeping)
-app.delete(["/api/admin/applications/unpaid", "/api/admin/admissions/unpaid"], authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+app.delete("/api/admin/applications/unpaid", authenticate, requireRoles(["admin", "registrar", "super_admin"]), async (req, res) => {
   console.log(`Clearing unpaid applications via ${req.path}`);
   try {
-    // Delete anything that is not explicitly payment_status="paid"
     const result = await db.collection("applications").deleteMany({
       $or: [
+        { status: "pending_payment" },
         { payment_status: { $exists: false } },
         { payment_status: null },
-        { payment_status: { $nin: ["paid"] } },
+        { payment_status: "pending" },
+        { payment_status: { $nin: ["paid", "refunded"] } },
       ],
     });
+    console.log(`Successfully cleared ${result.deletedCount} items`);
     res.json({ deleted: result.deletedCount, message: `Cleared ${result.deletedCount} unpaid/abandoned applications` });
   } catch (error) {
     console.error("Clear unpaid applications error:", error);
@@ -1615,131 +1617,109 @@ app.post("/api/courses/:courseId/materials", authenticate, requireRoles(["admin"
 });
 
 // ============ APPLICATION ROUTES ============
+// STRIPE-FIRST FLOW: Application is only stored in DB after payment confirmed by webhook.
+// This prevents "already applied" loops and keeps admissions table clean.
 app.post("/api/applications/create", async (req, res) => {
   try {
-    if (!db) {
-      return res.status(503).json({ detail: "Database not available" });
-    }
+    if (!db) return res.status(503).json({ detail: "Database not available" });
+    if (!stripe) return res.status(503).json({ detail: "Payment service not available. Please contact admissions@gitb.lt" });
 
     const {
       first_name, last_name, email, phone, course_id,
       country, city, address, date_of_birth,
       identification_url, high_school_certificate_url,
-      origin_url
+      motivation, origin_url
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
-      console.log("Missing fields:", { first_name: !!first_name, last_name: !!last_name, email: !!email, course_id: !!course_id });
-      return res.status(422).json({ detail: "Missing required fields" });
+      return res.status(422).json({ detail: "Missing required fields: first_name, last_name, email, course_id" });
     }
 
-    console.log("Looking up course:", course_id);
+    // Find the course (by UUID id, slug, or title)
     let course = await db.collection("courses").findOne({ id: course_id });
+    if (!course) course = await db.collection("courses").findOne({ slug: course_id });
     if (!course) {
-      course = await db.collection("courses").findOne({ slug: course_id });
+      const escaped = course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      course = await db.collection("courses").findOne({ slug: { $regex: new RegExp(`^${escaped}$`, 'i') } })
+        || await db.collection("courses").findOne({ title: { $regex: new RegExp(`^${escaped}$`, 'i') } });
     }
     if (!course) {
-      // Try case-insensitive slug search
-      course = await db.collection("courses").findOne({
-        slug: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-      });
+      console.error("Course not found for id:", course_id);
+      return res.status(404).json({ detail: "Course not found. Please select a valid programme." });
     }
-    if (!course) {
-      // Try finding by title (case-insensitive)
-      course = await db.collection("courses").findOne({
-        title: { $regex: new RegExp(`^${course_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-      });
-    }
-    if (!course) {
-      console.log("Course not found for:", course_id);
-      return res.status(404).json({ detail: "Course not found" });
-    }
-    console.log("Found course:", course.title);
 
-    // Only block if they have a PAID application — failed/abandoned checkouts are deleted so they can retry
+    // Block only if a PAID application already exists — never block on pending/failed
     const paidApp = await db.collection("applications").findOne({
-      email,
+      email: email.toLowerCase().trim(),
       course_id: course.id,
       payment_status: "paid",
     });
     if (paidApp) {
-      return res.status(400).json({ detail: "You have already paid the application fee for this course." });
+      return res.status(400).json({ detail: "You have already paid the application fee for this course. Please contact admissions@gitb.lt if you believe this is an error." });
     }
 
-    // Delete any previous unpaid/abandoned application so the student can retry
-    await db.collection("applications").deleteMany({
-      email,
-      course_id: course.id,
-      payment_status: { $ne: "paid" },
-    });
-
-    if (!stripe) {
-      return res.status(503).json({ detail: "Payment service not available" });
-    }
-
+    // Generate a unique application ID to embed in Stripe metadata
     const applicationId = uuidv4();
+    const frontendBase = origin_url || FRONTEND_URL || 'https://gitb.lt';
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [{
-        price_data: {
-          currency: "eur",
-          product_data: {
-            name: `Application Fee - ${course.title}`,
-            description: `Application fee for ${course.title} at GITB`
+    // Create Stripe Checkout Session — NO DB write until webhook confirms payment
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [{
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: `Application Fee — ${course.title}`,
+              description: `One-time non-refundable application fee for ${course.title} at GITB`,
+            },
+            unit_amount: Math.round(APPLICATION_FEE * 100),
           },
-          unit_amount: Math.round(APPLICATION_FEE * 100)
+          quantity: 1,
+        }],
+        mode: "payment",
+        success_url: `${frontendBase}/apply/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontendBase}/apply?cancelled=true`,
+        customer_email: email,
+        metadata: {
+          type: "application_fee",
+          application_id: applicationId,
+          course_id: course.id,
+          course_title: course.title,
+          first_name,
+          last_name,
+          email: email.toLowerCase().trim(),
+          phone: phone || "",
+          country: country || "",
+          city: city || "",
+          address: address || "",
+          date_of_birth: date_of_birth || "",
+          identification_url: identification_url || "",
+          high_school_certificate_url: high_school_certificate_url || "",
+          motivation: (motivation || "").slice(0, 500), // Stripe metadata values max 500 chars
         },
-        quantity: 1
-      }],
-      mode: "payment",
-      success_url: `${origin_url || FRONTEND_URL}/apply/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin_url || FRONTEND_URL}/apply?cancelled=true`,
-      customer_email: email,
-      metadata: {
-        application_id: applicationId,
-        course_id: course.id,
-        course_title: course.title,
-        first_name,
-        last_name,
-        email
-      }
-    });
+      });
+    } catch (stripeErr) {
+      console.error("Stripe session creation failed:", stripeErr.message, stripeErr.type);
+      return res.status(502).json({
+        detail: `Payment session could not be created: ${stripeErr.message}. Please try again or contact admissions@gitb.lt`,
+      });
+    }
 
-    const application = {
-      id: applicationId,
-      first_name,
-      last_name,
-      email,
-      phone: phone || null,
-      course_id: course.id,
-      course_title: course.title,
-      country: country || null,
-      city: city || null,
-      address: address || null,
-      date_of_birth: date_of_birth || null,
-      identification_url: identification_url || null,
-      high_school_certificate_url: high_school_certificate_url || null,
-      status: "pending_payment",
-      stripe_session_id: session.id,
-      payment_status: "pending",
-      payment_amount: APPLICATION_FEE,
-      created_at: new Date().toISOString()
-    };
+    console.log(`Stripe session created for ${email} → ${course.title} (session: ${session.id})`);
 
-    await db.collection("applications").insertOne(application);
-
-    // Wrap in `data` object - frontend expects response.data.checkout_url
+    // Return checkout URL — application will be created in DB by webhook on payment success
     res.json({
       data: {
         checkout_url: session.url,
         session_id: session.id,
-        application_id: applicationId
-      }
+        application_id: applicationId,
+      },
     });
   } catch (error) {
     console.error("Create application error:", error);
-    res.status(500).json({ detail: error.message || "Internal server error" });
+    res.status(500).json({ detail: "An unexpected error occurred. Please try again." });
   }
 });
 
@@ -2369,29 +2349,46 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
         }
 
         console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
-      } else if (metadata.application_id) {
-        // Application fee payment - update status and notify applicant
-        await db.collection("applications").updateOne(
-          { id: metadata.application_id },
-          {
-            $set: {
-              status: "pending",
-              payment_status: "paid",
-              paid_at: new Date().toISOString()
-            }
+      } else if (metadata.type === "application_fee" && metadata.application_id) {
+        // Stripe-first flow: Application record does NOT exist yet — create it now.
+        // Idempotency check: skip if already created (webhook may fire twice).
+        const exists = await db.collection("applications").findOne({ id: metadata.application_id });
+        if (!exists) {
+          await db.collection("applications").insertOne({
+            id: metadata.application_id,
+            first_name: metadata.first_name || "",
+            last_name: metadata.last_name || "",
+            email: metadata.email || "",
+            phone: metadata.phone || null,
+            course_id: metadata.course_id || null,
+            course_title: metadata.course_title || null,
+            country: metadata.country || null,
+            city: metadata.city || null,
+            address: metadata.address || null,
+            date_of_birth: metadata.date_of_birth || null,
+            identification_url: metadata.identification_url || null,
+            high_school_certificate_url: metadata.high_school_certificate_url || null,
+            motivation: metadata.motivation || null,
+            status: "pending",
+            payment_status: "paid",
+            stripe_session_id: session.id,
+            payment_amount: APPLICATION_FEE,
+            created_at: new Date().toISOString(),
+            paid_at: new Date().toISOString(),
+          });
+          console.log(`Application created for ${metadata.email} → course ${metadata.course_id} (id: ${metadata.application_id})`);
+
+          // Send confirmation email to the applicant
+          if (metadata.email && metadata.first_name) {
+            const courseTitle = metadata.course_title ||
+              (await db.collection("courses").findOne({ id: metadata.course_id }))?.title ||
+              "your chosen programme";
+            await sendApplicationReceivedEmail(metadata.email, metadata.first_name, courseTitle);
+            console.log(`Confirmation email sent to ${metadata.email}`);
           }
-        );
-
-        // Send confirmation email to the applicant
-        if (metadata.email && metadata.first_name) {
-          const courseTitle = metadata.course_title ||
-            (await db.collection("courses").findOne({ id: metadata.course_id }))?.title ||
-            "your chosen programme";
-          await sendApplicationReceivedEmail(metadata.email, metadata.first_name, courseTitle);
-          console.log(`Confirmation email sent to ${metadata.email}`);
+        } else {
+          console.log(`Duplicate webhook for application ${metadata.application_id} — skipping`);
         }
-
-        console.log(`Application fee paid for ${metadata.application_id}`);
       }
     }
 
