@@ -2115,8 +2115,25 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
 
 
     const isMonthly = payment_plan === 'monthly';
-    const monthlyAmount = course.monthly_price || Math.ceil(course.price / 12);
-    const chargeAmount = isMonthly ? monthlyAmount : course.price;
+
+    // Safely extract numeric price — course.price may be a number, an object {monthly,upfront}, or null/undefined
+    const rawUpfront =
+      typeof course.price === 'number' ? course.price
+      : typeof course.price === 'object' && course.price !== null
+        ? Number(course.price.upfront ?? course.price.monthly ?? 0)
+        : Number(course.price) || 0;
+    const rawMonthly = Number(course.monthly_price) || 0;
+
+    const upfrontAmount = rawUpfront;
+    const monthlyAmount = rawMonthly || (rawUpfront > 0 ? Math.ceil(rawUpfront / 12) : 0);
+    const chargeAmount = isMonthly ? monthlyAmount : upfrontAmount;
+
+    if (!chargeAmount || chargeAmount <= 0 || isNaN(chargeAmount)) {
+      return res.status(422).json({
+        detail: `Tuition fee for "${course.title}" has not been set. Please contact admissions@gitb.lt`
+      });
+    }
+
     const paymentDescription = isMonthly
       ? `Monthly installment 1 of 12 - ${course.title}`
       : `Full tuition - ${course.title}`;

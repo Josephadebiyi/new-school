@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Monitor, ClipboardList, CreditCard, User, LogOut,
   ChevronLeft, ChevronRight, Menu, X, CheckCircle, Circle, Play, FileText,
@@ -44,6 +44,7 @@ function TypeIcon({ type }) {
 export default function StudentDashboard() {
   const { user, token, logout, updateUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -63,6 +64,7 @@ export default function StudentDashboard() {
   const [addingCourse, setAddingCourse] = useState('');
   const [addCourseMsg, setAddCourseMsg] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', phone: '', profilePicture: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
@@ -75,6 +77,21 @@ export default function StudentDashboard() {
     if (!token) { navigate('/login'); return; }
     loadInitial();
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle Stripe redirect back after payment
+  useEffect(() => {
+    const status = searchParams.get('payment');
+    if (status === 'success') {
+      setError('');
+      setPaymentSuccess(true);
+      loadInitial();
+      setSearchParams({}, { replace: true });
+      setActiveView('dashboard');
+    } else if (status === 'cancelled') {
+      setError('Payment was cancelled. You can try again anytime.');
+      setSearchParams({}, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadInitial() {
     setLoading(true); setError('');
@@ -164,13 +181,15 @@ export default function StudentDashboard() {
     } catch (err) { setError(err.message || 'Failed to submit quiz.'); }
   }
 
-  async function handlePayment(courseIdOrEnrollment) {
+  async function handlePayment(courseIdOrEnrollment, explicitPlan = null) {
     setPaymentLoading(true); setError('');
     try {
       const courseId = typeof courseIdOrEnrollment === 'string'
         ? courseIdOrEnrollment
         : courseIdOrEnrollment.course_id || courseIdOrEnrollment.courseId;
-      const plan = (typeof courseIdOrEnrollment === 'object' && courseIdOrEnrollment.payment_plan) || 'one_time';
+      const plan = explicitPlan
+        || (typeof courseIdOrEnrollment === 'object' ? courseIdOrEnrollment.payment_plan : null)
+        || 'one_time';
       const data = await createTuitionPayment(token, courseId, plan, window.location.origin);
       const url = data?.checkout_url || data?.data?.checkout_url;
       if (url) window.location.href = url;
@@ -352,12 +371,12 @@ export default function StudentDashboard() {
                         <p className="text-xs text-yellow-700 bg-yellow-50 px-3 py-1.5 rounded-lg text-center">Added — pay tuition to unlock</p>
                         <div className="flex gap-2">
                           {course.price?.monthly > 0 && (
-                            <button onClick={() => handlePayment(course.id)} disabled={paymentLoading} className="flex-1 py-2 rounded-xl text-xs font-semibold border-2 disabled:opacity-50" style={{ borderColor: '#0C4E3A', color: '#0C4E3A' }}>
-                              Pay €{course.price.monthly}/mo
+                            <button onClick={() => handlePayment(course.id, 'monthly')} disabled={paymentLoading} className="flex-1 py-2 rounded-xl text-xs font-semibold border-2 disabled:opacity-50" style={{ borderColor: '#0C4E3A', color: '#0C4E3A' }}>
+                              {paymentLoading ? '...' : `€${course.price.monthly}/mo`}
                             </button>
                           )}
-                          <button onClick={() => handlePayment(course.id)} disabled={paymentLoading} className="flex-1 py-2 rounded-xl text-white text-xs font-semibold disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
-                            {paymentLoading ? '...' : course.price?.upfront > 0 ? `Pay €${course.price.upfront}` : 'Pay Tuition'}
+                          <button onClick={() => handlePayment(course.id, 'one_time')} disabled={paymentLoading} className="flex-1 py-2 rounded-xl text-white text-xs font-semibold disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
+                            {paymentLoading ? '...' : course.price?.upfront > 0 ? `€${course.price.upfront} full` : 'Pay Tuition'}
                           </button>
                         </div>
                       </div>
@@ -402,9 +421,16 @@ export default function StudentDashboard() {
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Tuition Payment Required</h3>
               <p className="text-sm text-gray-500 mb-5 max-w-sm mx-auto">Pay your tuition fee to unlock all materials, assignments, and quizzes for <strong>{selectedCourse.title}</strong>.</p>
-              <button onClick={() => handlePayment(selectedCourse.id)} disabled={paymentLoading} className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
-                {paymentLoading ? 'Starting…' : 'Pay Tuition Now'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                {selectedCourse.price?.monthly > 0 && (
+                  <button onClick={() => handlePayment(selectedCourse.id, 'monthly')} disabled={paymentLoading} className="px-6 py-2.5 rounded-xl font-semibold text-sm border-2 disabled:opacity-50" style={{ borderColor: '#0C4E3A', color: '#0C4E3A' }}>
+                    {paymentLoading ? 'Starting…' : `Pay €${selectedCourse.price.monthly}/month`}
+                  </button>
+                )}
+                <button onClick={() => handlePayment(selectedCourse.id, 'one_time')} disabled={paymentLoading} className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
+                  {paymentLoading ? 'Starting…' : selectedCourse.price?.upfront > 0 ? `Pay €${selectedCourse.price.upfront} in full` : 'Pay Tuition Now'}
+                </button>
+              </div>
             </div>
           );
           return (
@@ -803,6 +829,13 @@ export default function StudentDashboard() {
 
         {/* Page Content */}
         <main className="flex-1 px-4 md:px-6 py-6">
+          {paymentSuccess && (
+            <div className="mb-4 flex items-center gap-3 bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm">
+              <CheckCircle size={18} className="text-green-600 flex-shrink-0" />
+              <span className="flex-1 font-medium">Payment successful! Your course is now unlocked — click "Open Course" to start learning.</span>
+              <button onClick={() => setPaymentSuccess(false)}><X size={14} className="text-green-500 hover:text-green-700" /></button>
+            </div>
+          )}
           {error && (
             <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
               <AlertCircle size={16} className="flex-shrink-0" />
