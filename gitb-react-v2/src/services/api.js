@@ -381,6 +381,19 @@ export async function updateUserById(token, userId, payload) {
   return data;
 }
 
+// ─── Student Self-Service Enrollment ─────────────────────────────────────────
+
+export async function studentAddCourse(token, courseId) {
+  const res = await fetch(`${API_BASE}/api/student/add-course`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ course_id: courseId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to add course');
+  return data;
+}
+
 // ─── Admin Enrollment ────────────────────────────────────────────────────────
 
 export async function adminEnrollStudent(token, userId, courseId) {

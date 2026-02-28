@@ -55,8 +55,9 @@ export default function Apply() {
         phone: form.phone,
         course_id: form.courseId,
         motivation: form.motivation,
+        origin_url: window.location.origin,
       });
-      if (data.checkout_url) {
+      if (data?.checkout_url) {
         window.location.href = data.checkout_url;
       } else {
         setError('Payment session could not be created. Please try again.');

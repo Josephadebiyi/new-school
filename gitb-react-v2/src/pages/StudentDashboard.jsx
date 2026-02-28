@@ -12,6 +12,7 @@ import {
   getMyCourses, getMyEnrollments, getCourseMaterials, getCourseQuizzes,
   getQuizById, submitQuiz, getMyQuizResults, markLessonComplete,
   getCourseProgress, createTuitionPayment, updateProfile, uploadFile,
+  fetchCourses, studentAddCourse,
 } from '../services/api';
 
 function isYouTube(url) {
@@ -58,6 +59,9 @@ export default function StudentDashboard() {
   const [quizResult, setQuizResult] = useState(null);
   const [myResults, setMyResults] = useState([]);
   const [progress, setProgress] = useState({});
+  const [allCourses, setAllCourses] = useState([]);
+  const [addingCourse, setAddingCourse] = useState('');
+  const [addCourseMsg, setAddCourseMsg] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', phone: '', profilePicture: '' });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -75,12 +79,13 @@ export default function StudentDashboard() {
   async function loadInitial() {
     setLoading(true); setError('');
     try {
-      const [coursesData, enrollData, resultsData] = await Promise.allSettled([
-        getMyCourses(token), getMyEnrollments(token), getMyQuizResults(token),
+      const [coursesData, enrollData, resultsData, allCoursesData] = await Promise.allSettled([
+        getMyCourses(token), getMyEnrollments(token), getMyQuizResults(token), fetchCourses(),
       ]);
       const c = coursesData.status === 'fulfilled' ? coursesData.value : [];
       const e = enrollData.status === 'fulfilled' ? enrollData.value : [];
       const r = resultsData.status === 'fulfilled' ? resultsData.value : [];
+      if (allCoursesData.status === 'fulfilled') setAllCourses(Array.isArray(allCoursesData.value) ? allCoursesData.value : []);
       setCourses(c);
       setEnrollments(Array.isArray(e) ? e : []);
       setMyResults(Array.isArray(r) ? r : []);
@@ -154,17 +159,30 @@ export default function StudentDashboard() {
     } catch (err) { setError(err.message || 'Failed to submit quiz.'); }
   }
 
-  async function handlePayment(enrollment) {
+  async function handlePayment(courseIdOrEnrollment) {
     setPaymentLoading(true); setError('');
     try {
-      const courseId = enrollment.course_id || enrollment.courseId;
-      const plan = enrollment.payment_plan || 'one_time';
+      const courseId = typeof courseIdOrEnrollment === 'string'
+        ? courseIdOrEnrollment
+        : courseIdOrEnrollment.course_id || courseIdOrEnrollment.courseId;
+      const plan = (typeof courseIdOrEnrollment === 'object' && courseIdOrEnrollment.payment_plan) || 'one_time';
       const data = await createTuitionPayment(token, courseId, plan, window.location.origin);
       const url = data?.checkout_url || data?.data?.checkout_url;
       if (url) window.location.href = url;
       else setError('No checkout URL returned. Please contact support.');
     } catch (err) { setError(err.message || 'Payment failed. Please try again.'); }
     finally { setPaymentLoading(false); }
+  }
+
+  async function handleAddCourse(courseId) {
+    setAddingCourse(courseId); setAddCourseMsg('');
+    try {
+      await studentAddCourse(token, courseId);
+      setAddCourseMsg('Course added! Pay tuition to unlock full access.');
+      await loadInitial();
+    } catch (err) {
+      setAddCourseMsg(err.message || 'Failed to add course.');
+    } finally { setAddingCourse(''); }
   }
 
   async function handleProfileImageUpload(e) {
@@ -188,6 +206,7 @@ export default function StudentDashboard() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'browse', label: 'Browse Courses', icon: BookOpen },
     { id: 'study', label: 'Study Room', icon: Monitor },
     { id: 'quizzes', label: 'Quizzes', icon: ClipboardList },
     { id: 'payments', label: 'Payments', icon: CreditCard },
@@ -272,6 +291,86 @@ export default function StudentDashboard() {
     );
   }
 
+  function BrowseCoursesView() {
+    // Build a map of enrollments by course_id for quick lookup
+    const enrollmentMap = {};
+    enrollments.forEach((e) => { enrollmentMap[e.course_id] = e; });
+
+    return (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Browse Courses</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Add any course to your dashboard. Pay tuition to unlock full access.</p>
+        </div>
+        {addCourseMsg && (
+          <div className={`px-4 py-3 rounded-xl text-sm font-medium ${addCourseMsg.includes('added') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>{addCourseMsg}</div>
+        )}
+        {allCourses.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center border border-dashed border-gray-200">
+            <BookOpen size={40} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500">No courses available at the moment.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {allCourses.map((course) => {
+              const enrollment = enrollmentMap[course.id];
+              const isPaid = enrollment?.payment_status === 'paid';
+              const isPending = enrollment && !isPaid;
+
+              return (
+                <div key={course.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                  <div className="relative">
+                    <img src={course.img || '/images/course-uiux.jpg'} alt={course.title} className="w-full h-36 object-cover" onError={(e) => { e.target.src = '/images/course-uiux.jpg'; }} />
+                    {isPaid && (
+                      <span className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Enrolled</span>
+                    )}
+                    {isPending && (
+                      <span className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Unpaid</span>
+                    )}
+                  </div>
+                  <div className="p-4 flex flex-col flex-1">
+                    <h4 className="font-semibold text-gray-900 mb-1 truncate">{course.title}</h4>
+                    <p className="text-xs text-gray-400 mb-1">{course.category} {course.duration ? `· ${course.duration}` : ''}</p>
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2 flex-1">{course.description}</p>
+                    {course.price?.upfront > 0 && (
+                      <p className="text-sm font-bold text-gray-700 mb-3">
+                        €{course.price.upfront.toLocaleString()}
+                        {course.price.monthly > 0 && <span className="text-xs font-normal text-gray-400 ml-1">or €{course.price.monthly}/mo</span>}
+                      </p>
+                    )}
+                    {isPaid ? (
+                      <button onClick={() => { openStudy(courses.find((c) => c.id === course.id) || course); setActiveView('study'); }} className="w-full py-2 rounded-xl text-white text-sm font-semibold" style={{ backgroundColor: '#0C4E3A' }}>
+                        Open Course
+                      </button>
+                    ) : isPending ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-yellow-700 bg-yellow-50 px-3 py-1.5 rounded-lg text-center">Added — pay tuition to unlock</p>
+                        <div className="flex gap-2">
+                          {course.price?.monthly > 0 && (
+                            <button onClick={() => handlePayment(course.id)} disabled={paymentLoading} className="flex-1 py-2 rounded-xl text-xs font-semibold border-2 disabled:opacity-50" style={{ borderColor: '#0C4E3A', color: '#0C4E3A' }}>
+                              Pay €{course.price.monthly}/mo
+                            </button>
+                          )}
+                          <button onClick={() => handlePayment(course.id)} disabled={paymentLoading} className="flex-1 py-2 rounded-xl text-white text-xs font-semibold disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
+                            {paymentLoading ? '...' : course.price?.upfront > 0 ? `Pay €${course.price.upfront}` : 'Pay Tuition'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => handleAddCourse(course.id)} disabled={addingCourse === course.id} className="w-full py-2 rounded-xl text-white text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
+                        {addingCourse === course.id ? 'Adding…' : '+ Add to Dashboard'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function StudyView() {
     const weekGroups = groupByWeek(materials);
     const weeks = Object.keys(weekGroups).sort((a, b) => Number(a) - Number(b));
@@ -288,7 +387,22 @@ export default function StudentDashboard() {
         </div>
         {!selectedCourse ? (
           <div className="bg-white rounded-xl p-8 text-center border border-dashed border-gray-200"><Monitor size={40} className="mx-auto text-gray-300 mb-3" /><p className="text-gray-500">Select a course above to start studying.</p></div>
-        ) : (
+        ) : (() => {
+          const enrollment = enrollments.find((e) => e.course_id === selectedCourse.id);
+          const isPaid = enrollment?.payment_status === 'paid' || !enrollment;
+          if (!isPaid) return (
+            <div className="bg-white rounded-xl p-10 text-center border border-gray-100 shadow-sm">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-50 flex items-center justify-center">
+                <CreditCard size={28} className="text-yellow-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Tuition Payment Required</h3>
+              <p className="text-sm text-gray-500 mb-5 max-w-sm mx-auto">Pay your tuition fee to unlock all materials, assignments, and quizzes for <strong>{selectedCourse.title}</strong>.</p>
+              <button onClick={() => handlePayment(selectedCourse.id)} disabled={paymentLoading} className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50" style={{ backgroundColor: '#0C4E3A' }}>
+                {paymentLoading ? 'Starting…' : 'Pay Tuition Now'}
+              </button>
+            </div>
+          );
+          return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-1 space-y-3">
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -353,7 +467,8 @@ export default function StudentDashboard() {
               )}
             </div>
           </div>
-        )}
+        );
+        })()}
       </div>
     );
   }
@@ -690,6 +805,7 @@ export default function StudentDashboard() {
           <AnimatePresence mode="wait">
             <motion.div key={activeView} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               {activeView === 'dashboard' && <DashboardView />}
+              {activeView === 'browse' && <BrowseCoursesView />}
               {activeView === 'study' && <StudyView />}
               {activeView === 'quizzes' && <QuizView />}
               {activeView === 'payments' && <PaymentsView />}

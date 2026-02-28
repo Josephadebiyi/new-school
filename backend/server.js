@@ -1655,7 +1655,12 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
 app.get("/api/applications", authenticate, requireRoles(["admin", "registrar", "staff"]), async (req, res) => {
   try {
     const { status } = req.query;
-    const query = status ? { status } : {};
+    // Only show applications where the admission fee was actually paid.
+    // pending_payment entries are abandoned/incomplete checkout sessions.
+    const query = {
+      payment_status: "paid",
+      ...(status ? { status } : {}),
+    };
 
     const applications = await db.collection("applications")
       .find(query, { projection: { _id: 0 } })
@@ -1898,6 +1903,42 @@ app.get("/api/my-courses", authenticate, async (req, res) => {
   }
 });
 
+// Student self-service: add a course to dashboard (creates unpaid enrollment)
+app.post("/api/student/add-course", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { course_id } = req.body;
+    if (!course_id) return res.status(422).json({ detail: "course_id is required" });
+
+    let course = await db.collection("courses").findOne({ id: course_id });
+    if (!course) {
+      try { course = await db.collection("courses").findOne({ _id: new ObjectId(course_id) }); } catch {}
+    }
+    if (!course) return res.status(404).json({ detail: "Course not found" });
+
+    const existing = await db.collection("enrollments").findOne({
+      $or: [{ user_id: userId }, { student_id: userId }],
+      course_id: course.id || course._id.toString(),
+    });
+    if (existing) return res.status(400).json({ detail: "Already added to your dashboard" });
+
+    const enrollment = {
+      id: uuidv4(),
+      user_id: userId,
+      course_id: course.id || course._id.toString(),
+      status: "pending_payment",
+      payment_status: "unpaid",
+      self_enrolled: true,
+      created_at: new Date().toISOString(),
+    };
+    await db.collection("enrollments").insertOne(enrollment);
+    res.json({ success: true, enrollment_id: enrollment.id, course_title: course.title });
+  } catch (error) {
+    console.error("Add course error:", error);
+    res.status(500).json({ detail: error.message || "Internal server error" });
+  }
+});
+
 // Create tuition payment session for a course
 app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
@@ -1915,7 +1956,8 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       course_id: course_id
     });
 
-    // If no enrollment, check if user has approved application for this course
+    // If no enrollment exists, create one automatically.
+    // Students can add any course directly from their dashboard and pay tuition.
     if (!enrollment) {
       const application = await db.collection("applications").findOne({
         email: user.email,
@@ -1923,16 +1965,11 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         status: "approved"
       });
 
-      if (!application) {
-        return res.status(400).json({ detail: "No approved application found for this course" });
-      }
-
-      // Create enrollment with pending_payment status
       enrollment = {
         id: uuidv4(),
         user_id: userId,
         course_id: course_id,
-        application_id: application.id,
+        application_id: application ? application.id : null,
         status: "pending_payment",
         payment_status: "unpaid",
         created_at: new Date().toISOString()
@@ -1985,8 +2022,8 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         quantity: 1
       }],
       mode: "payment",
-      success_url: `${origin_url || FRONTEND_URL}/dashboard/student?payment=success&course=${course_id}`,
-      cancel_url: `${origin_url || FRONTEND_URL}/dashboard/student?payment=cancelled`,
+      success_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=success&course=${course_id}`,
+      cancel_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=cancelled`,
       customer_email: user.email,
       metadata: {
         type: "tuition",
