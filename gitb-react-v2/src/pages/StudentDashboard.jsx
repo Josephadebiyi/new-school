@@ -106,10 +106,16 @@ export default function StudentDashboard() {
     if (!course) return;
     setSelectedCourse(course); setMaterials([]); setQuizzes([]); setSelectedMaterial(null); setActiveQuiz(null); setQuizResult(null);
     try {
-      const [matsData, quizData] = await Promise.allSettled([
-        getCourseMaterials(token, course.id), getCourseQuizzes(token, course.id),
+      const [matsData, quizData, progressData] = await Promise.allSettled([
+        getCourseMaterials(token, course.id), getCourseQuizzes(token, course.id), getCourseProgress(token, course.id),
       ]);
-      if (matsData.status === 'fulfilled') setMaterials(Array.isArray(matsData.value) ? matsData.value : []);
+      if (matsData.status === 'fulfilled') {
+        const completedIds = new Set(
+          progressData.status === 'fulfilled' ? (progressData.value?.completed_lesson_ids || []) : []
+        );
+        const mats = (Array.isArray(matsData.value) ? matsData.value : []).map(m => ({ ...m, completed: completedIds.has(m.id) }));
+        setMaterials(mats);
+      }
       if (quizData.status === 'fulfilled') setQuizzes(Array.isArray(quizData.value) ? quizData.value : []);
     } catch { /* silently fail */ }
   }, [token]);
@@ -129,7 +135,6 @@ export default function StudentDashboard() {
 
   function selectMaterial(material) {
     setSelectedMaterial(material);
-    if (!material.completed) handleMarkComplete(material);
   }
 
   async function startQuiz(quiz) {
@@ -444,7 +449,10 @@ export default function StudentDashboard() {
                       <div className="flex items-center gap-2 mb-0.5"><TypeIcon type={selectedMaterial.type} /><span className="text-xs text-gray-400 capitalize">{selectedMaterial.type}</span></div>
                       <h3 className="font-semibold text-gray-900">{selectedMaterial.title}</h3>
                     </div>
-                    {selectedMaterial.completed && <span className="flex items-center gap-1 text-green-600 text-sm font-medium"><CheckCircle size={16} /> Completed</span>}
+                    {selectedMaterial.completed
+                      ? <span className="flex items-center gap-1 text-green-600 text-sm font-medium"><CheckCircle size={16} /> Completed</span>
+                      : <button onClick={() => handleMarkComplete(selectedMaterial)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: '#0C4E3A' }}><CheckCircle size={14} /> Mark Done</button>
+                    }
                   </div>
                   <div className="p-5">
                     {selectedMaterial.description && <p className="text-gray-600 text-sm mb-4">{selectedMaterial.description}</p>}

@@ -544,6 +544,26 @@ export async function deleteCourseMaterial(token, courseId, materialId) {
   return res.json();
 }
 
+// ─── Activity Log ────────────────────────────────────────────────────────────
+
+export async function getActivityLog(token, limit = 100) {
+  const res = await fetch(`${API_BASE}/api/admin/activity?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load activity log');
+  return res.json();
+}
+
+export async function deleteUser(token, userId) {
+  const res = await fetch(`${API_BASE}/api/users/${userId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to delete user');
+  return data;
+}
+
 // ─── Newsletter ──────────────────────────────────────────────────────────────
 
 export async function subscribeNewsletter(email) {

@@ -6,6 +6,7 @@ import {
   Edit, Save, Image as ImageIcon, RefreshCw, Settings as SettingsIcon, User,
   ChevronLeft, ChevronRight, Menu, X, Upload, DollarSign, Tag, AlertCircle,
   ClipboardList, Eye, EyeOff, Download as DownloadIcon, BarChart2, Globe,
+  Activity, UserMinus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -14,6 +15,7 @@ import {
   updateSystemSettings, updateProfile, getCourseMaterials, addCourseMaterial,
   uploadFile, createUser, adminEnrollStudent,
   assignCourseToTeacher, removeTeacherCourse, sendTestEmails,
+  getActivityLog, deleteUser,
 } from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -26,6 +28,7 @@ const SIDEBAR_ITEMS = [
   { id: 'students',   label: 'Students',    icon: Users },
   { id: 'staff',      label: 'Staff',       icon: UserCheck },
   { id: 'finance',    label: 'Finance',     icon: CreditCard },
+  { id: 'activity',   label: 'Activity',    icon: Activity },
   { id: 'settings',   label: 'Settings',    icon: SettingsIcon },
 ];
 
@@ -146,6 +149,14 @@ export default function AdminDashboard() {
   // Seed courses
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedMsg, setSeedMsg] = useState('');
+
+  // Wipe data
+  const [wipeLoading, setWipeLoading] = useState('');
+  const [wipeMsg, setWipeMsg] = useState('');
+
+  // Activity log
+  const [activityLog, setActivityLog] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   // Material upload ref
   const materialFileRef = useRef(null);
@@ -454,6 +465,41 @@ export default function AdminDashboard() {
     } finally { setTestEmailSending(false); }
   }
 
+  async function handleDeleteUser(u) {
+    if (!confirm(`Delete ${u.first_name} ${u.last_name} (${u.email})? This cannot be undone.`)) return;
+    try {
+      await deleteUser(token, u.id);
+      setAllUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (err) { alert(err.message); }
+  }
+
+  async function loadActivityLog() {
+    setActivityLoading(true);
+    try {
+      const logs = await getActivityLog(token, 200);
+      setActivityLog(Array.isArray(logs) ? logs : []);
+    } catch { /* silently fail */ }
+    finally { setActivityLoading(false); }
+  }
+
+  async function handleWipeData(type) {
+    const labels = { applications: 'ALL applications', enrollments: 'ALL enrollments' };
+    if (!confirm(`⚠ This will permanently delete ${labels[type]}. This cannot be undone. Continue?`)) return;
+    setWipeLoading(type); setWipeMsg('');
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/${type}/all`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed');
+      setWipeMsg(`✓ Deleted ${data.deleted} ${type}.`);
+      fetchData();
+    } catch (err) {
+      setWipeMsg('Error: ' + (err.message || 'Failed'));
+    } finally { setWipeLoading(''); }
+  }
+
   // ─── APPLICATIONS ─────────────────────────────────────────────────────────
 
   async function handleApprove(appId) {
@@ -574,7 +620,7 @@ export default function AdminDashboard() {
           {SIDEBAR_ITEMS.map(({ id, label, icon: Icon }) => {
             const active = activeTab === id;
             return (
-              <button key={id} onClick={() => { setActiveTab(id); setMobileOpen(false); }} title={collapsed ? label : undefined} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'justify-center' : ''}`} style={active ? { backgroundColor: '#D4F542', color: '#0B3B2C' } : { color: 'rgba(255,255,255,0.8)' }}>
+              <button key={id} onClick={() => { setActiveTab(id); setMobileOpen(false); if (id === 'activity') loadActivityLog(); }} title={collapsed ? label : undefined} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'justify-center' : ''}`} style={active ? { backgroundColor: '#D4F542', color: '#0B3B2C' } : { color: 'rgba(255,255,255,0.8)' }}>
                 <Icon size={18} />{!collapsed && <span>{label}</span>}
               </button>
             );
@@ -839,6 +885,7 @@ export default function AdminDashboard() {
                         <button onClick={() => toggleLockUser(u)} className={`p-1.5 rounded-lg text-xs font-medium transition-colors ${u.account_status === 'locked' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`} title={u.account_status === 'locked' ? 'Unlock' : 'Lock'}>
                           {u.account_status === 'locked' ? 'Unlock' : 'Lock'}
                         </button>
+                        <button onClick={() => handleDeleteUser(u)} className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Delete user"><UserMinus size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -920,6 +967,7 @@ export default function AdminDashboard() {
                         <button onClick={() => toggleLockUser(u)} className={`p-1.5 rounded-lg text-xs font-medium transition-colors ${u.account_status === 'locked' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`} title={u.account_status === 'locked' ? 'Unlock' : 'Lock'}>
                           {u.account_status === 'locked' ? 'Unlock' : 'Lock'}
                         </button>
+                        <button onClick={() => handleDeleteUser(u)} className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Delete user"><UserMinus size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -928,6 +976,70 @@ export default function AdminDashboard() {
             </table>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  function ActivityTab() {
+    const ACTION_LABELS = {
+      created_user: { label: 'Created user', color: 'bg-blue-50 text-blue-700', icon: '👤' },
+      deleted_user: { label: 'Deleted user', color: 'bg-red-50 text-red-700', icon: '🗑' },
+      approved_application: { label: 'Approved application', color: 'bg-green-50 text-green-700', icon: '✅' },
+      rejected_application: { label: 'Rejected application', color: 'bg-orange-50 text-orange-700', icon: '❌' },
+      created_course: { label: 'Created course', color: 'bg-purple-50 text-purple-700', icon: '📚' },
+      deleted_course: { label: 'Deleted course', color: 'bg-red-50 text-red-700', icon: '🗑' },
+    };
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Activity Log</h2>
+          <button onClick={loadActivityLog} disabled={activityLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            <RefreshCw size={14} className={activityLoading ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
+        {activityLog.length === 0 ? (
+          <div className="bg-white rounded-xl p-10 text-center border border-dashed border-gray-200">
+            <Activity size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 text-sm">No activity recorded yet.</p>
+            <button onClick={loadActivityLog} className="mt-3 px-4 py-2 rounded-lg text-sm font-medium text-white" style={{ backgroundColor: '#0B3B2C' }}>Load Activity</button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {['When', 'Admin', 'Action', 'Target', 'Details'].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {activityLog.map((log) => {
+                    const meta = ACTION_LABELS[log.action] || { label: log.action, color: 'bg-gray-50 text-gray-600', icon: '•' };
+                    return (
+                      <tr key={log.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-900 text-xs">{log.admin_name || '—'}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${meta.color}`}>
+                            {meta.icon} {meta.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-700 max-w-xs truncate">{log.target_name || log.target_id || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400">{log.details || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1023,6 +1135,22 @@ export default function AdminDashboard() {
             <p className={`text-sm font-medium px-3 py-2 rounded-lg ${testEmailMsg.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>{testEmailMsg}</p>
           )}
         </div>
+        <div className="bg-white rounded-xl shadow-sm border border-red-100 p-6 space-y-3">
+          <h3 className="font-semibold text-red-700 flex items-center gap-2"><Trash2 size={16} /> Data Management</h3>
+          <p className="text-sm text-gray-500">Permanently delete records from the database. Use to clear test/dummy data before going live. These actions cannot be undone.</p>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={() => handleClearUnpaidApplications()} className="flex-1 min-w-[160px] py-2.5 rounded-xl text-sm font-semibold border-2 border-orange-300 text-orange-600 hover:bg-orange-50 disabled:opacity-50 flex items-center justify-center gap-1.5" disabled={wipeLoading === 'applications/unpaid'}>
+              {wipeLoading === 'applications/unpaid' ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />} Clear Unpaid Apps
+            </button>
+            <button type="button" onClick={() => handleWipeData('applications')} disabled={!!wipeLoading} className="flex-1 min-w-[160px] py-2.5 rounded-xl text-sm font-semibold border-2 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1.5">
+              {wipeLoading === 'applications' ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />} Wipe All Applications
+            </button>
+            <button type="button" onClick={() => handleWipeData('enrollments')} disabled={!!wipeLoading} className="flex-1 min-w-[160px] py-2.5 rounded-xl text-sm font-semibold border-2 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1.5">
+              {wipeLoading === 'enrollments' ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />} Wipe All Enrollments
+            </button>
+          </div>
+          {wipeMsg && <p className={`text-sm font-medium px-3 py-2 rounded-lg ${wipeMsg.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>{wipeMsg}</p>}
+        </div>
       </div>
     );
   }
@@ -1085,6 +1213,7 @@ export default function AdminDashboard() {
               {activeTab === 'students'   && <UsersTab />}
               {activeTab === 'staff'      && <StaffTab />}
               {activeTab === 'finance'    && <FinanceTab />}
+              {activeTab === 'activity'   && <ActivityTab />}
               {activeTab === 'settings'   && <SettingsTab />}
             </>
           )}

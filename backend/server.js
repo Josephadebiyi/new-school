@@ -1033,6 +1033,38 @@ app.put("/api/users/:userId/role", authenticate, requireRoles(["admin"]), async 
   }
 });
 
+// ============ ACTIVITY LOGGING ============
+async function logActivity(adminId, adminName, action, targetType, targetId, targetName, details = '') {
+  try {
+    await db.collection("activity_logs").insertOne({
+      id: uuidv4(),
+      admin_id: adminId,
+      admin_name: adminName,
+      action,           // e.g. "deleted_user", "created_user", "approved_application"
+      target_type: targetType, // e.g. "user", "application", "course"
+      target_id: targetId,
+      target_name: targetName,
+      details,
+      timestamp: new Date().toISOString(),
+    });
+  } catch { /* non-blocking */ }
+}
+
+// Get activity log (admin only)
+app.get("/api/admin/activity", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const logs = await db.collection("activity_logs")
+      .find({})
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .toArray();
+    res.json(logs.map(({ _id, ...l }) => l));
+  } catch (err) {
+    res.status(500).json({ detail: err.message });
+  }
+});
+
 // ============ USER ROUTES ============
 app.get("/api/users", authenticate, requireRoles(["admin", "registrar", "staff"]), async (req, res) => {
   try {
@@ -1083,6 +1115,16 @@ app.post("/api/users", authenticate, requireRoles(["admin"]), async (req, res) =
     }
 
     await db.collection("users").insertOne(newUser);
+
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'created_user',
+      'user',
+      newUser.id,
+      `${first_name} ${last_name} (${email})`,
+      `Role: ${role}`
+    );
 
     // Send welcome email with credentials (non-blocking)
     sendStaffWelcomeEmail(email, first_name, last_name, role, password).catch((e) =>
@@ -1182,10 +1224,23 @@ app.put("/api/users/:userId/unlock", authenticate, requireRoles(["admin"]), asyn
 app.delete("/api/users/:userId", authenticate, requireRoles(["admin"]), async (req, res) => {
   try {
     const { userId } = req.params;
+    // Fetch target user before deleting so we can log their name/role
+    const target = await db.collection("users").findOne({ id: userId }, { projection: { first_name: 1, last_name: 1, email: 1, role: 1 } });
+    if (!target) return res.status(404).json({ detail: "User not found" });
     const result = await db.collection("users").deleteOne({ id: userId });
     if (result.deletedCount === 0) {
       return res.status(404).json({ detail: "User not found" });
     }
+    // Log the deletion
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'deleted_user',
+      'user',
+      userId,
+      `${target.first_name} ${target.last_name} (${target.email})`,
+      `Role: ${target.role}`
+    );
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Delete user error:", error);
@@ -1313,6 +1368,11 @@ app.post("/api/courses", authenticate, requireRoles(["admin"]), async (req, res)
     };
 
     await db.collection("courses").insertOne(newCourse);
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'created_course', 'course', newCourse.id, newCourse.title, ''
+    );
     delete newCourse._id;
 
     res.json(newCourse);
@@ -1425,6 +1485,7 @@ app.put("/api/courses/:courseId/tuition", authenticate, requireRoles(["admin"]),
 app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), async (req, res) => {
   try {
     const { courseId } = req.params;
+    const targetCourse = await db.collection("courses").findOne({ id: courseId }, { projection: { title: 1 } });
     let result = await db.collection("courses").deleteOne({ id: courseId });
     if (result.deletedCount === 0) {
       try { result = await db.collection("courses").deleteOne({ _id: new ObjectId(courseId) }); } catch {}
@@ -1432,6 +1493,11 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
     if (result.deletedCount === 0) {
       return res.status(404).json({ detail: "Course not found" });
     }
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'deleted_course', 'course', courseId, targetCourse?.title || courseId, ''
+    );
     res.json({ message: "Course deleted successfully" });
   } catch (error) {
     console.error("Delete course error:", error);
@@ -1442,12 +1508,37 @@ app.delete("/api/courses/:courseId", authenticate, requireRoles(["admin"]), asyn
 // Clear all unpaid/abandoned applications (admin housekeeping)
 app.delete("/api/admin/applications/unpaid", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
   try {
+    // Delete anything that is not explicitly payment_status="paid"
     const result = await db.collection("applications").deleteMany({
-      payment_status: { $ne: "paid" },
+      $or: [
+        { payment_status: { $exists: false } },
+        { payment_status: null },
+        { payment_status: { $nin: ["paid"] } },
+      ],
     });
-    res.json({ deleted: result.deletedCount, message: `Cleared ${result.deletedCount} unpaid applications` });
+    res.json({ deleted: result.deletedCount, message: `Cleared ${result.deletedCount} unpaid/abandoned applications` });
   } catch (error) {
     console.error("Clear unpaid applications error:", error);
+    res.status(500).json({ detail: error.message });
+  }
+});
+
+// Wipe ALL applications (super admin nuclear option)
+app.delete("/api/admin/applications/all", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const result = await db.collection("applications").deleteMany({});
+    res.json({ deleted: result.deletedCount, message: `Deleted all ${result.deletedCount} applications` });
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
+// Wipe ALL enrollments (super admin nuclear option)
+app.delete("/api/admin/enrollments/all", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const result = await db.collection("enrollments").deleteMany({});
+    res.json({ deleted: result.deletedCount, message: `Deleted all ${result.deletedCount} enrollments` });
+  } catch (error) {
     res.status(500).json({ detail: error.message });
   }
 });
@@ -1821,6 +1912,16 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       course ? course.price : 0
     );
 
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'approved_application',
+      'application',
+      applicationId,
+      `${application.first_name} ${application.last_name} (${application.email})`,
+      `Course: ${application.course_title}`
+    );
+
     res.json({
       message: "Application approved successfully. Welcome email sent to student.",
       student_email: application.email,
@@ -1885,6 +1986,16 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
     `;
 
     await sendEmail(application.email, `Application Update - ${application.course_title}`, html);
+
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'rejected_application',
+      'application',
+      applicationId,
+      `${application.first_name} ${application.last_name} (${application.email})`,
+      `Course: ${application.course_title}${reason ? ` — Reason: ${reason}` : ''}`
+    );
 
     res.json({ message: "Application rejected" });
   } catch (error) {
