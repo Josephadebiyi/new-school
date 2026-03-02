@@ -830,7 +830,13 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       </div>
     `;
 
-    await sendEmail(email, "Password Reset Request - GITB", html);
+    const emailSent = await sendEmail(email, "Password Reset Request - GITB", html);
+
+    if (!emailSent) {
+      console.error(`Failed to send password reset email to ${email}`);
+    } else {
+      console.log(`Password reset email sent successfully to ${email}`);
+    }
 
     res.json({ message: "If an account exists with that email, a reset link has been sent." });
   } catch (error) {
@@ -1087,6 +1093,8 @@ app.post("/api/users", authenticate, requireRoles(["admin"]), async (req, res) =
       return res.status(400).json({ detail: "Email already registered" });
     }
 
+    // Store plain password for email before hashing
+    const plainPassword = password;
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const newUser = {
@@ -1124,10 +1132,14 @@ app.post("/api/users", authenticate, requireRoles(["admin"]), async (req, res) =
       `Role: ${role}`
     );
 
-    // Send welcome email with credentials (non-blocking)
-    sendStaffWelcomeEmail(email, first_name, last_name, role, password).catch((e) =>
-      console.warn("Staff welcome email failed:", e.message)
-    );
+    // Send welcome email with credentials using plain password
+    try {
+      await sendStaffWelcomeEmail(email, first_name, last_name, role, plainPassword);
+      console.log(`Welcome email sent successfully to ${email}`);
+    } catch (emailError) {
+      console.error("Staff welcome email failed:", emailError.message);
+      // Continue even if email fails - user is already created
+    }
 
     delete newUser.password;
     delete newUser._id;
