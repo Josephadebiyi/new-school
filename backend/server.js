@@ -699,53 +699,47 @@ const generateAcceptanceLetter = (firstName, lastName, courseTitle) => {
     // ── Sign-off ───────────────────────────────────────────────────
     doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
     doc.text('Yours sincerely,', margin, y);
-    y = doc.y + 8;
+    y = doc.y + 10;
 
-    // ── Electronic stamp (circle) ──────────────────────────────────
-    const stampX = W - margin - 90, stampY = y, stampR = 44;
+    // ── Signature block (left) ─────────────────────────────────────
+    doc.moveTo(margin, y + 28).lineTo(margin + 145, y + 28).strokeColor('#bbb').lineWidth(0.6).stroke();
+    doc.fillColor('#1a1a1a').fontSize(10).font('Helvetica-Bold').text('Dr. Aremu, MSc, PhD', margin, y + 32);
+    doc.font('Helvetica').fillColor('#555').fontSize(9.5);
+    doc.text('Director of Admissions', margin, y + 46);
+    doc.text('Global Institute of Technology and Business', margin, y + 59);
+    doc.text('Vilnius, Lithuania', margin, y + 72);
+
+    // ── Electronic stamp — blue, beside signature ──────────────────
+    const stampBlue = '#1a3a8f';
+    const stampLightBlue = '#2a5abf';
+    const stampX = margin + 235, stampY = y, stampR = 46;
     doc.save();
-    // Outer ring
-    doc.circle(stampX, stampY + stampR, stampR).lineWidth(2.5).strokeColor(darkGreen).stroke();
-    // Inner ring
-    doc.circle(stampX, stampY + stampR, stampR - 7).lineWidth(0.8).strokeColor(darkGreen).stroke();
-    // Top arc text — "GLOBAL INSTITUTE OF TECHNOLOGY"
-    doc.fillColor(darkGreen).fontSize(5.5).font('Helvetica-Bold');
+    doc.circle(stampX, stampY + stampR, stampR).lineWidth(2.8).strokeColor(stampBlue).stroke();
+    doc.circle(stampX, stampY + stampR, stampR - 8).lineWidth(0.8).strokeColor(stampBlue).stroke();
+    // Top arc text
     const topText = 'GLOBAL INSTITUTE OF TECHNOLOGY AND BUSINESS';
     const topTextAngle = Math.PI * 0.72;
+    doc.fillColor(stampBlue).fontSize(5.5).font('Helvetica-Bold');
     topText.split('').forEach((ch, i) => {
       const angle = -Math.PI / 2 - topTextAngle / 2 + (i / (topText.length - 1)) * topTextAngle;
-      const r = stampR - 13;
+      const r = stampR - 14;
       const cx = stampX + r * Math.cos(angle);
       const cy = stampY + stampR + r * Math.sin(angle);
       doc.save().translate(cx, cy).rotate((angle + Math.PI / 2) * (180 / Math.PI)).text(ch, -3, -3).restore();
     });
-    // Bottom arc text — "VILNIUS · LITHUANIA"
+    // Bottom arc text
     const botText = 'VILNIUS  ·  LITHUANIA';
     const botTextAngle = Math.PI * 0.48;
     botText.split('').forEach((ch, i) => {
       const angle = Math.PI / 2 - botTextAngle / 2 + (i / (botText.length - 1)) * botTextAngle;
-      const r = stampR - 13;
+      const r = stampR - 14;
       const cx = stampX + r * Math.cos(angle);
       const cy = stampY + stampR + r * Math.sin(angle);
       doc.save().translate(cx, cy).rotate((angle - Math.PI / 2) * (180 / Math.PI)).text(ch, -3, -3).restore();
     });
-    // Centre logo text
-    doc.fillColor(darkGreen).fontSize(13).font('Helvetica-Bold');
-    doc.text('GITB', stampX - 14, stampY + stampR - 10, { width: 28, align: 'center' });
-    doc.fillColor(midGreen).fontSize(6).font('Helvetica');
-    doc.text('OFFICIAL', stampX - 16, stampY + stampR + 4, { width: 32, align: 'center' });
+    doc.fillColor(stampBlue).fontSize(14).font('Helvetica-Bold').text('GITB', stampX - 16, stampY + stampR - 12, { width: 32, align: 'center' });
+    doc.fillColor(stampLightBlue).fontSize(6).font('Helvetica').text('OFFICIAL', stampX - 18, stampY + stampR + 4, { width: 36, align: 'center' });
     doc.restore();
-
-    // ── Signature block ────────────────────────────────────────────
-    doc.fillColor('#1a1a1a').fontSize(9).font('Helvetica-Bold');
-    doc.text('Dr. A. Eriksson', margin, y + 18);
-    doc.font('Helvetica').fillColor('#555').fontSize(9);
-    doc.text('Director of Admissions', margin, y + 30);
-    doc.text('Global Institute of Technology and Business', margin, y + 42);
-    doc.text('Vilnius, Lithuania', margin, y + 54);
-
-    // Signature line
-    doc.moveTo(margin, y + 16).lineTo(margin + 130, y + 16).strokeColor('#aaa').lineWidth(0.5).stroke();
 
     doc.end();
   });
@@ -901,7 +895,7 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
       </p>
       <p style="color:#333;font-size:14px;margin:0;">
         Warmest regards,<br>
-        <strong style="font-size:15px;">Dr. A. Eriksson</strong><br>
+        <strong style="font-size:15px;">Dr. Aremu, MSc, PhD</strong><br>
         <span style="color:#5a9a6a;font-size:13px;">Director of Admissions</span><br>
         <span style="color:#888;font-size:12px;">Global Institute of Technology and Business · Vilnius, Lithuania</span>
       </p>
