@@ -726,37 +726,12 @@ const generateAcceptanceLetter = (firstName, lastName, courseTitle, tuitionAmoun
     doc.text('Sincerely,', margin, y);
     y = doc.y + 10;
 
-    // Signature block left
-    doc.moveTo(margin, y + 28).lineTo(margin + 145, y + 28).strokeColor('#bbb').lineWidth(0.6).stroke();
-    doc.fillColor('#1a1a1a').fontSize(10).font('Helvetica-Bold').text('Dr. Aremu, MSc, PhD', margin, y + 32);
+    // Signature block
+    doc.moveTo(margin, y + 28).lineTo(margin + 160, y + 28).strokeColor('#bbb').lineWidth(0.6).stroke();
+    doc.fillColor('#1a1a1a').fontSize(10).font('Helvetica-Bold').text('Admissions Office', margin, y + 32);
     doc.font('Helvetica').fillColor('#555').fontSize(9.5);
-    doc.text('Head of Admissions', margin, y + 46);
-    doc.text('Global Institute of Technology and Business', margin, y + 59);
-    doc.text('Vilnius, Lithuania', margin, y + 72);
-
-    // Blue stamp beside signature
-    const stampBlue = '#1a3a8f', stampLightBlue = '#2a5abf';
-    const stampX = margin + 235, stampY = y, stampR = 46;
-    doc.save();
-    doc.circle(stampX, stampY+stampR, stampR).lineWidth(2.8).strokeColor(stampBlue).stroke();
-    doc.circle(stampX, stampY+stampR, stampR-8).lineWidth(0.8).strokeColor(stampBlue).stroke();
-    const topText = 'GLOBAL INSTITUTE OF TECHNOLOGY AND BUSINESS';
-    const topTextAngle = Math.PI * 0.72;
-    doc.fillColor(stampBlue).fontSize(5.5).font('Helvetica-Bold');
-    topText.split('').forEach((ch, i) => {
-      const angle = -Math.PI/2 - topTextAngle/2 + (i/(topText.length-1))*topTextAngle;
-      const r = stampR - 14;
-      doc.save().translate(stampX + r*Math.cos(angle), stampY+stampR + r*Math.sin(angle)).rotate((angle+Math.PI/2)*(180/Math.PI)).text(ch,-3,-3).restore();
-    });
-    const botText = 'VILNIUS  ·  LITHUANIA', botTextAngle = Math.PI * 0.48;
-    botText.split('').forEach((ch, i) => {
-      const angle = Math.PI/2 - botTextAngle/2 + (i/(botText.length-1))*botTextAngle;
-      const r = stampR - 14;
-      doc.save().translate(stampX + r*Math.cos(angle), stampY+stampR + r*Math.sin(angle)).rotate((angle-Math.PI/2)*(180/Math.PI)).text(ch,-3,-3).restore();
-    });
-    doc.fillColor(stampBlue).fontSize(14).font('Helvetica-Bold').text('GITB', stampX-16, stampY+stampR-12, { width:32, align:'center' });
-    doc.fillColor(stampLightBlue).fontSize(6).font('Helvetica').text('OFFICIAL', stampX-18, stampY+stampR+4, { width:36, align:'center' });
-    doc.restore();
+    doc.text('Global Institute of Technology and Business', margin, y + 46);
+    doc.text('Vilnius, Lithuania', margin, y + 59);
 
     doc.end();
   });
@@ -912,8 +887,7 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
       </p>
       <p style="color:#333;font-size:14px;margin:0;">
         Warmest regards,<br>
-        <strong style="font-size:15px;">Dr. Aremu, MSc, PhD</strong><br>
-        <span style="color:#5a9a6a;font-size:13px;">Director of Admissions</span><br>
+        <strong style="font-size:15px;">Admissions Office</strong><br>
         <span style="color:#888;font-size:12px;">Global Institute of Technology and Business · Vilnius, Lithuania</span>
       </p>
     </div>
@@ -2283,6 +2257,11 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
 
     // Get course info for price
     const course = await db.collection("courses").findOne({ id: application.course_id });
+    const coursePrice = course ? (
+      typeof course.price === 'object' && course.price !== null
+        ? (course.price.upfront || course.price.monthly || 0)
+        : (Number(course.price) || 0)
+    ) : 0;
 
     // Create enrollment with pending_payment status (tuition not paid yet)
     const enrollment = {
@@ -2295,7 +2274,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       enrolled_at: new Date().toISOString(),
       status: "pending_payment", // Requires tuition payment
       payment_status: "unpaid",
-      tuition_amount: course ? course.price : 0,
+      tuition_amount: coursePrice,
       progress: 0
     };
 
@@ -2319,7 +2298,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       application.last_name,
       application.course_title,
       tempPassword,
-      course ? course.price : 0
+      coursePrice
     );
 
     logActivity(
@@ -2335,7 +2314,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
     res.json({
       message: "Application approved successfully. Welcome email sent to student.",
       student_email: application.email,
-      tuition_amount: course ? course.price : 0
+      tuition_amount: coursePrice
     });
   } catch (error) {
     console.error("Approve application error:", error);
