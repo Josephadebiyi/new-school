@@ -2414,7 +2414,9 @@ app.get("/api/dashboard/admin", authenticate, requireRoles(["admin", "super_admi
       lockedAccounts,
       unpaidStudents,
       totalUsers,
-      recentUsers
+      recentUsers,
+      appFeeRevenue,
+      tuitionRevenue
     ] = await Promise.all([
       db.collection("users").countDocuments({ role: "student" }),
       db.collection("users").countDocuments({ role: "lecturer" }),
@@ -2428,8 +2430,18 @@ app.get("/api/dashboard/admin", authenticate, requireRoles(["admin", "super_admi
         .find({}, { projection: { password: 0, _id: 0 } })
         .sort({ created_at: -1 })
         .limit(5)
-        .toArray()
+        .toArray(),
+      db.collection("applications").aggregate([
+        { $match: { payment_status: "paid" } },
+        { $group: { _id: null, total: { $sum: "$payment_amount" } } }
+      ]).toArray(),
+      db.collection("enrollments").aggregate([
+        { $match: { payment_status: "paid" } },
+        { $group: { _id: null, total: { $sum: "$payment_amount" } } }
+      ]).toArray()
     ]);
+
+    const totalRevenue = (appFeeRevenue[0]?.total || 0) + (tuitionRevenue[0]?.total || 0);
 
     res.json({
       total_students: totalStudents,
@@ -2440,7 +2452,8 @@ app.get("/api/dashboard/admin", authenticate, requireRoles(["admin", "super_admi
       locked_accounts: lockedAccounts,
       unpaid_students: unpaidStudents,
       total_users: totalUsers,
-      recent_users: recentUsers
+      recent_users: recentUsers,
+      total_revenue: totalRevenue
     });
   } catch (error) {
     console.error("Get admin dashboard error:", error);
