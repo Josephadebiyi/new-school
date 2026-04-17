@@ -554,136 +554,198 @@ const generateAcceptanceLetter = (firstName, lastName, courseTitle) => {
     const W = 595.28, H = 841.89;
     const darkGreen = '#0B3B2C';
     const midGreen  = '#5a8a00';
-    const margin    = 50;
+    const accentGold = '#D4F542';
+    const margin    = 52;
     const contentW  = W - margin * 2;
+    const dateStr   = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const refNo     = `GITB/ADM/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`;
+    const portalUrl = (process.env.FRONTEND_URL || 'https://gitb.lt') + '/student-login';
 
-    // White background
+    // ── Background ─────────────────────────────────────────────────
     doc.rect(0, 0, W, H).fill('white');
 
     // ── Decorative dot grid top-right ──────────────────────────────
-    const dotSz = 3.5, dotGap = 8.5;
-    for (let row = 0; row < 22; row++) {
-      for (let col = 0; col < 22; col++) {
-        const x = W - 210 + col * dotGap;
-        const y = 8 + row * dotGap;
-        if (x > W - 8) continue;
-        const dist = Math.sqrt(Math.pow(col - 21, 2) + Math.pow(row, 2));
-        const opacity = Math.max(0.04, 0.35 - dist * 0.015);
-        doc.rect(x, y, dotSz, dotSz).fillOpacity(opacity).fill('#8ab84a');
+    const dotSz = 3.2, dotGap = 8;
+    for (let row = 0; row < 24; row++) {
+      for (let col = 0; col < 24; col++) {
+        const x = W - 220 + col * dotGap;
+        const y = 6 + row * dotGap;
+        if (x > W - 6) continue;
+        const dist = Math.sqrt(Math.pow(col - 23, 2) + Math.pow(row, 2));
+        doc.rect(x, y, dotSz, dotSz).fillOpacity(Math.max(0.03, 0.38 - dist * 0.014)).fill('#8ab84a');
       }
     }
 
     // ── Decorative dot grid bottom-left ────────────────────────────
-    for (let row = 0; row < 12; row++) {
-      for (let col = 0; col < 12; col++) {
-        const x = 8 + col * dotGap;
-        const y = H - 200 + row * dotGap;
-        const dist = Math.sqrt(Math.pow(col, 2) + Math.pow(row - 11, 2));
-        const opacity = Math.max(0.04, 0.28 - dist * 0.02);
-        doc.rect(x, y, dotSz, dotSz).fillOpacity(opacity).fill('#8ab84a');
+    for (let row = 0; row < 14; row++) {
+      for (let col = 0; col < 14; col++) {
+        const x = 6 + col * dotGap;
+        const y = H - 220 + row * dotGap;
+        const dist = Math.sqrt(Math.pow(col, 2) + Math.pow(row - 13, 2));
+        doc.rect(x, y, dotSz, dotSz).fillOpacity(Math.max(0.03, 0.30 - dist * 0.018)).fill('#8ab84a');
       }
     }
     doc.fillOpacity(1);
 
     // ── Dark green curve bottom-right ──────────────────────────────
     doc.save()
-       .moveTo(W - 130, H - 50)
-       .bezierCurveTo(W - 70, H - 130, W, H - 90, W, H - 30)
-       .lineTo(W, H).lineTo(W - 130, H).closePath()
-       .fill(darkGreen)
-       .restore();
+       .moveTo(W - 140, H - 55)
+       .bezierCurveTo(W - 75, H - 145, W, H - 95, W, H - 35)
+       .lineTo(W, H).lineTo(W - 140, H).closePath()
+       .fill(darkGreen).restore();
 
-    // ── Green footer bar ───────────────────────────────────────────
-    doc.rect(0, H - 36, W, 36).fill(midGreen);
+    // ── Footer bar ─────────────────────────────────────────────────
+    doc.rect(0, H - 38, W, 38).fill(midGreen);
     doc.fillColor('white').fontSize(8.5).font('Helvetica');
-    doc.text('\u2709  admissions@gitb.lt', 28, H - 23);
-    doc.text('\u25CF  https://www.gitb.lt', 200, H - 23);
+    doc.text('\u2709  admissions@gitb.lt', 30, H - 25);
+    doc.text('\u25CF  https://www.gitb.lt', 210, H - 25);
+    doc.text(`Ref: ${refNo}`, W - 200, H - 25, { width: 170, align: 'right' });
 
     // ── Logo ───────────────────────────────────────────────────────
     const logoPath = path.join(__dirname, '../static/images/gitb-logo-full.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, margin, 28, { width: 155 });
+      doc.image(logoPath, margin, 26, { width: 160 });
     } else {
-      doc.fillColor(darkGreen).fontSize(22).font('Helvetica-Bold').text('GITB', margin, 35);
+      doc.fillColor(darkGreen).fontSize(24).font('Helvetica-Bold').text('GITB', margin, 32);
     }
 
-    // ── Thin divider ───────────────────────────────────────────────
-    doc.moveTo(margin, 108).lineTo(W - margin, 108)
-       .strokeColor('#d0d8d0').lineWidth(0.6).stroke();
+    // Right-aligned header info block
+    doc.fillColor('#444').fontSize(9).font('Helvetica');
+    doc.text('Global Institute of Technology and Business', margin, 32, { width: contentW, align: 'right' });
+    doc.text('Vilnius, Lithuania', margin, 44, { width: contentW, align: 'right' });
+    doc.text(`Date: ${dateStr}`, margin, 56, { width: contentW, align: 'right' });
+    doc.text(`Ref: ${refNo}`, margin, 68, { width: contentW, align: 'right' });
 
-    // ── Date (right-aligned) ───────────────────────────────────────
-    const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-    doc.fillColor('#555').fontSize(10).font('Helvetica');
-    doc.text(dateStr, margin, 120, { width: contentW, align: 'right' });
+    // ── Divider ────────────────────────────────────────────────────
+    doc.rect(margin, 112, contentW, 2).fill(darkGreen);
+    doc.rect(margin, 116, contentW, 0.5).fill(midGreen);
 
-    // ── Heading ────────────────────────────────────────────────────
-    doc.fillColor(darkGreen).fontSize(17).font('Helvetica-Bold');
-    doc.text('LETTER OF ACCEPTANCE', margin, 148, { width: contentW, align: 'center' });
-    // Underline accent
-    doc.rect(W / 2 - 90, 172, 180, 3).fill(midGreen);
+    // ── Title ──────────────────────────────────────────────────────
+    doc.fillColor(darkGreen).fontSize(18).font('Helvetica-Bold');
+    doc.text('OFFICIAL LETTER OF ACCEPTANCE', margin, 130, { width: contentW, align: 'center' });
+    doc.rect(W / 2 - 110, 155, 220, 3).fill(midGreen);
 
-    // ── Salutation & body ─────────────────────────────────────────
-    let y = 192;
+    // ── Addressee block ────────────────────────────────────────────
+    let y = 170;
+    doc.fillColor('#222').fontSize(11).font('Helvetica-Bold');
+    doc.text(`${firstName} ${lastName}`, margin, y);
+    doc.font('Helvetica').fillColor('#555').fontSize(10);
+    doc.text('Admitted Student — GITB', margin, y + 14);
+
+    // ── Salutation ─────────────────────────────────────────────────
+    y = 212;
     doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
-
     doc.text(`Dear ${firstName} ${lastName},`, margin, y, { width: contentW });
+    y = doc.y + 12;
+
+    // ── Body paragraphs ────────────────────────────────────────────
+    doc.text(
+      `On behalf of the entire faculty, administration, and student community of the Global Institute of Technology and Business (GITB), it is with great pleasure and pride that we inform you of your successful admission to our institution. After careful review of your application, academic background, and personal statement, our Admissions Board has unanimously agreed that you possess the qualities, dedication, and potential that GITB stands for.`,
+      margin, y, { width: contentW, lineGap: 2 }
+    );
     y = doc.y + 10;
 
     doc.text(
-      `We are delighted to inform you that your application to the Global Institute of Technology and Business (GITB) has been reviewed and you have been officially accepted. On behalf of our faculty and staff, we congratulate you on this achievement.`,
+      `This letter constitutes your official and binding confirmation of acceptance into the following programme:`,
       margin, y, { width: contentW }
     );
     y = doc.y + 10;
 
-    doc.font('Helvetica').text('Programme of Study:  ', margin, y, { continued: true, width: contentW });
-    doc.font('Helvetica-Bold').fillColor(darkGreen).text(courseTitle);
-    doc.font('Helvetica').fillColor('#1a1a1a');
+    // Programme highlight box
+    doc.rect(margin, y, contentW, 42).fill('#f0f9f0');
+    doc.rect(margin, y, 5, 42).fill(darkGreen);
+    doc.fillColor('#444').fontSize(9.5).font('Helvetica').text('PROGRAMME OF STUDY', margin + 16, y + 8, { width: contentW - 20 });
+    doc.fillColor(darkGreen).fontSize(14).font('Helvetica-Bold').text(courseTitle, margin + 16, y + 20, { width: contentW - 20 });
+    y = y + 42 + 12;
+
+    doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
+    doc.text(
+      `We are confident that your time at GITB will be both academically enriching and personally transformative. Our world-class faculty, cutting-edge curriculum, and vibrant learning community are designed to equip you with the knowledge, skills, and professional network needed to excel in today's competitive global landscape.`,
+      margin, y, { width: contentW, lineGap: 2 }
+    );
     y = doc.y + 10;
 
     doc.text(
-      'This letter serves as your official confirmation of acceptance and should be retained for your records.',
-      margin, y, { width: contentW }
+      `We warmly welcome you into the GITB family and wish you every success on this exciting new chapter of your journey. We look forward to celebrating your achievements and witnessing the remarkable contributions you will make — both within our institution and beyond.`,
+      margin, y, { width: contentW, lineGap: 2 }
     );
-    y = doc.y + 18;
+    y = doc.y + 14;
 
     // ── Next Steps box ─────────────────────────────────────────────
-    const boxH = 118;
+    const boxH = 100;
     doc.rect(margin, y, contentW, boxH).fill('#f0f7f0');
-    doc.rect(margin, y, 4, boxH).fill(darkGreen);
-
-    doc.fillColor(darkGreen).fontSize(11).font('Helvetica-Bold');
-    doc.text('Next Steps', margin + 16, y + 12, { width: contentW - 20 });
-
-    doc.fillColor('#222').fontSize(10).font('Helvetica');
+    doc.rect(margin, y, 5, boxH).fill(darkGreen);
+    doc.fillColor(darkGreen).fontSize(10.5).font('Helvetica-Bold');
+    doc.text('Next Steps to Enrol', margin + 16, y + 10, { width: contentW - 20 });
+    doc.fillColor('#333').fontSize(9.5).font('Helvetica');
     const steps = [
-      '1.  Log in to your Student Portal using the credentials provided in your welcome email.',
-      '2.  Navigate to your Student Dashboard and locate the Tuition Payment section.',
-      '3.  Complete your tuition payment to unlock your course materials and schedule.',
-      `4.  Student Portal: ${process.env.FRONTEND_URL || 'https://gitb.lt'}/student-login`,
+      `1.  Log in to your Student Portal at: ${portalUrl}`,
+      '2.  Change your temporary password and complete your student profile.',
+      '3.  Navigate to the Tuition Payment section in your dashboard.',
+      '4.  Complete payment to unlock your course materials and timetable.',
     ];
     steps.forEach((step, i) => {
-      doc.text(step, margin + 16, y + 30 + i * 20, { width: contentW - 30 });
+      doc.text(step, margin + 16, y + 28 + i * 17, { width: contentW - 30 });
     });
+    y = y + boxH + 14;
 
-    doc.fillColor('#666').fontSize(9);
-    doc.text('Course access is activated immediately after payment confirmation.', margin + 16, y + 106, { width: contentW - 30 });
-
-    y = y + boxH + 18;
-
-    // ── Closing ────────────────────────────────────────────────────
-    doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
+    doc.fillColor('#555').fontSize(9.5).font('Helvetica');
     doc.text(
-      'We look forward to supporting your academic journey at GITB. Should you have any questions, please contact us at admissions@gitb.lt.',
-      margin, y, { width: contentW }
+      'Should you have any questions or require assistance, please do not hesitate to contact our Admissions Office at admissions@gitb.lt. We are here to ensure your transition into GITB is as smooth and welcoming as possible.',
+      margin, y, { width: contentW, lineGap: 1.5 }
     );
-    y = doc.y + 24;
+    y = doc.y + 16;
 
+    // ── Sign-off ───────────────────────────────────────────────────
+    doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
     doc.text('Yours sincerely,', margin, y);
-    y = doc.y + 36;
-    doc.font('Helvetica-Bold').text('GITB Admissions Office', margin, y);
-    doc.font('Helvetica').fillColor('#555').fontSize(10);
-    doc.text('Global Institute of Technology and Business', margin, doc.y + 3);
-    doc.text('Vilnius, Lithuania', margin, doc.y + 3);
+    y = doc.y + 8;
+
+    // ── Electronic stamp (circle) ──────────────────────────────────
+    const stampX = W - margin - 90, stampY = y, stampR = 44;
+    doc.save();
+    // Outer ring
+    doc.circle(stampX, stampY + stampR, stampR).lineWidth(2.5).strokeColor(darkGreen).stroke();
+    // Inner ring
+    doc.circle(stampX, stampY + stampR, stampR - 7).lineWidth(0.8).strokeColor(darkGreen).stroke();
+    // Top arc text — "GLOBAL INSTITUTE OF TECHNOLOGY"
+    doc.fillColor(darkGreen).fontSize(5.5).font('Helvetica-Bold');
+    const topText = 'GLOBAL INSTITUTE OF TECHNOLOGY AND BUSINESS';
+    const topTextAngle = Math.PI * 0.72;
+    topText.split('').forEach((ch, i) => {
+      const angle = -Math.PI / 2 - topTextAngle / 2 + (i / (topText.length - 1)) * topTextAngle;
+      const r = stampR - 13;
+      const cx = stampX + r * Math.cos(angle);
+      const cy = stampY + stampR + r * Math.sin(angle);
+      doc.save().translate(cx, cy).rotate((angle + Math.PI / 2) * (180 / Math.PI)).text(ch, -3, -3).restore();
+    });
+    // Bottom arc text — "VILNIUS · LITHUANIA"
+    const botText = 'VILNIUS  ·  LITHUANIA';
+    const botTextAngle = Math.PI * 0.48;
+    botText.split('').forEach((ch, i) => {
+      const angle = Math.PI / 2 - botTextAngle / 2 + (i / (botText.length - 1)) * botTextAngle;
+      const r = stampR - 13;
+      const cx = stampX + r * Math.cos(angle);
+      const cy = stampY + stampR + r * Math.sin(angle);
+      doc.save().translate(cx, cy).rotate((angle - Math.PI / 2) * (180 / Math.PI)).text(ch, -3, -3).restore();
+    });
+    // Centre logo text
+    doc.fillColor(darkGreen).fontSize(13).font('Helvetica-Bold');
+    doc.text('GITB', stampX - 14, stampY + stampR - 10, { width: 28, align: 'center' });
+    doc.fillColor(midGreen).fontSize(6).font('Helvetica');
+    doc.text('OFFICIAL', stampX - 16, stampY + stampR + 4, { width: 32, align: 'center' });
+    doc.restore();
+
+    // ── Signature block ────────────────────────────────────────────
+    doc.fillColor('#1a1a1a').fontSize(9).font('Helvetica-Bold');
+    doc.text('Dr. A. Eriksson', margin, y + 18);
+    doc.font('Helvetica').fillColor('#555').fontSize(9);
+    doc.text('Director of Admissions', margin, y + 30);
+    doc.text('Global Institute of Technology and Business', margin, y + 42);
+    doc.text('Vilnius, Lithuania', margin, y + 54);
+
+    // Signature line
+    doc.moveTo(margin, y + 16).lineTo(margin + 130, y + 16).strokeColor('#aaa').lineWidth(0.5).stroke();
 
     doc.end();
   });
