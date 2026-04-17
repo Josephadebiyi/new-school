@@ -157,6 +157,104 @@ app.use(cors({
   origin: CORS_ORIGINS === "*" ? "*" : CORS_ORIGINS.split(","),
   credentials: true
 }));
+
+// Stripe webhook MUST be registered before express.json() so it receives the raw body buffer.
+// stripe.webhooks.constructEvent() requires the raw bytes to verify the signature.
+app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    let event;
+
+    if (webhookSecret && sig) {
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      } catch (err) {
+        console.error("Webhook signature verification failed:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    } else {
+      // For testing without webhook secret
+      event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const metadata = session.metadata || {};
+
+      if (metadata.type === 'tuition' && metadata.enrollment_id) {
+        // Update enrollment to paid
+        await db.collection("enrollments").updateOne(
+          { id: metadata.enrollment_id },
+          {
+            $set: {
+              status: "active",
+              payment_status: "paid",
+              tuition_paid_at: new Date().toISOString()
+            }
+          }
+        );
+
+        // Update user payment status
+        if (metadata.user_id) {
+          await db.collection("users").updateOne(
+            { id: metadata.user_id },
+            { $set: { payment_status: "paid" } }
+          );
+        }
+
+        console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
+      } else if (metadata.type === "application_fee" && metadata.application_id) {
+        // Stripe-first flow: Application record does NOT exist yet — create it now.
+        // Idempotency check: skip if already created (webhook may fire twice).
+        const exists = await db.collection("applications").findOne({ id: metadata.application_id });
+        if (!exists) {
+          await db.collection("applications").insertOne({
+            id: metadata.application_id,
+            first_name: metadata.first_name || "",
+            last_name: metadata.last_name || "",
+            email: metadata.email || "",
+            phone: metadata.phone || null,
+            course_id: metadata.course_id || null,
+            course_title: metadata.course_title || null,
+            country: metadata.country || null,
+            city: metadata.city || null,
+            address: metadata.address || null,
+            date_of_birth: metadata.date_of_birth || null,
+            identification_url: metadata.identification_url || null,
+            high_school_certificate_url: metadata.high_school_certificate_url || null,
+            motivation: metadata.motivation || null,
+            status: "pending",
+            payment_status: "paid",
+            stripe_session_id: session.id,
+            payment_amount: APPLICATION_FEE,
+            created_at: new Date().toISOString(),
+            paid_at: new Date().toISOString(),
+          });
+          console.log(`Application created for ${metadata.email} → course ${metadata.course_id} (id: ${metadata.application_id})`);
+
+          // Send confirmation email to the applicant
+          if (metadata.email && metadata.first_name) {
+            const courseTitle = metadata.course_title ||
+              (await db.collection("courses").findOne({ id: metadata.course_id }))?.title ||
+              "your chosen programme";
+            await sendApplicationReceivedEmail(metadata.email, metadata.first_name, courseTitle);
+            console.log(`Confirmation email sent to ${metadata.email}`);
+          }
+        } else {
+          console.log(`Duplicate webhook for application ${metadata.application_id} — skipping`);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(500).json({ detail: "Webhook processing failed" });
+  }
+});
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -2302,101 +2400,7 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
   }
 });
 
-// Stripe webhook for tuition payments
-app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
-  try {
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event;
-
-    if (webhookSecret && sig) {
-      try {
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-      } catch (err) {
-        console.error("Webhook signature verification failed:", err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-      }
-    } else {
-      // For testing without webhook secret
-      event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    }
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const metadata = session.metadata || {};
-
-      if (metadata.type === 'tuition' && metadata.enrollment_id) {
-        // Update enrollment to paid
-        await db.collection("enrollments").updateOne(
-          { id: metadata.enrollment_id },
-          {
-            $set: {
-              status: "active",
-              payment_status: "paid",
-              tuition_paid_at: new Date().toISOString()
-            }
-          }
-        );
-
-        // Update user payment status
-        if (metadata.user_id) {
-          await db.collection("users").updateOne(
-            { id: metadata.user_id },
-            { $set: { payment_status: "paid" } }
-          );
-        }
-
-        console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
-      } else if (metadata.type === "application_fee" && metadata.application_id) {
-        // Stripe-first flow: Application record does NOT exist yet — create it now.
-        // Idempotency check: skip if already created (webhook may fire twice).
-        const exists = await db.collection("applications").findOne({ id: metadata.application_id });
-        if (!exists) {
-          await db.collection("applications").insertOne({
-            id: metadata.application_id,
-            first_name: metadata.first_name || "",
-            last_name: metadata.last_name || "",
-            email: metadata.email || "",
-            phone: metadata.phone || null,
-            course_id: metadata.course_id || null,
-            course_title: metadata.course_title || null,
-            country: metadata.country || null,
-            city: metadata.city || null,
-            address: metadata.address || null,
-            date_of_birth: metadata.date_of_birth || null,
-            identification_url: metadata.identification_url || null,
-            high_school_certificate_url: metadata.high_school_certificate_url || null,
-            motivation: metadata.motivation || null,
-            status: "pending",
-            payment_status: "paid",
-            stripe_session_id: session.id,
-            payment_amount: APPLICATION_FEE,
-            created_at: new Date().toISOString(),
-            paid_at: new Date().toISOString(),
-          });
-          console.log(`Application created for ${metadata.email} → course ${metadata.course_id} (id: ${metadata.application_id})`);
-
-          // Send confirmation email to the applicant
-          if (metadata.email && metadata.first_name) {
-            const courseTitle = metadata.course_title ||
-              (await db.collection("courses").findOne({ id: metadata.course_id }))?.title ||
-              "your chosen programme";
-            await sendApplicationReceivedEmail(metadata.email, metadata.first_name, courseTitle);
-            console.log(`Confirmation email sent to ${metadata.email}`);
-          }
-        } else {
-          console.log(`Duplicate webhook for application ${metadata.application_id} — skipping`);
-        }
-      }
-    }
-
-    res.json({ received: true });
-  } catch (error) {
-    console.error("Webhook error:", error);
-    res.status(500).json({ detail: "Webhook processing failed" });
-  }
-});
+// Stripe webhook is registered before express.json() — see top of middleware section.
 
 // ============ DASHBOARD ROUTES ============
 app.get("/api/dashboard/admin", authenticate, requireRoles(["admin", "super_admin", "sub_admin", "staff"]), async (req, res) => {
