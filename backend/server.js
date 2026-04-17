@@ -33,6 +33,7 @@ const documentUpload = multer({
 });
 const { Resend } = require("resend");
 const Stripe = require("stripe");
+const PDFDocument = require("pdfkit");
 
 // Load environment variables
 require("dotenv").config();
@@ -542,6 +543,152 @@ const getLocationFromIP = async (ip) => {
 };
 
 // ============ EMAIL FUNCTIONS ============
+const generateAcceptanceLetter = (firstName, lastName, courseTitle) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 0 });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const W = 595.28, H = 841.89;
+    const darkGreen = '#0B3B2C';
+    const midGreen  = '#5a8a00';
+    const margin    = 50;
+    const contentW  = W - margin * 2;
+
+    // White background
+    doc.rect(0, 0, W, H).fill('white');
+
+    // ── Decorative dot grid top-right ──────────────────────────────
+    const dotSz = 3.5, dotGap = 8.5;
+    for (let row = 0; row < 22; row++) {
+      for (let col = 0; col < 22; col++) {
+        const x = W - 210 + col * dotGap;
+        const y = 8 + row * dotGap;
+        if (x > W - 8) continue;
+        const dist = Math.sqrt(Math.pow(col - 21, 2) + Math.pow(row, 2));
+        const opacity = Math.max(0.04, 0.35 - dist * 0.015);
+        doc.rect(x, y, dotSz, dotSz).fillOpacity(opacity).fill('#8ab84a');
+      }
+    }
+
+    // ── Decorative dot grid bottom-left ────────────────────────────
+    for (let row = 0; row < 12; row++) {
+      for (let col = 0; col < 12; col++) {
+        const x = 8 + col * dotGap;
+        const y = H - 200 + row * dotGap;
+        const dist = Math.sqrt(Math.pow(col, 2) + Math.pow(row - 11, 2));
+        const opacity = Math.max(0.04, 0.28 - dist * 0.02);
+        doc.rect(x, y, dotSz, dotSz).fillOpacity(opacity).fill('#8ab84a');
+      }
+    }
+    doc.fillOpacity(1);
+
+    // ── Dark green curve bottom-right ──────────────────────────────
+    doc.save()
+       .moveTo(W - 130, H - 50)
+       .bezierCurveTo(W - 70, H - 130, W, H - 90, W, H - 30)
+       .lineTo(W, H).lineTo(W - 130, H).closePath()
+       .fill(darkGreen)
+       .restore();
+
+    // ── Green footer bar ───────────────────────────────────────────
+    doc.rect(0, H - 36, W, 36).fill(midGreen);
+    doc.fillColor('white').fontSize(8.5).font('Helvetica');
+    doc.text('\u2709  admissions@gitb.lt', 28, H - 23);
+    doc.text('\u25CF  https://www.gitb.lt', 200, H - 23);
+
+    // ── Logo ───────────────────────────────────────────────────────
+    const logoPath = path.join(__dirname, '../static/images/gitb-logo-full.png');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, margin, 28, { width: 155 });
+    } else {
+      doc.fillColor(darkGreen).fontSize(22).font('Helvetica-Bold').text('GITB', margin, 35);
+    }
+
+    // ── Thin divider ───────────────────────────────────────────────
+    doc.moveTo(margin, 108).lineTo(W - margin, 108)
+       .strokeColor('#d0d8d0').lineWidth(0.6).stroke();
+
+    // ── Date (right-aligned) ───────────────────────────────────────
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    doc.fillColor('#555').fontSize(10).font('Helvetica');
+    doc.text(dateStr, margin, 120, { width: contentW, align: 'right' });
+
+    // ── Heading ────────────────────────────────────────────────────
+    doc.fillColor(darkGreen).fontSize(17).font('Helvetica-Bold');
+    doc.text('LETTER OF ACCEPTANCE', margin, 148, { width: contentW, align: 'center' });
+    // Underline accent
+    doc.rect(W / 2 - 90, 172, 180, 3).fill(midGreen);
+
+    // ── Salutation & body ─────────────────────────────────────────
+    let y = 192;
+    doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
+
+    doc.text(`Dear ${firstName} ${lastName},`, margin, y, { width: contentW });
+    y = doc.y + 10;
+
+    doc.text(
+      `We are delighted to inform you that your application to the Global Institute of Technology and Business (GITB) has been reviewed and you have been officially accepted. On behalf of our faculty and staff, we congratulate you on this achievement.`,
+      margin, y, { width: contentW }
+    );
+    y = doc.y + 10;
+
+    doc.font('Helvetica').text('Programme of Study:  ', margin, y, { continued: true, width: contentW });
+    doc.font('Helvetica-Bold').fillColor(darkGreen).text(courseTitle);
+    doc.font('Helvetica').fillColor('#1a1a1a');
+    y = doc.y + 10;
+
+    doc.text(
+      'This letter serves as your official confirmation of acceptance and should be retained for your records.',
+      margin, y, { width: contentW }
+    );
+    y = doc.y + 18;
+
+    // ── Next Steps box ─────────────────────────────────────────────
+    const boxH = 118;
+    doc.rect(margin, y, contentW, boxH).fill('#f0f7f0');
+    doc.rect(margin, y, 4, boxH).fill(darkGreen);
+
+    doc.fillColor(darkGreen).fontSize(11).font('Helvetica-Bold');
+    doc.text('Next Steps', margin + 16, y + 12, { width: contentW - 20 });
+
+    doc.fillColor('#222').fontSize(10).font('Helvetica');
+    const steps = [
+      '1.  Log in to your Student Portal using the credentials provided in your welcome email.',
+      '2.  Navigate to your Student Dashboard and locate the Tuition Payment section.',
+      '3.  Complete your tuition payment to unlock your course materials and schedule.',
+      `4.  Student Portal: ${process.env.FRONTEND_URL || 'https://gitb.lt'}/student-login`,
+    ];
+    steps.forEach((step, i) => {
+      doc.text(step, margin + 16, y + 30 + i * 20, { width: contentW - 30 });
+    });
+
+    doc.fillColor('#666').fontSize(9);
+    doc.text('Course access is activated immediately after payment confirmation.', margin + 16, y + 106, { width: contentW - 30 });
+
+    y = y + boxH + 18;
+
+    // ── Closing ────────────────────────────────────────────────────
+    doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica');
+    doc.text(
+      'We look forward to supporting your academic journey at GITB. Should you have any questions, please contact us at admissions@gitb.lt.',
+      margin, y, { width: contentW }
+    );
+    y = doc.y + 24;
+
+    doc.text('Yours sincerely,', margin, y);
+    y = doc.y + 36;
+    doc.font('Helvetica-Bold').text('GITB Admissions Office', margin, y);
+    doc.font('Helvetica').fillColor('#555').fontSize(10);
+    doc.text('Global Institute of Technology and Business', margin, doc.y + 3);
+    doc.text('Vilnius, Lithuania', margin, doc.y + 3);
+
+    doc.end();
+  });
+};
+
 const getEmailHeader = (subtitle = "Global Institute of Tech and Business") => `
   <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #0C4E3A 0%, #0a3d2d 100%); border-radius: 10px 10px 0 0;">
     <img src="https://gitb.lt/images/email.jpg" alt="GITB" style="max-width: 350px; height: auto; display: block; margin: 0 auto 8px;" />
@@ -549,18 +696,15 @@ const getEmailHeader = (subtitle = "Global Institute of Tech and Business") => `
   </div>
 `;
 
-const sendEmail = async (to, subject, html) => {
+const sendEmail = async (to, subject, html, attachments = []) => {
   if (!resend) {
     console.warn("Email not sent - Resend not configured");
     return false;
   }
   try {
-    await resend.emails.send({
-      from: `GITB <${ADMIN_EMAIL}>`,
-      to: [to],
-      subject,
-      html,
-    });
+    const payload = { from: `GITB <${ADMIN_EMAIL}>`, to: [to], subject, html };
+    if (attachments.length > 0) payload.attachments = attachments;
+    await resend.emails.send(payload);
     return true;
   } catch (error) {
     console.error("Email error:", error.message);
@@ -624,7 +768,17 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
     </div>
   `;
 
-  return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html);
+  try {
+    const pdfBuffer = await generateAcceptanceLetter(firstName, lastName, courseTitle);
+    const attachments = [{
+      filename: `GITB_Acceptance_Letter_${firstName}_${lastName}.pdf`,
+      content: pdfBuffer.toString('base64'),
+    }];
+    return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html, attachments);
+  } catch (pdfErr) {
+    console.error("PDF generation failed, sending email without attachment:", pdfErr.message);
+    return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html);
+  }
 };
 
 // Login notification email - DISABLED per user request
