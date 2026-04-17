@@ -715,56 +715,113 @@ const sendEmail = async (to, subject, html, attachments = []) => {
 // Welcome email when application is approved
 const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword, tuitionAmount = 0) => {
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
-      ${getEmailHeader()}
-      
-      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <h2 style="color: #3d7a4a; margin-top: 0;">Welcome to Global Institute of Tech and Business!</h2>
-        
-        <p>Dear ${firstName} ${lastName},</p>
-        
-        <p><strong>Congratulations on your admission!</strong> You've taken a bold step toward building real skills in technology and business, and we're excited to have you join our academic community.</p>
-        
-        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #3d7a4a;">
-          <h3 style="margin: 0 0 10px 0; color: #2d5a3a;">Your Program</h3>
-          <p style="margin: 0; font-size: 18px; color: #333;"><strong>${courseTitle}</strong></p>
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f4f6f4; padding: 24px;">
+
+      <!-- Header with logo -->
+      <div style="background: linear-gradient(135deg, #0B3B2C 0%, #0a3d2d 100%); border-radius: 12px 12px 0 0; padding: 28px 32px; text-align: center;">
+        <img src="https://gitb.lt/images/email.jpg" alt="GITB — Global Institute of Technology and Business"
+             style="max-width: 320px; width: 100%; height: auto; display: block; margin: 0 auto;" />
+        <p style="margin: 12px 0 0; color: #D4F542; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">
+          Admissions Office
+        </p>
+      </div>
+
+      <!-- Body -->
+      <div style="background: #ffffff; padding: 40px 36px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+
+        <h2 style="color: #0B3B2C; margin: 0 0 6px; font-size: 22px;">Congratulations, ${firstName}!</h2>
+        <p style="color: #5a8a6a; margin: 0 0 24px; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+          Your admission has been confirmed
+        </p>
+
+        <p style="color: #333; line-height: 1.7;">
+          Dear <strong>${firstName} ${lastName}</strong>,<br><br>
+          We are thrilled to welcome you to the <strong>Global Institute of Technology and Business (GITB)</strong>.
+          Your application has been reviewed and accepted — you are now officially a GITB student.
+        </p>
+
+        <!-- Programme box -->
+        <div style="background: #f0f9f2; border-left: 5px solid #0B3B2C; border-radius: 6px; padding: 18px 20px; margin: 24px 0;">
+          <p style="margin: 0 0 4px; font-size: 12px; color: #5a8a6a; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Programme of Study</p>
+          <p style="margin: 0; font-size: 18px; color: #0B3B2C; font-weight: bold;">${courseTitle}</p>
         </div>
-        
-        <h3 style="color: #333;">Here's what to do next:</h3>
-        
-        <div style="background: #fff8e1; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
-          <h4 style="margin: 0 0 10px 0; color: #f57c00;">Step 1: Complete Your Tuition Payment</h4>
-          <p style="margin: 0;">To unlock your course and access all learning materials, please complete your tuition payment of <strong>€${tuitionAmount || 'See dashboard'}</strong> after logging in.</p>
+
+        <!-- Credentials card -->
+        <div style="background: #0B3B2C; border-radius: 10px; padding: 24px 28px; margin: 28px 0;">
+          <p style="margin: 0 0 16px; color: #D4F542; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px;">
+            🔐 Your Account Details
+          </p>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; color: #a8c8b0; font-size: 13px; width: 140px;">Login Email</td>
+              <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: bold;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #a8c8b0; font-size: 13px;">Temporary Password</td>
+              <td style="padding: 8px 0;">
+                <span style="background: #1a5c40; color: #D4F542; padding: 6px 14px; border-radius: 6px; font-size: 16px; font-weight: bold; letter-spacing: 1px; font-family: monospace;">
+                  ${tempPassword}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #a8c8b0; font-size: 13px;">Portal URL</td>
+              <td style="padding: 8px 0;">
+                <a href="${FRONTEND_URL}/student-login" style="color: #D4F542; font-size: 13px;">${FRONTEND_URL}/student-login</a>
+              </td>
+            </tr>
+          </table>
         </div>
-        
-        <p>Log in using the credentials below to access your student dashboard:</p>
-        
-        <div style="background: #f5f5f5; padding: 25px; border-radius: 8px; margin: 25px 0;">
-          <h3 style="margin: 0 0 15px 0; color: #333;">Your Login Credentials</h3>
-          <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-          <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #fff3e0; padding: 5px 10px; border-radius: 4px; color: #e65100; font-size: 16px;">${tempPassword}</code></p>
-        </div>
-        
-        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
-          <p style="margin: 0; color: #e65100;">
-            <strong>Important:</strong> Please change your password after first login and complete your tuition payment to access your courses.
+
+        <!-- Warning -->
+        <div style="background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 0 0 28px;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;">
+            <strong>⚠ Important:</strong> This is a temporary password. Please change it immediately after your first login to secure your account.
           </p>
         </div>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${FRONTEND_URL}/student-login" style="display: inline-block; padding: 15px 40px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-            Login to Student Portal
+
+        <!-- Next steps -->
+        <h3 style="color: #0B3B2C; margin: 0 0 14px; font-size: 16px;">What to do next</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          ${[
+            ['1', 'Log in to the Student Portal using your credentials above.'],
+            ['2', 'Change your temporary password when prompted.'],
+            ['3', `Complete your tuition payment of <strong>€${tuitionAmount || 'see dashboard'}</strong> to unlock your course materials.`],
+            ['4', 'Your acceptance letter is attached to this email — please save it for your records.'],
+          ].map(([n, text]) => `
+          <tr>
+            <td style="vertical-align: top; padding: 7px 14px 7px 0; width: 32px;">
+              <div style="background: #0B3B2C; color: white; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-size: 12px; font-weight: bold;">${n}</div>
+            </td>
+            <td style="vertical-align: middle; padding: 7px 0; color: #444; font-size: 14px; line-height: 1.6;">${text}</td>
+          </tr>`).join('')}
+        </table>
+
+        <!-- CTA button -->
+        <div style="text-align: center; margin: 32px 0 24px;">
+          <a href="${FRONTEND_URL}/student-login"
+             style="display: inline-block; padding: 14px 44px; background: #0B3B2C; color: #D4F542; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; letter-spacing: 0.5px;">
+            Login to Student Portal →
           </a>
         </div>
-        
-        <p style="color: #666; font-size: 14px;">If you experience any difficulty accessing your account, contact the admin team immediately for assistance.</p>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-        
-        <p style="color: #333;"><strong>Welcome once again — your journey starts now.</strong></p>
-        
-        <p style="color: #666; margin-bottom: 0;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0;" />
+
+        <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0;">
+          If you experience any difficulty accessing your account, please contact us at
+          <a href="mailto:admissions@gitb.lt" style="color: #0B3B2C;">admissions@gitb.lt</a>.
+          We look forward to supporting your journey.
+        </p>
+        <p style="color: #333; margin: 20px 0 0;">
+          Best regards,<br>
+          <strong>GITB Admissions Team</strong><br>
+          <span style="color: #888; font-size: 12px;">Global Institute of Technology and Business · Vilnius, Lithuania</span>
+        </p>
       </div>
+
+      <p style="text-align: center; color: #aaa; font-size: 11px; margin-top: 16px;">
+        © GITB · <a href="https://gitb.lt" style="color: #aaa;">gitb.lt</a> · admissions@gitb.lt
+      </p>
     </div>
   `;
 
