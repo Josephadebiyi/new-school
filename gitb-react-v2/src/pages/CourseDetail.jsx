@@ -298,7 +298,7 @@ const CourseDetail = () => {
 
       {/* ── CERTIFICATES ── */}
       {course.certificates.length > 0 && (
-        <section className="bg-[#E8D5F7] py-16">
+        <section className="bg-[#E8E4DD] py-16">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8 text-center">Certificates Included</h2>
             <div className="grid sm:grid-cols-2 gap-4">

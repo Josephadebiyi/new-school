@@ -314,7 +314,7 @@ const FeaturedProgramsSection = ({ courses, navigate }) => (
 );
 
 const ProofSection = () => (
-  <section className="bg-[#E8D5F7] py-20">
+  <section className="bg-[#E8E4DD] py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="grid lg:grid-cols-[0.85fr_1.15fr] gap-10 items-center">
         <div className="rounded-[2rem] overflow-hidden shadow-2xl">
