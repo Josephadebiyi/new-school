@@ -23,9 +23,10 @@ const Navbar = () => {
 
   const navLinks = [
     { name: 'Courses', path: '/courses' },
+    { name: 'Events', path: '/events' },
+    { name: 'LMS', path: '/login' },
     { name: 'About Us', path: '/about' },
-    { name: 'Accelerators', path: '/accelerators' },
-    { name: 'Admissions', path: '/admissions' },
+    { name: 'Testimonials', path: '/testimonials' },
     { name: 'Contact', path: '/contact' },
   ];
 
@@ -54,7 +55,7 @@ const Navbar = () => {
           <Link to="/" className="flex items-center">
             <img
               src="/images/gitb-logo-full.png"
-              alt="GITB"
+              alt="Global Institute of Technology and Business"
               className={`h-9 w-auto transition-all duration-300 ${logoFilter}`}
             />
           </Link>
@@ -73,14 +74,8 @@ const Navbar = () => {
 
           <div className="hidden md:flex items-center space-x-3">
             <button
-              onClick={() => navigate('/login')}
-              className={`${textColor} text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity`}
-            >
-              Login
-            </button>
-            <button
               onClick={() => navigate('/apply')}
-              className="px-5 py-2.5 rounded-full text-sm font-bold bg-[#D4F542] text-[#0B3B2C] hover:bg-white transition-colors cursor-pointer"
+              className="px-6 py-3 rounded-full text-sm font-bold uppercase tracking-wide bg-[#D4F542] text-[#0B3B2C] border border-[#D4F542] hover:bg-white hover:border-white transition-colors cursor-pointer"
             >
               Apply Now
             </button>
@@ -114,14 +109,8 @@ const Navbar = () => {
               ))}
               <div className="pt-4 flex flex-col space-y-4">
                 <button
-                  onClick={() => { navigate('/login'); setIsOpen(false); }}
-                  className="text-left px-3 font-medium text-white cursor-pointer"
-                >
-                  Login
-                </button>
-                <button
                   onClick={() => { navigate('/apply'); setIsOpen(false); }}
-                  className="mx-3 px-5 py-3 rounded-full text-center font-bold bg-[#D4F542] text-[#0B3B2C] cursor-pointer"
+                  className="mx-3 px-5 py-3 rounded-full text-center font-bold uppercase tracking-wide bg-[#D4F542] text-[#0B3B2C] cursor-pointer"
                 >
                   Apply Now
                 </button>

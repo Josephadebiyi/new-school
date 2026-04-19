@@ -1,3 +1,5 @@
+import { courses as fallbackCourses } from '../data/courses';
+
 // In production the frontend is hosted on Hostinger while the API is on Render.
 // VITE_API_BASE is set to the Render URL in .env.production so all fetch calls
 // hit the correct server. In dev, it's empty and Vite proxies /api/* locally.
@@ -52,23 +54,43 @@ function normalizeCourse(c) {
 // ─── Public Course Routes ────────────────────────────────────────────────────
 
 export async function fetchCourses() {
-  const res = await fetch(`${API_BASE}/api/courses/public`);
-  if (!res.ok) throw new Error('Failed to fetch courses');
-  const data = await res.json();
-  return Array.isArray(data) ? data.map(normalizeCourse) : [];
+  try {
+    const res = await fetch(`${API_BASE}/api/courses/public`);
+    if (!res.ok) throw new Error('Failed to fetch courses');
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0
+      ? data.map(normalizeCourse)
+      : fallbackCourses.map(normalizeCourse);
+  } catch {
+    return fallbackCourses.map(normalizeCourse);
+  }
 }
 
 export async function fetchStats() {
-  const res = await fetch(`${API_BASE}/api/public/stats`);
-  if (!res.ok) throw new Error('Failed to fetch stats');
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/api/public/stats`);
+    if (!res.ok) throw new Error('Failed to fetch stats');
+    return res.json();
+  } catch {
+    return {
+      graduates: 1200,
+      countries: 20,
+      courses: fallbackCourses.length,
+    };
+  }
 }
 
 export async function fetchCourseById(id) {
-  const res = await fetch(`${API_BASE}/api/courses/public/${id}`);
-  if (!res.ok) throw new Error('Course not found');
-  const data = await res.json();
-  return normalizeCourse(data);
+  try {
+    const res = await fetch(`${API_BASE}/api/courses/public/${id}`);
+    if (!res.ok) throw new Error('Course not found');
+    const data = await res.json();
+    return normalizeCourse(data);
+  } catch {
+    const localCourse = fallbackCourses.find((course) => course.id === id);
+    if (!localCourse) throw new Error('Course not found');
+    return normalizeCourse(localCourse);
+  }
 }
 
 // ─── Applications ────────────────────────────────────────────────────────────

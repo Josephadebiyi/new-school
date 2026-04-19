@@ -62,16 +62,16 @@ const ApplySuccess = () => {
 
             <h1 className="text-3xl font-bold text-[#1a1a1a] mb-3">Application Received!</h1>
             <p className="text-gray-500 mb-8 leading-relaxed">
-              Your application has been submitted and your payment was successful. Welcome to GITB — we'll be in touch within 1 business day.
+              Your application has been submitted successfully. Our admissions team will review your details and contact you with the next steps.
             </p>
 
             <div className="bg-[#F3F4F6] rounded-2xl p-6 mb-8 text-left space-y-3">
               <h3 className="font-bold text-[#1a1a1a] text-sm mb-4">What happens next?</h3>
               {[
-                "You'll receive a confirmation email shortly",
-                "Our admissions team will review your application",
-                "You'll be contacted to complete enrolment",
-                "Access to your student portal will be activated",
+                "You’ll receive a confirmation email shortly",
+                "Our admissions team will review your submission",
+                "We’ll contact you with the next onboarding steps",
+                "Your learning journey can begin once enrollment is confirmed",
               ].map((step, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-5 h-5 rounded-full bg-[#0B3B2C] text-white text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">
@@ -111,7 +111,7 @@ const ApplySuccess = () => {
 
             <h1 className="text-3xl font-bold text-[#1a1a1a] mb-3">Payment Processing</h1>
             <p className="text-gray-500 mb-8 leading-relaxed">
-              Your payment is still being processed. This can take a few minutes. You'll receive a confirmation email once it's complete.
+              Your payment is still being processed. This can take a few minutes, and you’ll receive confirmation once everything is complete.
             </p>
 
             <p className="text-sm text-gray-400 mb-6">
@@ -145,7 +145,7 @@ const ApplySuccess = () => {
               {message || 'We could not confirm your application status.'}
             </p>
             <p className="text-sm text-gray-400 mb-8">
-              If you completed payment, please contact us immediately and we'll sort it out.
+              If you completed payment, please contact us and we’ll help resolve it quickly.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">

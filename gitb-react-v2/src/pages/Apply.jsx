@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle, ChevronRight, User, BookOpen, CreditCard } from 'lucide-react';
-import { fetchCourses, createApplication } from '../services/api';
+import { BookOpen, CheckCircle, CreditCard, User } from 'lucide-react';
+import { createApplication, fetchCourses } from '../services/api';
 
 const steps = [
   { label: 'Personal Details', icon: User },
-  { label: 'Course Selection', icon: BookOpen },
-  { label: 'Review & Pay', icon: CreditCard },
+  { label: 'Program Selection', icon: BookOpen },
+  { label: 'Review', icon: CreditCard },
 ];
 
 const inputClass = 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#0B3B2C] focus:ring-2 focus:ring-[#0B3B2C]/10 text-[#1a1a1a] text-sm transition-all';
@@ -32,17 +32,14 @@ export default function Apply() {
   });
 
   useEffect(() => {
-    fetchCourses()
-      .then(setCourses)
-      .catch(() => { });
+    fetchCourses().then(setCourses).catch(() => {});
   }, []);
 
-  const update = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const update = (event) => setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
 
   const canAdvanceStep1 = form.firstName && form.lastName && form.email;
   const canAdvanceStep2 = form.courseId;
-
-  const selectedCourse = courses.find((c) => c.id === form.courseId);
+  const selectedCourse = courses.find((course) => course.id === form.courseId);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -72,71 +69,67 @@ export default function Apply() {
   return (
     <div className="min-h-screen bg-[#F3F4F6] pt-28 pb-20">
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
-
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-10"
         >
-          <h1 className="text-4xl font-bold text-[#0B3B2C] mb-3">Begin Your Journey</h1>
-          <p className="text-gray-500">Complete the steps below to apply for a GITB program.</p>
+          <h1 className="text-4xl font-bold text-[#0B3B2C] mb-3">Apply to GITB</h1>
+          <p className="text-gray-500 max-w-xl mx-auto">
+            Complete your application to begin the admissions process for one of our practical, career-focused programs.
+          </p>
         </motion.div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center mb-10 gap-0">
-          {steps.map((s, i) => {
-            const Icon = s.icon;
-            const done = i < step;
-            const active = i === step;
+        <div className="flex items-center justify-center mb-10 gap-3 flex-wrap">
+          {steps.map((item, index) => {
+            const Icon = item.icon;
+            const done = index < step;
+            const active = index === step;
             return (
-              <div key={i} className="flex items-center">
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${done ? 'bg-[#D4F542] text-[#0B3B2C]' :
-                    active ? 'bg-[#0B3B2C] text-white' :
-                      'bg-white text-gray-400 border border-gray-200'
-                  }`}>
-                  {done ? <CheckCircle size={14} /> : <Icon size={14} />}
-                  <span className="hidden sm:inline">{s.label}</span>
-                  <span className="sm:hidden">{i + 1}</span>
-                </div>
-                {i < steps.length - 1 && (
-                  <ChevronRight size={16} className="mx-1 text-gray-300" />
-                )}
+              <div
+                key={item.label}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                  done
+                    ? 'bg-[#D4F542] text-[#0B3B2C]'
+                    : active
+                      ? 'bg-[#0B3B2C] text-white'
+                      : 'bg-white text-gray-400 border border-gray-200'
+                }`}
+              >
+                {done ? <CheckCircle size={14} /> : <Icon size={14} />}
+                <span>{item.label}</span>
               </div>
             );
           })}
         </div>
 
-        {/* Form card */}
         <motion.div
           key={step}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
           className="bg-white rounded-3xl shadow-lg p-8"
         >
           <AnimatePresence mode="wait">
-            {/* Step 1: Personal Details */}
             {step === 0 && (
-              <motion.div key="s1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Personal Details</h2>
+              <motion.div key="step-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Personal details</h2>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className={labelClass}>First Name *</label>
-                    <input className={inputClass} name="firstName" value={form.firstName} onChange={update} placeholder="Jane" required />
+                    <input className={inputClass} name="firstName" value={form.firstName} onChange={update} placeholder="Jane" />
                   </div>
                   <div>
                     <label className={labelClass}>Last Name *</label>
-                    <input className={inputClass} name="lastName" value={form.lastName} onChange={update} placeholder="Doe" required />
+                    <input className={inputClass} name="lastName" value={form.lastName} onChange={update} placeholder="Doe" />
                   </div>
                 </div>
                 <div className="mb-4">
                   <label className={labelClass}>Email Address *</label>
-                  <input className={inputClass} type="email" name="email" value={form.email} onChange={update} placeholder="jane.doe@example.com" required />
+                  <input className={inputClass} type="email" name="email" value={form.email} onChange={update} placeholder="jane.doe@example.com" />
                 </div>
                 <div className="mb-6">
                   <label className={labelClass}>Phone Number</label>
-                  <input className={inputClass} type="tel" name="phone" value={form.phone} onChange={update} placeholder="+370 600 00000" />
+                  <input className={inputClass} type="tel" name="phone" value={form.phone} onChange={update} placeholder="+44 7000 000000" />
                 </div>
                 <button
                   onClick={() => setStep(1)}
@@ -148,22 +141,15 @@ export default function Apply() {
               </motion.div>
             )}
 
-            {/* Step 2: Course Selection */}
             {step === 1 && (
-              <motion.div key="s2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Choose Your Program</h2>
+              <motion.div key="step-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Select your program</h2>
                 <div className="mb-4">
                   <label className={labelClass}>Program of Interest *</label>
-                  <select
-                    className={inputClass}
-                    name="courseId"
-                    value={form.courseId}
-                    onChange={update}
-                    required
-                  >
+                  <select className={inputClass} name="courseId" value={form.courseId} onChange={update}>
                     <option value="" disabled>Select a program</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.title}</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>{course.title}</option>
                     ))}
                   </select>
                 </div>
@@ -178,24 +164,23 @@ export default function Apply() {
                     <div>
                       <p className="font-bold text-[#0B3B2C] text-sm">{selectedCourse.title}</p>
                       <p className="text-xs text-gray-500">{selectedCourse.duration} · {selectedCourse.level}</p>
-                      {selectedCourse.price.monthly > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">From €{selectedCourse.price.monthly}/mo</p>
-                      )}
+                      <p className="text-xs text-gray-400 mt-1">{selectedCourse.category}</p>
                     </div>
                   </motion.div>
                 )}
 
                 <div className="mb-6">
-                  <label className={labelClass}>Why do you want to join GITB?</label>
+                  <label className={labelClass}>What do you want to achieve?</label>
                   <textarea
                     className={`${inputClass} resize-none`}
                     name="motivation"
                     rows={4}
                     value={form.motivation}
                     onChange={update}
-                    placeholder="Tell us about your goals and what you hope to achieve..."
+                    placeholder="Tell us a little about your goals, your interest, or what made you choose this program."
                   />
                 </div>
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep(0)}
@@ -206,18 +191,17 @@ export default function Apply() {
                   <button
                     onClick={() => setStep(2)}
                     disabled={!canAdvanceStep2}
-                    className="flex-2 flex-grow py-4 rounded-full font-bold text-base bg-[#0B3B2C] text-white hover:bg-[#164E3E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    className="flex-grow py-4 rounded-full font-bold text-base bg-[#0B3B2C] text-white hover:bg-[#164E3E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    Review Application
+                    Review application
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* Step 3: Review & Pay */}
             {step === 2 && (
-              <motion.div key="s3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Review & Pay</h2>
+              <motion.div key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Review and submit</h2>
 
                 <div className="space-y-3 mb-6">
                   <div className="bg-[#F3F4F6] rounded-2xl p-4">
@@ -228,17 +212,9 @@ export default function Apply() {
                   </div>
 
                   <div className="bg-[#F3F4F6] rounded-2xl p-4">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Program</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Program</p>
                     <p className="font-semibold text-[#1a1a1a]">{selectedCourse?.title || 'Selected course'}</p>
                     {selectedCourse && <p className="text-sm text-gray-500">{selectedCourse.duration} · {selectedCourse.level}</p>}
-                  </div>
-
-                  <div className="bg-[#D4F542] rounded-2xl p-4 flex justify-between items-center">
-                    <div>
-                      <p className="text-xs font-bold text-[#0B3B2C]/70 uppercase tracking-wider mb-1">Application Fee</p>
-                      <p className="text-sm text-[#0B3B2C]/70">One-time, non-refundable</p>
-                    </div>
-                    <p className="text-3xl font-bold text-[#0B3B2C]">€50</p>
                   </div>
                 </div>
 
@@ -248,8 +224,8 @@ export default function Apply() {
                   </div>
                 )}
 
-                <p className="text-xs text-gray-400 text-center mb-4">
-                  By submitting you will be redirected to our secure Stripe payment page.
+                <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                  When you submit, we will create your application and direct you to the secure payment step if required by the backend flow.
                 </p>
 
                 <div className="flex gap-3">
@@ -264,7 +240,7 @@ export default function Apply() {
                     disabled={loading}
                     className="flex-grow py-4 rounded-full font-bold text-base bg-[#D4F542] text-[#0B3B2C] hover:bg-white border border-[#D4F542] hover:border-[#0B3B2C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    {loading ? 'Processing…' : 'Submit & Pay €50'}
+                    {loading ? 'Processing…' : 'Submit application'}
                   </button>
                 </div>
               </motion.div>

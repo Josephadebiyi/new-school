@@ -1,266 +1,311 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Play, ArrowUpRight, Users, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowRight, Award, Briefcase, CheckCircle2, Clock3, GraduationCap, PlayCircle, Star, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { fetchCourses, fetchStats } from '../services/api';
 
-const HeroSection = ({ navigate }) => (
-  <section className="bg-[#FF6B47] min-h-screen pt-20 relative overflow-hidden">
-    <img src="/images/header.jpg" alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none select-none" />
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-      <div className="grid lg:grid-cols-2 gap-12 items-center">
+const heroSlides = [
+  {
+    image: '/images/classroom-lead.jpg',
+    label: 'Student-centered learning',
+  },
+  {
+    image: '/images/events-hero-1.jpg',
+    label: 'Academic ambition and career readiness',
+  },
+  {
+    image: '/images/graduate-portrait.jpg',
+    label: 'Practical digital education',
+  },
+  {
+    image: '/images/vr-lab.jpg',
+    label: 'Career growth and future opportunity',
+  },
+];
+
+const outcomes = [
+  'Beginner-friendly learning paths',
+  'Hands-on projects and guided practice',
+  'Mentorship, accountability, and community',
+  'Career coaching and interview support',
+];
+
+const whyChooseUs = [
+  {
+    title: 'Practical learning',
+    text: 'Every program is built around applicable skills, guided exercises, and projects you can actually talk about in interviews.',
+    icon: CheckCircle2,
+  },
+  {
+    title: 'Flexible structure',
+    text: 'Study around work, school, or family with live support, recordings, and a pace designed for real life.',
+    icon: Clock3,
+  },
+  {
+    title: 'Career direction',
+    text: 'We do not stop at teaching. We help learners position themselves for internships, freelance work, and entry-level roles.',
+    icon: Briefcase,
+  },
+  {
+    title: 'Supportive community',
+    text: 'Learn with tutors, mentors, and classmates who keep you accountable and make the journey less overwhelming.',
+    icon: Users,
+  },
+];
+
+const testimonials = [
+  {
+    name: 'Amaka',
+    role: 'Data Analytics Student',
+    quote: 'The biggest difference for me was clarity. I finally understood how to move from learning theory to building work I could confidently present.',
+  },
+  {
+    name: 'David',
+    role: 'Frontend Development Student',
+    quote: 'I joined as a complete beginner and the step-by-step teaching made web development feel achievable instead of intimidating.',
+  },
+  {
+    name: 'Favour',
+    role: 'Virtual Assistant Student',
+    quote: 'The live sessions, recordings, and tutor support helped me stay consistent even while working full time.',
+  },
+];
+
+const faqs = [
+  {
+    question: 'Do I need a tech background?',
+    answer: 'No. Our beginner tracks are designed for learners starting from scratch, with clear explanations and guided support.',
+  },
+  {
+    question: 'Can I learn while working?',
+    answer: 'Yes. Our programs are designed with flexible formats, recorded support, and structured guidance for busy professionals.',
+  },
+  {
+    question: 'Will I build real projects?',
+    answer: 'Yes. Our programs are designed around practical assignments, guided exercises, and portfolio-ready work that helps learners demonstrate real capability.',
+  },
+  {
+    question: 'Is there support after classes?',
+    answer: 'Yes. We now feature mentorship, accountability, community support, and career guidance as a core part of the learning experience.',
+  },
+];
+
+const HeroSection = ({ navigate, stats, currentSlide }) => (
+  <section className="bg-[#0B3B2C] pt-28 pb-20 relative overflow-hidden">
+    {heroSlides.map((slide, index) => (
+      <div
+        key={slide.image}
+        className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-20' : 'opacity-0'}`}
+      >
+        <img src={slide.image} alt="" aria-hidden="true" className="w-full h-full object-cover" />
+      </div>
+    ))}
+    <div className="absolute -top-20 right-0 w-[32rem] h-[32rem] rounded-full bg-[#6B5B4F] blur-3xl opacity-25" />
+    <div className="absolute bottom-0 left-0 w-[24rem] h-[24rem] rounded-full bg-[#D4F542] blur-3xl opacity-20" />
+
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center">
         <div className="text-white">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center space-x-2 bg-white/20 rounded-full px-4 py-2 mb-6"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium mb-6"
           >
-            <img src="/images/eu-flag.png" alt="EU" className="h-4 w-auto rounded-sm" />
-            <span className="text-white text-sm font-medium">EU-recognised programs</span>
+            <Star size={14} className="text-[#D4F542]" />
+            {heroSlides[currentSlide]?.label}
           </motion.div>
+
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-5xl md:text-7xl font-bold leading-tight mb-8"
+            transition={{ delay: 0.08 }}
+            className="text-5xl md:text-7xl font-bold leading-[0.95] mb-6"
           >
-            Global Institute of<br />
-            Tech & Business
+            GITB helps learners build skills that lead somewhere.
           </motion.h1>
+
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-white/90 text-xl mb-8 max-w-md font-medium"
+            transition={{ delay: 0.16 }}
+            className="text-lg md:text-xl text-white/75 leading-relaxed max-w-2xl mb-8"
           >
-            Master innovation and leadership. Dive into industry-led, practical programs designed to secure high-impact careers in the digital age.
+            Build practical, globally relevant skills through beginner-friendly programs, expert-led training, flexible learning formats, and support designed to help you move toward meaningful digital careers.
           </motion.p>
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="flex gap-4"
+            transition={{ delay: 0.24 }}
+            className="flex flex-col sm:flex-row gap-4 mb-10"
           >
             <button
               onClick={() => navigate('/apply')}
-              className="bg-white text-[#1a1a1a] px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              className="bg-[#D4F542] text-[#0B3B2C] px-8 py-4 rounded-full font-bold uppercase tracking-wide text-lg border border-[#D4F542] hover:bg-white hover:border-white transition-colors cursor-pointer"
             >
-              Apply now
+              Apply Now
             </button>
             <button
               onClick={() => navigate('/courses')}
-              className="border border-white/40 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-2"
+              className="border border-white/30 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
-              Explore courses <ArrowRight size={18} />
+              Explore programs <ArrowRight size={18} />
             </button>
           </motion.div>
+
+          <div className="grid sm:grid-cols-3 gap-4 max-w-3xl">
+            {[
+              { label: 'Programs', value: `${stats.courses || 12}+` },
+              { label: 'Learners reached', value: `${stats.graduates || 1200}+` },
+              { label: 'Countries served', value: `${stats.countries || 20}+` },
+            ].map((item) => (
+              <div key={item.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-3xl font-bold text-white">{item.value}</p>
+                <p className="text-sm text-white/60">{item.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 mt-6">
+            {heroSlides.map((slide, index) => (
+              <span
+                key={slide.label}
+                className={`h-2 rounded-full transition-all duration-500 ${index === currentSlide ? 'w-8 bg-[#D4F542]' : 'w-2 bg-white/35'}`}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Featured course images — replaces chat mockup */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="relative"
+          className="grid grid-cols-2 gap-4"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-3xl overflow-hidden shadow-2xl aspect-[3/4]">
-              <img src="/images/course-cybersec.jpg" alt="Cybersecurity" className="w-full h-full object-cover" />
+          <div className="rounded-[2rem] overflow-hidden shadow-2xl aspect-[4/5]">
+            <img src="/images/classroom-lead.jpg" alt="Learners building practical skills in a classroom setting" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex flex-col gap-4 pt-8">
+            <div className="rounded-[2rem] overflow-hidden shadow-2xl aspect-square">
+              <img src="/images/vr-lab.jpg" alt="Student exploring immersive technology training" className="w-full h-full object-cover" />
             </div>
-            <div className="flex flex-col gap-4 pt-8">
-              <div className="rounded-3xl overflow-hidden shadow-2xl aspect-square">
-                <img src="/images/course-uiux.jpg" alt="UI/UX Design" className="w-full h-full object-cover" />
-              </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-white">
-                <p className="font-bold text-sm">500+ graduates</p>
-                <p className="text-xs text-white/70">across 20+ countries</p>
-              </div>
+            <div className="rounded-[2rem] bg-white p-6 shadow-2xl">
+              <p className="text-sm font-bold text-[#0B3B2C] mb-2">Why learners choose GITB</p>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Practical learning, structured support, stronger program pathways, and a clearer route from training to opportunity.
+              </p>
             </div>
           </div>
         </motion.div>
       </div>
     </div>
+  </section>
+);
 
-    {/* Accelerator Banner */}
-    <div className="bg-[#6B46C1] py-4">
-      <div className="max-w-7xl mx-auto px-4 flex items-center justify-center space-x-4">
-        <span className="text-white font-medium">New cohort — GITB Accelerator Program</span>
+const OutcomesSection = () => (
+  <section className="bg-[#F5F3EA] py-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="grid lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
+        <div>
+          <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#6B5B4F] mb-4">Why this direction works</p>
+          <h2 className="text-4xl md:text-5xl font-bold text-[#0B3B2C] mb-5 leading-tight">
+            Training designed for outcomes, not just enrollment.
+          </h2>
+          <p className="text-gray-600 leading-relaxed">
+            Learners want clarity before they commit. They want to know whether they can begin from where they are, whether the training is practical, whether support is available, and whether the learning can lead to real career progress.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          {outcomes.map((item) => (
+            <div key={item} className="rounded-3xl bg-white p-6 shadow-sm border border-[#0B3B2C]/5">
+              <div className="w-12 h-12 rounded-2xl bg-[#0B3B2C] flex items-center justify-center mb-4">
+                <CheckCircle2 size={20} className="text-[#D4F542]" />
+              </div>
+              <p className="text-[#0B3B2C] font-semibold leading-relaxed">{item}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+const WhyChooseSection = () => (
+  <section className="bg-white py-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mb-12">
+        <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#8B7355] mb-4">Why choose GITB</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-4">Why ambitious learners choose GITB.</h2>
+        <p className="text-gray-600 leading-relaxed">
+          GITB combines program quality, learner support, and career direction to help students move from curiosity to confidence.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {whyChooseUs.map((item) => {
+          const Icon = item.icon;
+          return (
+            <motion.div
+              key={item.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="rounded-3xl bg-[#F8F8F5] p-7 border border-black/5"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-[#0B3B2C] flex items-center justify-center mb-5">
+                <Icon size={24} className="text-[#D4F542]" />
+              </div>
+              <h3 className="text-xl font-bold text-[#1a1a1a] mb-3 capitalize">{item.title}</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">{item.text}</p>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+);
+
+const FeaturedProgramsSection = ({ courses, navigate }) => (
+  <section className="bg-[#0B3B2C] py-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+        <div className="max-w-2xl">
+          <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#D4F542] mb-4">Programs</p>
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Expanded course offering, clearer paths.</h2>
+          <p className="text-white/70 leading-relaxed">
+            Our course catalog spans product, design, engineering, data, marketing, operations, and AI, giving learners multiple paths into in-demand digital careers.
+          </p>
+        </div>
         <button
-          onClick={() => navigate('/accelerators')}
-          className="bg-white/20 text-white px-4 py-1 rounded-full text-sm font-medium hover:bg-white/30 transition-colors cursor-pointer"
+          onClick={() => navigate('/courses')}
+          className="text-white font-semibold flex items-center gap-2 hover:text-[#D4F542] transition-colors cursor-pointer"
         >
-          Learn more
+          View all programs <ArrowRight size={18} />
         </button>
       </div>
-    </div>
-  </section>
-);
 
-const ImpactSection = ({ navigate }) => (
-  <section className="bg-[#0B3B2C] py-20 relative overflow-hidden">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-16">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-5xl md:text-7xl font-bold text-white mb-4"
-        >
-          education for impact
-        </motion.h2>
-        <p className="text-white/70 max-w-2xl mx-auto">
-          Graduates from GITB work at leading organisations across Europe and beyond. Our programs combine industry-relevant curriculum with real-world projects.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-[#FF6B47] rounded-3xl p-6 aspect-square flex flex-col justify-between">
-          <div className="w-full h-48 rounded-2xl mb-4 overflow-hidden">
-            <img src="/images/course-uiux.jpg" alt="UI/UX Course" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <h3 className="text-white font-bold text-lg">Design for real products</h3>
-            <p className="text-white/80 text-sm">Build portfolio-worthy projects from day one</p>
-          </div>
-        </div>
-        <div className="bg-[#f0f2f5] rounded-3xl p-8 aspect-square flex flex-col justify-center items-center text-center">
-          <div className="w-32 h-32 rounded-full mb-6 overflow-hidden shadow-lg border-4 border-[#0B3B2C] flex items-center justify-center bg-[#0B3B2C]">
-            <img src="/images/eu-flag.png" alt="European Union" className="w-[80%] h-[80%] object-contain" />
-          </div>
-          <h3 className="text-[#0B3B2C] font-bold text-2xl mb-2">GITB</h3>
-          <p className="text-[#0B3B2C]/70">EU-recognised qualifications for global impact</p>
-        </div>
-        <div className="bg-[#2dd4bf] rounded-3xl p-6 aspect-square flex flex-col justify-between">
-          <div className="w-full h-48 rounded-2xl mb-4 overflow-hidden">
-            <img src="/images/course-cybersec.jpg" alt="Cybersecurity Course" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <h3 className="text-[#0B3B2C] font-bold text-lg">Cybersecurity careers</h3>
-            <p className="text-[#0B3B2C]/80 text-sm">Industry-certified ethical hacking & security</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-20 text-center">
-        <h3 className="text-4xl md:text-6xl font-bold text-[#FF6B47] mb-8">Invest in your future</h3>
-        <div className="max-w-4xl mx-auto rounded-3xl overflow-hidden shadow-2xl">
-          <div className="relative aspect-video flex items-center justify-center overflow-hidden group">
-            <img src="/images/invest-future.jpg" alt="Invest in your future" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors duration-300"></div>
-            <div className="relative z-10 text-center text-white cursor-pointer" onClick={() => navigate('/courses')}>
-              <div className="w-20 h-20 bg-[#D4F542] rounded-full flex items-center justify-center mx-auto mb-4 hover:scale-110 transition-transform shadow-[0_0_30px_rgba(212,245,66,0.5)]">
-                <Play size={32} className="text-[#0B3B2C] ml-1" />
-              </div>
-              <p className="text-2xl font-bold shadow-sm">Explore All Programs</p>
-              <p className="text-white/90 text-base mt-2 font-medium tracking-wide">5 courses · certification included</p>
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {courses.slice(0, 6).map((course) => (
+          <div
+            key={course.id}
+            onClick={() => navigate(`/courses/${course.id}`)}
+            className="rounded-[2rem] overflow-hidden bg-white shadow-xl cursor-pointer group"
+          >
+            <div className="h-56 overflow-hidden">
+              <img src={course.img} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
-
-const MomConnectStatsSection = ({ stats }) => (
-  <section className="bg-[#E8E04A] py-20">
-    <div className="max-w-4xl mx-auto px-4 text-center">
-      <h2 className="text-4xl md:text-5xl font-bold text-[#6B46C1] mb-4">
-        Outcomes that speak for themselves.
-      </h2>
-      <p className="text-2xl text-[#6B46C1] mb-16">Powered by GITB</p>
-
-      <div className="bg-white rounded-3xl p-8 shadow-xl">
-        <div className="grid md:grid-cols-2 gap-8 items-center">
-          <div className="text-left">
-            <div className="flex items-center space-x-2 mb-4">
-              <img src="/images/gitb-logo.png" alt="GITB" className="h-8 w-auto" />
-              <span className="font-bold text-[#0B3B2C]">GITB</span>
+            <div className="p-6">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wide mb-3">
+                <span className="text-[#0B3B2C]">{course.category}</span>
+                <span className="text-gray-400">{course.duration}</span>
+              </div>
+              <h3 className="text-xl font-bold text-[#1a1a1a] mb-3">{course.title}</h3>
+              <p className="text-sm text-gray-600 leading-relaxed mb-4">{course.description}</p>
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#0B3B2C] group-hover:gap-3 transition-all">
+                Explore course <ArrowRight size={16} />
+              </span>
             </div>
-            <p className="text-gray-600 mb-6">
-              Our graduates secure roles in top tech firms, banks, and government agencies across Europe. With GITB's structured mentorship and career support, your next role is within reach.
-            </p>
-            <div className="flex space-x-8">
-              <div>
-                <div className="text-3xl font-bold text-[#0B3B2C]">{stats?.graduates || 0}+</div>
-                <div className="text-sm text-gray-500">students & graduates</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-[#0B3B2C]">{stats?.countries || 20}+</div>
-                <div className="text-sm text-gray-500">countries</div>
-              </div>
-            </div>
-          </div>
-          <div className="aspect-[4/3] bg-gradient-to-br from-[#0B3B2C] to-[#164E3E] rounded-2xl overflow-hidden">
-            <img src="/images/course-kyc.jpg" alt="Student" className="w-full h-full object-cover opacity-80" />
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
-
-const PrivateConversationsSection = () => (
-  <section className="bg-[#E8E04A] py-20">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl md:text-5xl font-bold text-[#6B46C1] mb-4">
-          Real skills.<br />Real results.
-        </h2>
-        <p className="text-[#6B46C1]/80 max-w-2xl mx-auto">
-          Our programs are built with employers. Every course includes hands-on projects, certification prep, and career coaching designed to get you hired.
-        </p>
-      </div>
-
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-        <div className="grid md:grid-cols-3">
-          <div className="p-6 border-r">
-            <div className="space-y-3">
-              <div className="p-3 bg-[#0B3B2C] rounded-lg text-white text-sm font-bold">
-                My Programs
-              </div>
-              {['UI/UX Design', 'Cybersecurity', 'KYC & Compliance', 'Languages', 'IAM Security'].map((c, i) => (
-                <div key={i} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
-                  <div className="w-8 h-8 bg-[#D4F542] rounded-full shrink-0"></div>
-                  <span className="text-sm text-gray-700">{c}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="md:col-span-2 p-6 bg-gray-50">
-            <div className="bg-white rounded-2xl shadow-sm h-full p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <img src="/images/gitb-logo.png" alt="GITB" className="h-8 w-8 rounded-full object-contain bg-[#0B3B2C] p-1" />
-                  <div>
-                    <div className="font-bold text-sm">GITB Learning Portal</div>
-                    <div className="text-xs text-green-600">● Active</div>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="bg-gray-100 p-3 rounded-lg rounded-tl-none max-w-[80%] text-sm">
-                  Your next lesson: Network Penetration — Week 4
-                </div>
-                <div className="flex justify-end">
-                  <div className="bg-[#D4F542] p-3 rounded-lg rounded-tr-none max-w-[80%] text-sm text-[#0B3B2C]">
-                    Great work on the lab assignment! You're on track.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-8 mt-12">
-        {[
-          { title: 'Mentor support', desc: 'Weekly sessions with industry professionals' },
-          { title: 'Focus on outcomes', desc: 'Job placement assistance included' },
-          { title: 'Flexible study', desc: 'Online and hybrid options available' },
-        ].map((feature, i) => (
-          <div key={i} className="text-center">
-            <h4 className="font-bold text-[#0B3B2C] mb-2">{feature.title}</h4>
-            <p className="text-sm text-[#0B3B2C]/70">{feature.desc}</p>
           </div>
         ))}
       </div>
@@ -268,251 +313,204 @@ const PrivateConversationsSection = () => (
   </section>
 );
 
-const WHOStatsSection = ({ stats }) => (
-  <section className="bg-[#5eead4] py-20">
+const ProofSection = () => (
+  <section className="bg-[#E8D5F7] py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="grid lg:grid-cols-[0.85fr_1.15fr] gap-10 items-center">
+        <div className="rounded-[2rem] overflow-hidden shadow-2xl">
+          <img src="/images/invest-future.jpg" alt="Student success story" className="w-full h-full object-cover" />
+        </div>
         <div>
-          <div className="flex items-center space-x-3 mb-6">
-            <img src="/images/eu-flag.png" alt="EU" className="h-8 w-auto rounded" />
-            <span className="font-bold text-[#0B3B2C]">European Union Recognition</span>
-          </div>
-          <p className="text-[#0B3B2C]/80 mb-8 leading-relaxed">
-            GITB programs are aligned with EU educational standards and recognised by European employers. Our certifications open doors across the EU job market, from Vilnius to Berlin.
+          <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#8B7355] mb-4">Student outcomes</p>
+          <h2 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-5">A stronger proof section builds trust fast.</h2>
+          <p className="text-gray-700 leading-relaxed mb-6">
+            GITB is built to help learners make measurable progress. That means structured teaching, practical assignments, mentor support, and a stronger focus on employability across the learning journey.
           </p>
-          <div className="flex space-x-12">
-            <div>
-              <div className="text-4xl font-bold text-[#0B3B2C]">{stats?.countries || 27}</div>
-              <div className="text-sm text-[#0B3B2C]/60">EU countries</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-[#0B3B2C]">{stats?.courses || 0}+</div>
-              <div className="text-sm text-[#0B3B2C]/60">programs</div>
-            </div>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {[
+              { label: 'Live support', icon: Users },
+              { label: 'Project based', icon: GraduationCap },
+              { label: 'Career minded', icon: Award },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-2xl bg-white/80 p-5 border border-black/5">
+                  <Icon size={20} className="text-[#8B7355] mb-3" />
+                  <p className="font-semibold text-[#1a1a1a]">{item.label}</p>
+                </div>
+              );
+            })}
           </div>
-        </div>
-        <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl">
-          <img src="/images/course-languages.jpg" alt="European programs" className="w-full h-full object-cover" />
         </div>
       </div>
     </div>
   </section>
 );
 
-const ScaleOutreachSection = () => (
-  <section className="bg-[#5eead4] py-20">
-    <div className="max-w-4xl mx-auto px-4 text-center">
-      <h2 className="text-4xl md:text-5xl font-bold text-[#0B3B2C] mb-4">Career placement rate</h2>
-      <p className="text-[#0B3B2C]/70 mb-12">
-        Our graduates go on to meaningful, well-paid roles. GITB's career support team helps every student from CV to offer letter.
-      </p>
-
-      <div className="relative inline-block">
-        <div className="w-64 h-64 relative">
-          <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#0B3B2C" strokeWidth="20" opacity="0.1" />
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#0B3B2C" strokeWidth="20"
-              strokeDasharray="251.2" strokeDashoffset="62.8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#FF6B47" strokeWidth="20"
-              strokeDasharray="251.2" strokeDashoffset="188.4" strokeLinecap="round" />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-[#0B3B2C]">87%</div>
-              <div className="text-xs text-[#0B3B2C]/60">Placed</div>
-            </div>
-          </div>
-        </div>
-        <div className="absolute -right-4 top-0 w-12 h-12 bg-[#FF6B47] rounded-full flex items-center justify-center text-white text-xs font-bold">Tech</div>
-        <div className="absolute -right-8 top-16 w-12 h-12 bg-[#0B3B2C] rounded-full flex items-center justify-center text-white text-xs font-bold">Fin</div>
-        <div className="absolute -right-4 top-32 w-12 h-12 bg-[#6B46C1] rounded-full flex items-center justify-center text-white text-xs font-bold">Sec</div>
-      </div>
-    </div>
-  </section>
-);
-
-const SesameSection = () => (
-  <section className="bg-[#0B3B2C] py-20">
+const LMSSection = ({ navigate }) => (
+  <section className="bg-[#F5F3EA] py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="grid lg:grid-cols-2 gap-12 items-center">
-        <div className="order-2 lg:order-1 aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl">
-          <img src="/images/course-iam.jpg" alt="IAM Security" className="w-full h-full object-cover" />
-        </div>
-        <div className="order-1 lg:order-2 text-white">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-12 h-12 bg-[#D4F542] rounded-full flex items-center justify-center text-[#0B3B2C] font-bold text-xs">IAM</div>
-            <span className="font-bold">Identity & Access Management</span>
-          </div>
-          <p className="text-white/80 mb-8 leading-relaxed">
-            Our IAM program is built for the modern enterprise. Learn to design identity frameworks used by organisations globally — from RBAC to OAuth 2.0. CIAM certified.
+      <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-10 items-center">
+        <div>
+          <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#8B7355] mb-4">LMS</p>
+          <h2 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-5">A connected digital learning experience.</h2>
+          <p className="text-gray-600 leading-relaxed mb-6">
+            Your student portal is part of the full learning experience. It gives learners access to course materials, recorded sessions, support resources, and progress tracking in one place.
           </p>
-          <div className="flex space-x-12">
-            <div>
-              <div className="text-4xl font-bold text-[#D4F542]">3</div>
-              <div className="text-sm text-white/60">months</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-[#D4F542]">CIAM</div>
-              <div className="text-sm text-white/60">certified</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
-
-const FeaturedCoursesSection = ({ courses, loading, navigate }) => (
-  <section className="bg-[#F3F4F6] py-20">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between mb-12">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-4xl md:text-5xl font-bold text-[#1a1a1a]"
-        >
-          Our Programs
-        </motion.h2>
-        <button
-          onClick={() => navigate('/courses')}
-          className="text-[#0B3B2C] font-bold flex items-center hover:underline cursor-pointer text-sm gap-1"
-        >
-          View all <ArrowRight size={14} />
-        </button>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        {loading
-          ? Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-lg animate-pulse">
-              <div className="h-48 bg-gray-200" />
-              <div className="p-5 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-1/3" />
-                <div className="h-5 bg-gray-200 rounded w-3/4" />
+          <div className="space-y-3 mb-8">
+            {[
+              'Sign in to your learning portal',
+              'Access program materials and support',
+              'Continue your progress from one place',
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-3 text-gray-700">
+                <CheckCircle2 size={18} className="text-[#0B3B2C] shrink-0" />
+                <span>{item}</span>
               </div>
-            </div>
-          ))
-          : courses.slice(0, 3).map((c, i) => (
-            <motion.div
-              key={c.id}
-              initial={{ opacity: 0, y: 15 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
-              onClick={() => navigate(`/courses/${c.id}`)}
-              className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer group"
+            ))}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={() => navigate('/login')}
+              className="bg-[#0B3B2C] text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-[#164E3E] transition-colors cursor-pointer"
             >
-              <div className="h-48 overflow-hidden">
-                <img src={c.img} alt={c.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              Go to LMS
+            </button>
+            <button
+              onClick={() => navigate('/student-login')}
+              className="border border-[#0B3B2C]/20 text-[#0B3B2C] px-8 py-4 rounded-full font-bold text-lg hover:bg-white transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              Student sign in <ArrowRight size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] bg-white p-6 shadow-xl border border-black/5">
+          <div className="rounded-[1.5rem] overflow-hidden bg-[#0B3B2C] text-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <p className="font-bold">GITB Learning Portal</p>
+                <p className="text-sm text-white/60">Courses, support, and progress in one place</p>
               </div>
-              <div className="p-5">
-                {c.duration && (
-                  <div className="flex items-center space-x-2 text-gray-400 text-xs mb-2">
-                    <Clock size={11} />
-                    <span>{c.duration}</span>
-                  </div>
-                )}
-                <h3 className="font-bold text-[#1a1a1a] group-hover:text-[#0B3B2C] transition-colors mb-1">
-                  {c.title}
-                </h3>
-                {c.price.monthly > 0 && (
-                  <p className="text-xs text-gray-500">From €{c.price.monthly}/mo</p>
-                )}
+              <PlayCircle size={24} className="text-[#D4F542]" />
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-white/10 rounded-2xl p-4">
+                <p className="text-sm font-semibold mb-1">Continue learning</p>
+                <p className="text-sm text-white/65">Resume your selected program and keep track of your momentum.</p>
               </div>
-            </motion.div>
-          ))}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl p-4 text-[#0B3B2C]">
+                  <p className="text-sm font-bold">Recorded lessons</p>
+                  <p className="text-xs text-gray-500 mt-1">Revisit class content whenever you need it.</p>
+                </div>
+                <div className="bg-[#D4F542] rounded-2xl p-4 text-[#0B3B2C]">
+                  <p className="text-sm font-bold">Mentor support</p>
+                  <p className="text-xs text-[#0B3B2C]/70 mt-1">Stay accountable with guided support and check-ins.</p>
+                </div>
+              </div>
+              <div className="bg-white/10 rounded-2xl p-4">
+                <p className="text-sm font-semibold mb-1">Built into the student journey</p>
+                <p className="text-sm text-white/65">From admissions to coursework and support, the portal helps keep the learning journey organised and accessible.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 );
 
-const CommunitySection = ({ navigate }) => (
-  <section className="bg-[#0B3B2C] py-20">
+const TestimonialsSection = ({ navigate }) => (
+  <section className="bg-white py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-16">
-        <h2 className="text-4xl md:text-6xl font-bold text-white mb-4">
-          Together,<br />we build futures
-        </h2>
-        <p className="text-white/70 max-w-2xl mx-auto">
-          Join a community of learners, professionals, and mentors dedicated to building meaningful tech careers.
+      <div className="text-center max-w-3xl mx-auto mb-12">
+        <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#6B5B4F] mb-4">Testimonials</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-4">Real learner stories.</h2>
+        <p className="text-gray-600 leading-relaxed">
+          Student stories show how training translates into confidence, capability, and progress. This section helps future learners see what growth can look like in practice.
         </p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-[#128C7E] rounded-3xl p-6 text-white">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-4">
-            <Users size={24} />
-          </div>
-          <h3 className="font-bold text-lg mb-2">Student Community</h3>
-          <p className="text-sm text-white/80 mb-4">Connect with fellow students and alumni from 20+ countries.</p>
-          <span className="text-xs bg-white/20 px-3 py-1 rounded-full">WhatsApp & Discord</span>
-        </div>
-
-        <div className="bg-[#6B46C1] rounded-3xl p-6 text-white relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-4">
-              <ArrowUpRight size={24} />
+        {testimonials.map((testimonial) => (
+          <div key={testimonial.name} className="rounded-[2rem] bg-[#F6F6F1] p-8 border border-black/5">
+            <div className="flex items-center gap-1 text-[#6B5B4F] mb-5">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Star key={index} size={16} fill="currentColor" />
+              ))}
             </div>
-            <h3 className="font-bold text-lg mb-2">Acceleration Program</h3>
-            <p className="text-sm text-white/80 mb-4">Join a select cohort to launch your tech career with hands-on mentorship and live projects.</p>
-            <button
-              onClick={() => navigate('/accelerators')}
-              className="text-xs bg-white/20 px-3 py-1 rounded-full hover:bg-white/30 transition-colors cursor-pointer"
-            >
-              Learn more
-            </button>
+            <p className="text-gray-700 leading-relaxed mb-6">"{testimonial.quote}"</p>
+            <div>
+              <p className="font-bold text-[#1a1a1a]">{testimonial.name}</p>
+              <p className="text-sm text-gray-500">{testimonial.role}</p>
+            </div>
           </div>
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mb-8"></div>
-        </div>
-
-        <div className="bg-[#FF6B47] rounded-3xl p-6 text-white">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-4">
-            <Play size={24} />
-          </div>
-          <h3 className="font-bold text-lg mb-2">Weekly Mentorship</h3>
-          <p className="text-sm text-white/80 mb-4">Live sessions with industry professionals every week.</p>
-          <div className="flex -space-x-2 mt-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="w-8 h-8 bg-white/30 rounded-full border-2 border-[#FF6B47]"></div>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
 
-      <div className="mt-8 flex justify-center">
-        <div className="bg-[#D4F542] rounded-3xl p-6 max-w-sm w-full">
-          <div className="flex items-center space-x-4 mb-4">
-            <img src="/images/gitb-logo.png" alt="GITB" className="w-12 h-12 rounded-full object-contain bg-[#0B3B2C] p-1" />
+      <div className="text-center mt-10">
+        <button
+          onClick={() => navigate('/testimonials')}
+          className="inline-flex items-center gap-2 text-[#0B3B2C] font-semibold hover:text-[#8B7355] transition-colors cursor-pointer"
+        >
+          View all testimonials <ArrowRight size={16} />
+        </button>
+      </div>
+    </div>
+  </section>
+);
+
+const FAQSection = () => (
+  <section className="bg-[#F5F3EA] py-20">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="text-center max-w-2xl mx-auto mb-12">
+        <p className="text-sm font-bold tracking-[0.2em] uppercase text-[#0B3B2C] mb-4">Frequently asked questions</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-4">Questions learners ask before they apply.</h2>
+        <p className="text-gray-600 leading-relaxed">
+          Clear answers help learners make informed decisions. This section addresses common questions around background, time, outcomes, and support before they apply.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {faqs.map((faq) => (
+          <div key={faq.question} className="rounded-3xl bg-white p-6 border border-black/5 shadow-sm">
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-2">{faq.question}</h3>
+            <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
           </div>
-          <h3 className="font-bold text-[#0B3B2C] mb-2">1-1 Career Support</h3>
-          <p className="text-sm text-[#0B3B2C]/80">Our advisors help with CVs, interviews, and job applications.</p>
-        </div>
+        ))}
       </div>
     </div>
   </section>
 );
 
 const CTASection = ({ navigate }) => (
-  <section className="bg-[#6B46C1] py-32 relative overflow-hidden">
-    <div className="absolute top-10 left-10 w-32 h-32 bg-[#FF6B47] rounded-full opacity-80"></div>
-    <div className="absolute bottom-10 right-10 w-48 h-48 bg-[#FF6B47] rounded-full opacity-60"></div>
-    <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-[#D4F542] rounded-full opacity-40"></div>
+  <section className="bg-[#8B7355] py-24 relative overflow-hidden">
+    <div className="absolute top-0 left-0 w-72 h-72 bg-[#6B5B4F] rounded-full blur-3xl opacity-35" />
+    <div className="absolute bottom-0 right-0 w-72 h-72 bg-[#D4F542] rounded-full blur-3xl opacity-20" />
+
     <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-      <motion.h2
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="text-5xl md:text-7xl font-bold text-white mb-8"
-      >
-        Start your<br />career today
-      </motion.h2>
-      <button
-        onClick={() => navigate('/apply')}
-        className="bg-white text-[#6B46C1] px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-colors cursor-pointer"
-      >
-        Apply now
-      </button>
+      <p className="text-sm font-bold tracking-[0.25em] uppercase text-white/70 mb-5">Scholarship-style CTA</p>
+      <h2 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-[0.95]">
+        Ready to turn interest into a real learning path?
+      </h2>
+      <p className="text-lg text-white/80 max-w-2xl mx-auto mb-8 leading-relaxed">
+        Join a learning environment designed to help you build practical skills, stay supported, and move toward stronger professional opportunities.
+      </p>
+      <div className="flex flex-col sm:flex-row justify-center gap-4">
+        <button
+          onClick={() => navigate('/apply')}
+          className="bg-white text-[#8B7355] px-8 py-4 rounded-full font-bold text-lg hover:bg-[#F5F3EA] transition-colors cursor-pointer"
+        >
+          Apply now
+        </button>
+        <button
+          onClick={() => navigate('/contact')}
+          className="border border-white/30 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          Talk to admissions
+        </button>
+      </div>
     </div>
   </section>
 );
@@ -520,30 +518,32 @@ const CTASection = ({ navigate }) => (
 const Home = () => {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
-  const [stats, setStats] = useState({ graduates: 0, countries: 27, courses: 0 });
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ graduates: 1200, countries: 20, courses: 12 });
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
-    Promise.all([fetchCourses(), fetchStats()])
-      .then(([coursesData, statsData]) => {
-        setCourses(coursesData);
-        setStats(statsData);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    fetchCourses().then(setCourses).catch(() => {});
+    fetchStats().then(setStats).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 4500);
+
+    return () => window.clearInterval(timer);
   }, []);
 
   return (
     <>
-      <HeroSection navigate={navigate} />
-      <ImpactSection navigate={navigate} />
-      <MomConnectStatsSection stats={stats} />
-      <PrivateConversationsSection />
-      <WHOStatsSection stats={stats} />
-      <ScaleOutreachSection />
-      <SesameSection />
-      <FeaturedCoursesSection courses={courses} loading={loading} navigate={navigate} />
-      <CommunitySection navigate={navigate} />
+      <HeroSection navigate={navigate} stats={stats} currentSlide={currentSlide} />
+      <OutcomesSection />
+      <WhyChooseSection />
+      <FeaturedProgramsSection courses={courses} navigate={navigate} />
+      <LMSSection navigate={navigate} />
+      <ProofSection />
+      <TestimonialsSection navigate={navigate} />
+      <FAQSection />
       <CTASection navigate={navigate} />
     </>
   );

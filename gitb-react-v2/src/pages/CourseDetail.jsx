@@ -305,7 +305,7 @@ const CourseDetail = () => {
               {course.certificates.map((cert, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
                   className="flex items-center space-x-4 bg-white p-4 rounded-2xl shadow-sm">
-                  <div className="w-12 h-12 bg-[#6B46C1] rounded-xl flex items-center justify-center shrink-0">
+                  <div className="w-12 h-12 bg-[#8B7355] rounded-xl flex items-center justify-center shrink-0">
                     <Award size={24} className="text-white" />
                   </div>
                   <div>
@@ -421,7 +421,7 @@ const CourseDetail = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-10">
               <h2 className="text-2xl font-bold text-[#1a1a1a]">Other Courses</h2>
-              <button onClick={() => navigate('/courses')} className="text-[#6B46C1] font-bold flex items-center hover:underline cursor-pointer text-sm">
+              <button onClick={() => navigate('/courses')} className="text-[#8B7355] font-bold flex items-center hover:underline cursor-pointer text-sm">
                 View all <ArrowRight size={14} className="ml-1" />
               </button>
             </div>
@@ -439,7 +439,7 @@ const CourseDetail = () => {
                         <Clock size={11} /><span>{c.duration}</span>
                       </div>
                     )}
-                    <h3 className="font-bold text-[#1a1a1a] text-sm group-hover:text-[#6B46C1] transition-colors">{c.title}</h3>
+                    <h3 className="font-bold text-[#1a1a1a] text-sm group-hover:text-[#8B7355] transition-colors">{c.title}</h3>
                   </div>
                 </motion.div>
               ))}

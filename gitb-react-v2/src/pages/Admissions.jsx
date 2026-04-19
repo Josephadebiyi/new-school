@@ -1,37 +1,37 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { CheckCircle, FileText, UserCheck, CreditCard, ChevronRight } from 'lucide-react';
+import { CheckCircle, ChevronRight, Clock3, FileText, GraduationCap, UserCheck } from 'lucide-react';
 
 const steps = [
   {
-    icon: FileText,
+    icon: GraduationCap,
     number: '01',
-    title: 'Choose Your Program',
-    desc: 'Explore our courses and find the one that aligns with your career goals — tech, compliance, design, or language.',
+    title: 'Choose a program',
+    desc: 'Browse the catalog and pick the path that matches your goals, background, and preferred pace.',
     color: 'bg-[#D4F542]',
     textColor: 'text-[#0B3B2C]',
   },
   {
-    icon: UserCheck,
+    icon: FileText,
     number: '02',
-    title: 'Submit Your Application',
-    desc: 'Fill out the short online form with your personal details, motivation, and the program you wish to join.',
+    title: 'Complete the form',
+    desc: 'Share your personal details, selected course, and a short note about what you want to achieve.',
     color: 'bg-[#0B3B2C]',
     textColor: 'text-white',
   },
   {
-    icon: CreditCard,
+    icon: UserCheck,
     number: '03',
-    title: 'Pay Application Fee',
-    desc: 'A one-time €50 non-refundable application fee is required. Payments are processed securely via Stripe.',
-    color: 'bg-[#6B46C1]',
+    title: 'Application review',
+    desc: 'Our admissions team checks your submission and confirms the next steps for enrollment.',
+    color: 'bg-[#8B7355]',
     textColor: 'text-white',
   },
   {
-    icon: CheckCircle,
+    icon: Clock3,
     number: '04',
-    title: 'Get Accepted',
-    desc: 'Our committee reviews applications within 1–3 business days. Once accepted, you receive your student portal access.',
+    title: 'Start your journey',
+    desc: 'Once approved, you receive onboarding guidance and can begin preparing for your cohort.',
     color: 'bg-[#1a1a1a]',
     textColor: 'text-white',
   },
@@ -39,72 +39,61 @@ const steps = [
 
 const faqs = [
   {
-    q: 'Do I need prior experience in tech?',
-    a: 'No — our beginner-friendly programs are designed to take you from zero to job-ready. Advanced tracks do require some background.',
+    q: 'Do I need prior experience?',
+    a: 'Not for most programs. Many tracks are designed for beginners and career switchers, with clear and structured learning support.',
   },
   {
-    q: 'Is there an application fee?',
-    a: 'Yes, a €50 non-refundable application processing fee is required before your application goes under review.',
+    q: 'How long does the admissions process take?',
+    a: 'The process is designed to be straightforward. After submitting your application, the admissions team follows up with the next steps as quickly as possible.',
   },
   {
-    q: 'Are classes online or in-person?',
-    a: 'We offer fully online and hybrid models at our European campus in Vilnius, Lithuania, depending on the course.',
+    q: 'Can I learn while working or studying?',
+    a: 'Yes. The public-facing site now consistently emphasizes flexible learning and support for busy learners.',
   },
   {
-    q: 'How long does admission take?',
-    a: 'Our committee reviews applications within 1–3 business days after payment is confirmed.',
-  },
-  {
-    q: 'Are certificates EU-recognised?',
-    a: 'Yes — GITB is accredited through EAHEA and our certifications are recognised across European Union member states.',
-  },
-  {
-    q: 'Can I pay for tuition in instalments?',
-    a: 'Yes. Most programs offer monthly, quarterly, and upfront payment options. You choose your plan after acceptance.',
+    q: 'Can someone help me choose a program?',
+    a: 'Yes. If you are unsure, the admissions team can guide you toward a program that fits your goals and current level.',
   },
 ];
 
 const Admissions = () => {
   return (
     <div className="min-h-screen bg-white">
-
-      {/* Hero */}
       <section className="bg-[#0B3B2C] pt-32 pb-20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#164E3E] to-transparent opacity-50" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl"
+            className="max-w-3xl"
           >
             <span className="inline-block bg-[#D4F542] text-[#0B3B2C] text-xs font-bold px-3 py-1 rounded-full mb-6 uppercase tracking-wider">
-              Admissions Open
+              Admissions
             </span>
             <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6">
-              Join the Next<br />Generation
+              A clear path from application to enrollment.
             </h1>
-            <p className="text-white/60 text-lg leading-relaxed mb-8">
-              Our admissions process is designed to find ambitious individuals ready to take their careers to the next level. We look for passion, drive, and a desire to grow.
+            <p className="text-white/60 text-lg leading-relaxed mb-8 max-w-2xl">
+              Our admissions process is designed to be clear, supportive, and accessible for learners who are serious about building practical digital skills.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 to="/apply"
                 className="bg-[#D4F542] text-[#0B3B2C] px-8 py-4 rounded-full font-bold text-base hover:bg-white transition-colors text-center"
               >
-                Start Application
+                Start application
               </Link>
               <Link
                 to="/courses"
                 className="border border-white/30 text-white px-8 py-4 rounded-full font-bold text-base hover:bg-white/10 transition-colors text-center"
               >
-                Browse Programs
+                Browse programs
               </Link>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* How to Apply */}
       <section className="bg-[#F3F4F6] py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -113,20 +102,22 @@ const Admissions = () => {
             viewport={{ once: true }}
             className="text-center mb-14"
           >
-            <h2 className="text-4xl font-bold text-[#1a1a1a] mb-3">How to Apply</h2>
-            <p className="text-gray-500 max-w-xl mx-auto">A simple, transparent 4-step process to get you started.</p>
+            <h2 className="text-4xl font-bold text-[#1a1a1a] mb-3">How admissions works</h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              From choosing a program to completing enrollment, each step is designed to reduce uncertainty and help you move forward with confidence.
+            </p>
           </motion.div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {steps.map((step, i) => {
+            {steps.map((step, index) => {
               const Icon = step.icon;
               return (
                 <motion.div
-                  key={i}
+                  key={step.title}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
+                  transition={{ delay: index * 0.08 }}
                   className={`${step.color} rounded-3xl p-8 relative overflow-hidden`}
                 >
                   <div className="absolute top-4 right-6 text-6xl font-black opacity-10 leading-none">
@@ -140,7 +131,9 @@ const Admissions = () => {
                   <h3 className={`font-bold text-lg mb-3 ${step.textColor}`}>{step.title}</h3>
                   <p className={`text-sm leading-relaxed ${
                     step.color === 'bg-[#D4F542]' ? 'text-[#0B3B2C]/70' : 'text-white/70'
-                  }`}>{step.desc}</p>
+                  }`}>
+                    {step.desc}
+                  </p>
                 </motion.div>
               );
             })}
@@ -148,7 +141,6 @@ const Admissions = () => {
         </div>
       </section>
 
-      {/* Requirements */}
       <section className="bg-white py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -159,17 +151,17 @@ const Admissions = () => {
             >
               <h2 className="text-4xl font-bold text-[#1a1a1a] mb-6">What we look for</h2>
               <p className="text-gray-500 mb-8 leading-relaxed">
-                GITB welcomes applications from students of all backgrounds. You don't need a degree — you need drive.
+                We welcome applicants from different backgrounds who are ready to learn consistently, engage with practical work, and grow toward professional opportunities.
               </p>
               <ul className="space-y-4">
                 {[
-                  'Motivation to build a career in your chosen field',
-                  'Basic computer literacy (for most programs)',
-                  'Fluency in English (instruction language)',
-                  'Commitment to completing the full program',
-                  'Valid ID for identity verification',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3">
+                  'A genuine interest in building practical skills',
+                  'Commitment to learning consistently and completing the program',
+                  'Basic digital confidence for online study and communication',
+                  'Willingness to participate in projects, exercises, and guided support',
+                  'A clear reason for wanting to grow professionally',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
                     <CheckCircle size={18} className="text-[#0B3B2C] shrink-0 mt-0.5" />
                     <span className="text-gray-700 text-sm">{item}</span>
                   </li>
@@ -179,7 +171,7 @@ const Admissions = () => {
                 to="/apply"
                 className="inline-flex items-center gap-2 mt-8 bg-[#0B3B2C] text-white px-8 py-4 rounded-full font-bold hover:bg-[#164E3E] transition-colors text-sm"
               >
-                Apply Now <ChevronRight size={16} />
+                Apply now <ChevronRight size={16} />
               </Link>
             </motion.div>
 
@@ -190,8 +182,8 @@ const Admissions = () => {
               className="rounded-3xl overflow-hidden shadow-2xl"
             >
               <img
-                src="/images/course-cybersec.jpg"
-                alt="GITB Students"
+                src="/images/graduate-portrait.jpg"
+                alt="Graduate ready for the next professional step"
                 className="w-full object-cover"
               />
             </motion.div>
@@ -199,7 +191,6 @@ const Admissions = () => {
         </div>
       </section>
 
-      {/* EU Recognition */}
       <section className="bg-[#F3F4F6] py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -213,16 +204,15 @@ const Admissions = () => {
               <img src="/images/eahea-badge.png" alt="EAHEA" className="h-14 w-auto opacity-80" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">EU-Accredited Programs</h3>
+              <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">Accreditation and quality standards</h3>
               <p className="text-gray-500 text-sm leading-relaxed">
-                GITB is accredited through the European Accreditation for Higher Education and Arts (EAHEA). All our certificates are recognised across European Union member states, giving graduates a strong advantage in the European job market.
+                GITB aligns its learning experience with high standards of structure, academic credibility, and student support, helping learners pursue training with greater confidence.
               </p>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* FAQ */}
       <section className="bg-[#0B3B2C] py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -231,21 +221,21 @@ const Admissions = () => {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-4xl font-bold text-white mb-3">Frequently Asked Questions</h2>
+            <h2 className="text-4xl font-bold text-white mb-3">Frequently asked questions</h2>
             <p className="text-white/50">
-              Still have questions? Email{' '}
+              Need help? Email{' '}
               <a href="mailto:admissions@gitb.lt" className="text-[#D4F542] hover:underline">admissions@gitb.lt</a>
             </p>
           </motion.div>
 
           <div className="space-y-4">
-            {faqs.map((faq, i) => (
+            {faqs.map((faq, index) => (
               <motion.div
-                key={i}
+                key={faq.q}
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
+                transition={{ delay: index * 0.05 }}
                 className="bg-white/10 rounded-2xl p-6"
               >
                 <h4 className="font-bold text-[#D4F542] mb-2">{faq.q}</h4>
@@ -256,7 +246,6 @@ const Admissions = () => {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="bg-[#D4F542] py-20">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <motion.div
@@ -264,18 +253,17 @@ const Admissions = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-4xl font-bold text-[#0B3B2C] mb-4">{"Don't wait. Empower your future."}</h2>
-            <p className="text-[#0B3B2C]/70 mb-8">The application takes under 5 minutes.</p>
+            <h2 className="text-4xl font-bold text-[#0B3B2C] mb-4">Ready to take the next step?</h2>
+            <p className="text-[#0B3B2C]/70 mb-8">Start your application and take the next step toward practical, career-focused learning.</p>
             <Link
               to="/apply"
               className="bg-[#0B3B2C] text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-[#164E3E] transition-colors inline-block"
             >
-              Start Application
+              Start application
             </Link>
           </motion.div>
         </div>
       </section>
-
     </div>
   );
 };

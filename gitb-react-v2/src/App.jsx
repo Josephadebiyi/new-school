@@ -14,6 +14,8 @@ import About from './pages/About';
 import Courses from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
 import Contact from './pages/Contact';
+import Events from './pages/Events';
+import Testimonials from './pages/Testimonials';
 import StudentLogin from './pages/StudentLogin';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminLogin from './pages/AdminLogin';
@@ -56,6 +58,8 @@ function AppShell() {
           <Route path="/about" element={<About />} />
           <Route path="/courses" element={<Courses />} />
           <Route path="/courses/:id" element={<CourseDetail />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/testimonials" element={<Testimonials />} />
           <Route path="/contact" element={<Contact />} />
           
           {/* Public Auth Routes */}

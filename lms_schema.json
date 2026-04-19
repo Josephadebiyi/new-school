@@ -1,0 +1,748 @@
+{
+  "system": {
+    "name": "GITB LMS",
+    "version": "1.0.0",
+    "environment": "production",
+    "timezone": "Africa/Lagos"
+  },
+  
+  "database": {
+    "collections": [
+      {
+        "name": "users",
+        "description": "All system users with role-based access",
+        "schema": {
+          "_id": "ObjectId",
+          "email": "string (unique)",
+          "password": "string (hashed)",
+          "firstName": "string",
+          "lastName": "string",
+          "phone": "string",
+          "role": "enum: ['super_admin', 'sub_admin', 'staff', 'teacher', 'student']",
+          "status": "enum: ['active', 'suspended', 'banned', 'pending']",
+          "profilePicture": "string (URL)",
+          "department": "string (for staff only)",
+          "abilities": ["string"],
+          "createdAt": "timestamp",
+          "updatedAt": "timestamp",
+          "lastLogin": "timestamp",
+          "bannedAt": "timestamp",
+          "bannedBy": "ObjectId (ref: users)",
+          "banReason": "string"
+        }
+      },
+      
+      {
+        "name": "students",
+        "description": "Extended student profile",
+        "schema": {
+          "_id": "ObjectId",
+          "userId": "ObjectId (ref: users)",
+          "studentId": "string (unique)",
+          "program": "string",
+          "level": "enum: ['100', '200', '300', '400', '500']",
+          "enrollmentStatus": "enum: ['pending', 'accepted', 'rejected', 'active', 'graduated', 'withdrawn']",
+          "admissionRequest": {
+            "submittedAt": "timestamp",
+            "documents": ["string (URLs)"],
+            "applicationFee": {
+              "amount": "number",
+              "status": "enum: ['pending', 'paid', 'waived']",
+              "paidAt": "timestamp",
+              "transactionRef": "string"
+            },
+            "reviewedBy": "ObjectId (ref: users)",
+            "reviewedAt": "timestamp",
+            "rejectionReason": "string"
+          },
+          "cgpa": "number",
+          "totalUnits": "number",
+          "completedUnits": "number",
+          "enrolledCourses": ["ObjectId (ref: courses)"],
+          "createdAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "staff",
+        "description": "Staff details and permissions",
+        "schema": {
+          "_id": "ObjectId",
+          "userId": "ObjectId (ref: users)",
+          "staffId": "string (unique)",
+          "department": "enum: ['finance', 'admission', 'support', 'academic']",
+          "position": "string",
+          "abilities": {
+            "canViewStudents": "boolean",
+            "canEditStudents": "boolean",
+            "canViewPayments": "boolean",
+            "canProcessPayments": "boolean",
+            "canViewAdmissions": "boolean",
+            "canProcessAdmissions": "boolean",
+            "canViewReports": "boolean",
+            "canManageSupport": "boolean",
+            "canBanUsers": "boolean"
+          },
+          "assignedBy": "ObjectId (ref: users)",
+          "createdAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "teachers",
+        "description": "Teacher/instructor details",
+        "schema": {
+          "_id": "ObjectId",
+          "userId": "ObjectId (ref: users)",
+          "teacherId": "string (unique)",
+          "specialization": ["string"],
+          "assignedCourses": ["ObjectId (ref: courses)"],
+          "bio": "string",
+          "qualifications": ["string"],
+          "createdAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "courses",
+        "description": "Course catalog with pricing",
+        "schema": {
+          "_id": "ObjectId",
+          "code": "string (unique)",
+          "title": "string",
+          "description": "string",
+          "program": "string",
+          "level": "enum: ['100', '200', '300', '400', '500']",
+          "semester": "enum: ['first', 'second']",
+          "units": "number",
+          "type": "enum: ['core', 'elective']",
+          "pricing": {
+            "tuitionFee": "number",
+            "currency": "string",
+            "setBy": "ObjectId (ref: users)",
+            "setAt": "timestamp",
+            "installments": {
+              "enabled": "boolean",
+              "numberOfInstallments": "number",
+              "installmentAmount": "number"
+            }
+          },
+          "thumbnail": "string (URL)",
+          "status": "enum: ['draft', 'published', 'archived']",
+          "createdBy": "ObjectId (ref: users)",
+          "assignedTeacher": "ObjectId (ref: teachers)",
+          "createdAt": "timestamp",
+          "updatedAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "course_content",
+        "description": "Course materials and structure",
+        "schema": {
+          "_id": "ObjectId",
+          "courseId": "ObjectId (ref: courses)",
+          "week": "number",
+          "title": "string",
+          "type": "enum: ['video', 'pdf', 'reading', 'interactive', 'worksheet', 'summary']",
+          "content": {
+            "url": "string",
+            "duration": "number (for videos)",
+            "fileSize": "number",
+            "mimeType": "string"
+          },
+          "order": "number",
+          "isPublished": "boolean",
+          "createdBy": "ObjectId (ref: teachers)",
+          "createdAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "assessments",
+        "description": "Quizzes and exams",
+        "schema": {
+          "_id": "ObjectId",
+          "courseId": "ObjectId (ref: courses)",
+          "week": "number",
+          "title": "string",
+          "type": "enum: ['practice', 'graded', 'exam']",
+          "description": "string",
+          "instructions": "string",
+          "settings": {
+            "attemptsAllowed": "number",
+            "gradingMethod": "enum: ['highest', 'average', 'latest']",
+            "timeLimit": "number (minutes, 0 for unlimited)",
+            "passingScore": "number",
+            "shuffleQuestions": "boolean",
+            "showCorrectAnswers": "boolean",
+            "availableFrom": "timestamp",
+            "availableUntil": "timestamp"
+          },
+          "questions": [
+            {
+              "id": "string",
+              "type": "enum: ['multiple_choice', 'true_false', 'short_answer', 'essay']",
+              "question": "string",
+              "options": ["string"],
+              "correctAnswer": "string or array",
+              "points": "number",
+              "explanation": "string"
+            }
+          ],
+          "totalPoints": "number",
+          "createdBy": "ObjectId (ref: teachers)",
+          "createdAt": "timestamp",
+          "updatedAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "assessment_attempts",
+        "description": "Student quiz attempts and scores",
+        "schema": {
+          "_id": "ObjectId",
+          "assessmentId": "ObjectId (ref: assessments)",
+          "studentId": "ObjectId (ref: students)",
+          "attemptNumber": "number",
+          "answers": [
+            {
+              "questionId": "string",
+              "answer": "string or array",
+              "isCorrect": "boolean",
+              "pointsEarned": "number"
+            }
+          ],
+          "score": "number",
+          "percentage": "number",
+          "status": "enum: ['in_progress', 'completed', 'graded']",
+          "startedAt": "timestamp",
+          "submittedAt": "timestamp",
+          "gradedBy": "ObjectId (ref: teachers)",
+          "gradedAt": "timestamp",
+          "feedback": "string"
+        }
+      },
+      
+      {
+        "name": "payments",
+        "description": "All financial transactions",
+        "schema": {
+          "_id": "ObjectId",
+          "studentId": "ObjectId (ref: students)",
+          "type": "enum: ['application_fee', 'tuition_fee', 'installment', 'other']",
+          "description": "string",
+          "amount": "number",
+          "currency": "string",
+          "status": "enum: ['pending', 'processing', 'completed', 'failed', 'refunded']",
+          "method": "enum: ['card', 'bank_transfer', 'mobile_money', 'cash']",
+          "transactionRef": "string (unique)",
+          "gatewayRef": "string",
+          "courseId": "ObjectId (ref: courses)",
+          "semester": "string",
+          "level": "string",
+          "installmentNumber": "number",
+          "totalInstallments": "number",
+          "processedBy": "ObjectId (ref: staff)",
+          "receiptUrl": "string",
+          "metadata": "object",
+          "createdAt": "timestamp",
+          "updatedAt": "timestamp"
+        }
+      },
+      
+      {
+        "name": "enrollments",
+        "description": "Student course enrollments",
+        "schema": {
+          "_id": "ObjectId",
+          "studentId": "ObjectId (ref: students)",
+          "courseId": "ObjectId (ref: courses)",
+          "semester": "string",
+          "session": "string",
+          "status": "enum: ['active', 'completed', 'dropped', 'deferred']",
+          "progress": "number (percentage)",
+          "enrolledAt": "timestamp",
+          "completedAt": "timestamp",
+          "finalGrade": "string",
+          "gradePoints": "number"
+        }
+      },
+      
+      {
+        "name": "results",
+        "description": "Academic results and transcripts",
+        "schema": {
+          "_id": "ObjectId",
+          "studentId": "ObjectId (ref: students)",
+          "enrollmentId": "ObjectId (ref: enrollments)",
+          "courseId": "ObjectId (ref: courses)",
+          "semester": "string",
+          "session": "string",
+          "level": "string",
+          "scores": {
+            "ca": "number",
+            "exam": "number",
+            "total": "number"
+          },
+          "grade": "string",
+          "gradePoint": "number",
+          "units": "number",
+          "qualityPoints": "number",
+          "published": "boolean",
+          "publishedAt": "timestamp",
+          "publishedBy": "ObjectId (ref: staff)"
+        }
+      },
+      
+      {
+        "name": "activity_logs",
+        "description": "System audit trail",
+        "schema": {
+          "_id": "ObjectId",
+          "userId": "ObjectId (ref: users)",
+          "action": "string",
+          "resource": "string",
+          "resourceId": "string",
+          "details": "object",
+          "ipAddress": "string",
+          "userAgent": "string",
+          "timestamp": "timestamp"
+        }
+      }
+    ]
+  },
+  
+  "roles_and_permissions": {
+    "super_admin": {
+      "description": "Full system access",
+      "permissions": [
+        "manage_all_users",
+        "create_sub_admins",
+        "create_staff",
+        "set_course_prices",
+        "view_all_payments",
+        "process_refunds",
+        "manage_admissions",
+        "ban_any_user",
+        "system_settings",
+        "view_reports",
+        "backup_data"
+      ],
+      "routes": ["/admin/*", "/finance/*", "/admission/*", "/support/*", "/academic/*"]
+    },
+    
+    "sub_admin": {
+      "description": "Limited admin access assigned by super admin",
+      "permissions": [
+        "view_assigned_sections",
+        "manage_teachers",
+        "view_reports",
+        "process_admissions",
+        "view_payments"
+      ],
+      "assignableDepartments": ["finance", "admission", "support", "academic"]
+    },
+    
+    "staff": {
+      "description": "Department-specific staff",
+      "departments": {
+        "finance": {
+          "abilities": ["view_payments", "process_payments", "view_financial_reports", "generate_receipts"],
+          "cannot": ["set_prices", "view_student_academic_records"]
+        },
+        "admission": {
+          "abilities": ["view_applications", "process_admissions", "verify_documents", "track_application_fees"],
+          "cannot": ["accept_payments", "view_academic_data"]
+        },
+        "support": {
+          "abilities": ["view_student_profiles", "manage_tickets", "reset_passwords", "view_basic_info"],
+          "cannot": ["process_payments", "modify_grades", "ban_users"]
+        },
+        "academic": {
+          "abilities": ["view_courses", "view_enrollments", "view_results", "generate_transcripts"],
+          "cannot": ["set_prices", "process_payments"]
+        }
+      }
+    },
+    
+    "teacher": {
+      "description": "Course instructors",
+      "permissions": [
+        "create_courses",
+        "edit_own_courses",
+        "add_course_materials",
+        "upload_videos",
+        "upload_pdfs",
+        "create_quizzes",
+        "bulk_upload_questions",
+        "grade_assessments",
+        "view_enrolled_students",
+        "view_student_progress",
+        "set_attempt_limits",
+        "configure_grading_method"
+      ],
+      "restrictions": [
+        "cannot_set_course_price",
+        "cannot_ban_students",
+        "cannot_view_payments",
+        "cannot_access_other_teachers_courses"
+      ]
+    },
+    
+    "student": {
+      "description": "Enrolled students",
+      "permissions": [
+        "view_courses",
+        "access_course_content",
+        "attempt_quizzes",
+        "view_own_results",
+        "make_payments",
+        "view_payment_history",
+        "download_receipts",
+        "request_transcript",
+        "edit_profile"
+      ],
+      "restrictions": [
+        "access_blocked_when_banned",
+        "access_blocked_when_suspended",
+        "cannot_view_others_data",
+        "cannot_access_unenrolled_courses"
+      ]
+    }
+  },
+  
+  "api_endpoints": {
+    "authentication": {
+      "POST /api/auth/register": "Student registration",
+      "POST /api/auth/login": "User login",
+      "POST /api/auth/logout": "User logout",
+      "POST /api/auth/refresh": "Refresh token",
+      "POST /api/auth/forgot-password": "Password reset request"
+    },
+    
+    "admin": {
+      "GET /api/admin/dashboard": "Admin dashboard stats",
+      "GET /api/admin/users": "List all users",
+      "POST /api/admin/users": "Create user (staff, teacher)",
+      "PUT /api/admin/users/:id/ban": "Ban user",
+      "PUT /api/admin/users/:id/unban": "Unban user",
+      "GET /api/admin/admissions": "View admission requests",
+      "PUT /api/admin/admissions/:id/accept": "Accept admission",
+      "PUT /api/admin/admissions/:id/reject": "Reject admission",
+      "POST /api/admin/sub-admins": "Create sub-admin",
+      "POST /api/admin/staff": "Create staff with abilities",
+      "GET /api/admin/reports/financial": "Financial reports",
+      "GET /api/admin/reports/academic": "Academic reports",
+      "GET /api/admin/logs": "Activity logs"
+    },
+    
+    "finance": {
+      "GET /api/finance/payments": "List all payments",
+      "GET /api/finance/payments/:studentId": "Student payment history",
+      "POST /api/finance/payments/verify": "Verify payment",
+      "GET /api/finance/application-fees": "Track application fees",
+      "GET /api/finance/tuition-fees": "Track tuition fees",
+      "POST /api/finance/receipts/:paymentId": "Generate receipt",
+      "GET /api/finance/reports": "Financial reports"
+    },
+    
+    "admission": {
+      "GET /api/admission/requests": "List applications",
+      "GET /api/admission/requests/:id": "Application details",
+      "PUT /api/admission/requests/:id/status": "Update status",
+      "GET /api/admission/fees": "Application fee status",
+      "POST /api/admission/fees/remind": "Send payment reminder"
+    },
+    
+    "courses": {
+      "GET /api/courses": "List courses",
+      "GET /api/courses/:id": "Course details",
+      "POST /api/courses": "Create course (Admin only)",
+      "PUT /api/courses/:id/price": "Set course price (Admin only)",
+      "POST /api/courses/:id/content": "Add content (Teacher)",
+      "GET /api/courses/:id/content": "View content",
+      "POST /api/courses/:id/enroll": "Enroll student",
+      "GET /api/courses/:id/students": "View enrolled students"
+    },
+    
+    "assessments": {
+      "GET /api/assessments": "List assessments",
+      "POST /api/assessments": "Create assessment (Teacher)",
+      "POST /api/assessments/bulk-upload": "Bulk upload questions (Teacher)",
+      "GET /api/assessments/:id": "Assessment details",
+      "POST /api/assessments/:id/attempt": "Start attempt (Student)",
+      "PUT /api/assessments/:id/submit": "Submit attempt (Student)",
+      "GET /api/assessments/:id/results": "View results",
+      "POST /api/assessments/:id/grade": "Manual grade (Teacher)"
+    },
+    
+    "students": {
+      "GET /api/students/dashboard": "Student dashboard",
+      "GET /api/students/courses": "My courses",
+      "GET /api/students/results": "My results",
+      "GET /api/students/transcript": "Request transcript",
+      "GET /api/students/payments": "My payments",
+      "POST /api/students/payments": "Make payment"
+    }
+  },
+  
+  "frontend_structure": {
+    "student_portal": {
+      "routes": [
+        {
+          "path": "/dashboard",
+          "component": "StudentDashboard",
+          "widgets": ["outstanding_payment", "cgpa_card", "completed_units", "recent_courses", "transactions"]
+        },
+        {
+          "path": "/courses",
+          "component": "CoursesPage",
+          "features": ["course_grid", "progress_tracking", "go_to_class"]
+        },
+        {
+          "path": "/course/:id",
+          "component": "CoursePlayer",
+          "features": ["video_player", "pdf_viewer", "week_navigation", "download_materials"]
+        },
+        {
+          "path": "/assessment/:id",
+          "component": "AssessmentPage",
+          "features": ["quiz_interface", "timer", "attempt_counter", "auto_submit"]
+        },
+        {
+          "path": "/results",
+          "component": "ResultsPage",
+          "features": ["semester_tabs", "grade_table", "cgpa_calculation", "request_transcript"]
+        },
+        {
+          "path": "/payments",
+          "component": "PaymentsPage",
+          "features": ["outstanding_balance", "payment_history", "make_payment", "view_receipts"]
+        }
+      ],
+      "restricted_message": {
+        "banned": "Your account has been suspended. Please contact support.",
+        "suspended": "Your account is temporarily suspended.",
+        "pending_admission": "Your admission is pending approval."
+      }
+    },
+    
+    "teacher_portal": {
+      "routes": [
+        {
+          "path": "/teacher/dashboard",
+          "component": "TeacherDashboard",
+          "widgets": ["my_courses", "pending_grading", "student_count"]
+        },
+        {
+          "path": "/teacher/courses",
+          "component": "CourseManagement",
+          "features": ["create_course", "edit_course", "publish_unpublish"]
+        },
+        {
+          "path": "/teacher/course/:id/content",
+          "component": "ContentManager",
+          "features": ["add_video", "add_pdf", "add_reading", "week_organization", "drag_drop_ordering"]
+        },
+        {
+          "path": "/teacher/course/:id/assessments",
+          "component": "AssessmentManager",
+          "features": [
+            "create_quiz",
+            "bulk_upload_questions",
+            "manual_question_entry",
+            "set_attempts",
+            "set_grading_method",
+            "configure_timing"
+          ]
+        },
+        {
+          "path": "/teacher/assessment/:id/grade",
+          "component": "GradingInterface",
+          "features": ["view_attempts", "auto_graded_results", "manual_override", "provide_feedback"]
+        }
+      ]
+    },
+    
+    "admin_portal": {
+      "layout": "sidebar_navigation",
+      "sections": {
+        "dashboard": {
+          "path": "/admin/dashboard",
+          "widgets": ["total_students", "total_revenue", "pending_admissions", "recent_payments", "system_health"]
+        },
+        "user_management": {
+          "path": "/admin/users",
+          "submenu": [
+            {
+              "title": "All Users",
+              "path": "/admin/users/all",
+              "actions": ["view", "edit", "ban", "unban", "reset_password"]
+            },
+            {
+              "title": "Sub Admins",
+              "path": "/admin/users/sub-admins",
+              "actions": ["create", "edit_permissions", "deactivate"]
+            },
+            {
+              "title": "Staff",
+              "path": "/admin/users/staff",
+              "actions": ["create_by_department", "assign_abilities", "transfer_department"]
+            },
+            {
+              "title": "Teachers",
+              "path": "/admin/users/teachers",
+              "actions": ["create", "assign_courses", "view_performance"]
+            },
+            {
+              "title": "Banned Users",
+              "path": "/admin/users/banned",
+              "actions": ["view_reason", "unban", "extend_ban"]
+            }
+          ]
+        },
+        "admissions": {
+          "path": "/admin/admissions",
+          "features": [
+            "view_all_applications",
+            "filter_by_status",
+            "view_documents",
+            "accept_application",
+            "reject_with_reason",
+            "track_application_fees"
+          ]
+        },
+        "finance": {
+          "path": "/admin/finance",
+          "submenu": [
+            {
+              "title": "Application Fees",
+              "path": "/admin/finance/application-fees",
+              "features": ["track_all", "verify_payments", "waive_fees"]
+            },
+            {
+              "title": "Tuition Fees",
+              "path": "/admin/finance/tuition-fees",
+              "features": ["set_course_prices", "view_collections", "outstanding_balances", "installment_plans"]
+            },
+            {
+              "title": "Reports",
+              "path": "/admin/finance/reports",
+              "features": ["revenue_by_program", "revenue_by_semester", "payment_methods_analytics"]
+            }
+          ]
+        },
+        "academic": {
+          "path": "/admin/academic",
+          "features": ["all_courses", "enrollments", "results_management", "transcript_requests"]
+        },
+        "settings": {
+          "path": "/admin/settings",
+          "features": ["system_config", "payment_gateways", "email_templates", "backup_restore"]
+        }
+      }
+    },
+    
+    "staff_portal": {
+      "department_based_routes": {
+        "finance": ["/staff/finance/payments", "/staff/finance/reports"],
+        "admission": ["/staff/admission/applications", "/staff/admission/verification"],
+        "support": ["/staff/support/tickets", "/staff/support/students"],
+        "academic": ["/staff/academic/records", "/staff/academic/transcripts"]
+      }
+    }
+  },
+  
+  "features_configuration": {
+    "admission_workflow": {
+      "steps": [
+        "student_submits_application",
+        "pays_application_fee",
+        "uploads_documents",
+        "staff_verifies_payment",
+        "staff_reviews_documents",
+        "admin_approves_or_rejects",
+        "student_receives_notification"
+      ],
+      "automation": {
+        "payment_reminder": "24_hours_before_deadline",
+        "auto_reject": "incomplete_after_30_days"
+      }
+    },
+    
+    "payment_system": {
+      "application_fee": {
+        "amount": 5000,
+        "currency": "NGN",
+        "required_before": "document_review"
+      },
+      "tuition_fee": {
+        "set_by": "admin_only",
+        "installments": {
+          "enabled": true,
+          "max_installments": 3,
+          "minimum_first_payment": 40
+        }
+      },
+      "gateways": ["paystack", "flutterwave", "bank_transfer"]
+    },
+    
+    "assessment_engine": {
+      "question_types": ["multiple_choice", "true_false", "short_answer", "essay"],
+      "bulk_upload_format": "excel_or_csv",
+      "auto_grading": ["multiple_choice", "true_false"],
+      "manual_grading": ["short_answer", "essay"],
+      "settings": {
+        "attempts": "1_to_unlimited",
+        "grading_method": ["highest", "average", "latest"],
+        "time_limit": "optional",
+        "question_shuffle": true,
+        "answer_review": "configurable"
+      }
+    },
+    
+    "ban_system": {
+      "levels": [
+        {
+          "type": "suspension",
+          "duration": "temporary",
+          "access": "login_allowed_but_limited",
+          "appealable": true
+        },
+        {
+          "type": "ban",
+          "duration": "permanent",
+          "access": "complete_lockout",
+          "appealable": false
+        }
+      ],
+      "triggers": ["payment_fraud", "academic_dishonesty", "harassment", "multiple_policy_violations"],
+      "notification": "email_sent_with_reason"
+    }
+  },
+  
+  "notification_templates": {
+    "admission_accepted": {
+      "subject": "Congratulations! Admission Approved",
+      "channels": ["email", "sms", "in_app"]
+    },
+    "admission_rejected": {
+      "subject": "Admission Status Update",
+      "requires_reason": true
+    },
+    "payment_received": {
+      "subject": "Payment Confirmation",
+      "attachment": "receipt_pdf"
+    },
+    "payment_overdue": {
+      "subject": "Outstanding Payment Reminder",
+      "frequency": "weekly"
+    },
+    "ban_notice": {
+      "subject": "Account Access Restricted",
+      "requires_reason": true,
+      "includes_appeal_info": true
+    }
+  }
+}
