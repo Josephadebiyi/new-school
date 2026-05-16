@@ -161,6 +161,13 @@ const CourseDetail = () => {
                   Ask a question
                 </a>
               </div>
+              <div className="flex items-center gap-3 mt-6 pt-6 border-t border-white/10">
+                <img src="/images/actd-logo.png" alt="ACTD Accredited" className="h-10 w-auto opacity-85" />
+                <div>
+                  <p className="text-white text-xs font-semibold">ACTD Accredited</p>
+                  <p className="text-white/45 text-xs">American Council of Training and Development</p>
+                </div>
+              </div>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>

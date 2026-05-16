@@ -35,6 +35,7 @@ const Footer = () => {
               <li><Link to="/login" className="hover:text-white transition-colors">LMS</Link></li>
               <li><Link to="/testimonials" className="hover:text-white transition-colors">Testimonials</Link></li>
               <li><Link to="/contact" className="hover:text-white transition-colors">Contact Us</Link></li>
+              <li><Link to="/verify-certificate" className="hover:text-white transition-colors">Verify Certificate</Link></li>
             </ul>
           </div>
 
@@ -75,10 +76,9 @@ const Footer = () => {
               <span>Privacy Policy</span>
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-6">
-            <img src="/images/eu-flag.png" alt="EU" className="h-5 w-auto rounded-sm" />
-            <img src="/images/eahea-badge.png" alt="EAHEA" className="h-8 w-auto opacity-60" />
-            <span className="text-sm text-gray-500">Built for ambitious learners across borders</span>
+          <div className="flex items-center gap-4 mt-6">
+            <img src="/images/eu-flag.png" alt="EU" className="h-5 w-auto rounded-sm opacity-80" />
+            <img src="/images/actd-banner.png" alt="ACTD - American Council of Training and Development" className="h-7 w-auto opacity-75" />
           </div>
         </div>
       </div>

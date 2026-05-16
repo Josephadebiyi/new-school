@@ -88,6 +88,10 @@ const faqs = [
     question: 'Is there support after classes?',
     answer: 'Yes. We now feature mentorship, accountability, community support, and career guidance as a core part of the learning experience.',
   },
+  {
+    question: 'Are GITB certificates accredited?',
+    answer: 'Yes. GITB is accredited by the American Council of Training and Development (ACTD). All certificates issued are internationally recognised and can be verified online through our certificate verification portal.',
+  },
 ];
 
 const HeroSection = ({ navigate, stats, currentSlide }) => (
@@ -121,7 +125,7 @@ const HeroSection = ({ navigate, stats, currentSlide }) => (
             transition={{ delay: 0.08 }}
             className="text-5xl md:text-7xl font-bold leading-[0.95] mb-6"
           >
-            GITB helps learners build skills that lead somewhere.
+            Future-Ready Skills for the Digital World
           </motion.h1>
 
           <motion.p
@@ -173,6 +177,12 @@ const HeroSection = ({ navigate, stats, currentSlide }) => (
                 className={`h-2 rounded-full transition-all duration-500 ${index === currentSlide ? 'w-8 bg-[#D4F542]' : 'w-2 bg-white/35'}`}
               />
             ))}
+          </div>
+
+          <div className="flex items-center gap-3 mt-6 pt-6 border-t border-white/10">
+            <img src="/images/eu-flag.png" alt="EU" className="h-5 w-auto rounded-sm opacity-80" />
+            <img src="/images/actd-logo.png" alt="ACTD Accredited" className="h-9 w-auto opacity-80" />
+            <span className="text-white/50 text-xs">ACTD Accredited</span>
           </div>
         </div>
 
@@ -421,6 +431,45 @@ const LMSSection = ({ navigate }) => (
   </section>
 );
 
+const AccreditationSection = ({ navigate }) => (
+  <section className="bg-[#0B3B2C] py-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="flex flex-col md:flex-row items-center gap-10 md:gap-16"
+      >
+        <div className="flex items-center gap-6 shrink-0">
+          <img src="/images/eu-flag.png" alt="EU" className="h-12 w-auto rounded opacity-90" />
+          <img src="/images/actd-logo.png" alt="ACTD Accredited" className="h-24 w-auto" />
+        </div>
+        <div className="flex-1 text-center md:text-left">
+          <p className="text-xs font-bold tracking-[0.2em] uppercase text-[#D4F542] mb-2">Accreditation</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Internationally recognised qualifications.</h2>
+          <p className="text-white/60 leading-relaxed max-w-xl">
+            GITB is accredited by the <span className="text-white font-semibold">American Council of Training and Development (ACTD)</span>, confirming that our programs meet rigorous international standards for quality, structure, and professional relevance.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 shrink-0">
+          <button
+            onClick={() => navigate('/verify-certificate')}
+            className="bg-[#D4F542] text-[#0B3B2C] px-6 py-3 rounded-full font-bold text-sm hover:bg-white transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Verify a Certificate
+          </button>
+          <button
+            onClick={() => navigate('/admissions')}
+            className="border border-white/20 text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-white/10 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Learn more
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  </section>
+);
+
 const TestimonialsSection = ({ navigate }) => (
   <section className="bg-white py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -542,6 +591,7 @@ const Home = () => {
       <FeaturedProgramsSection courses={courses} navigate={navigate} />
       <LMSSection navigate={navigate} />
       <ProofSection />
+      <AccreditationSection navigate={navigate} />
       <TestimonialsSection navigate={navigate} />
       <FAQSection />
       <CTASection navigate={navigate} />

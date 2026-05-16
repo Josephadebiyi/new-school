@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 // Pages whose top section has a dark background — navbar text must be white when unscrolled
@@ -9,6 +9,8 @@ const DARK_BG_PREFIXES = ['/', '/courses', '/admissions', '/contact', '/helpdesk
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [testimonialsOpen, setTestimonialsOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -18,15 +20,23 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close mobile menu on route change
-  useEffect(() => { setIsOpen(false); }, [location.pathname]);
+  useEffect(() => { setIsOpen(false); setTestimonialsOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setTestimonialsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const navLinks = [
     { name: 'Courses', path: '/courses' },
     { name: 'Events', path: '/events' },
     { name: 'LMS', path: '/login' },
     { name: 'About Us', path: '/about' },
-    { name: 'Testimonials', path: '/testimonials' },
     { name: 'Contact', path: '/contact' },
   ];
 
@@ -70,6 +80,43 @@ const Navbar = () => {
                 {link.name}
               </button>
             ))}
+
+            {/* Testimonials dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setTestimonialsOpen((o) => !o)}
+                className={`${textColor} text-sm font-medium hover:opacity-70 transition-opacity cursor-pointer flex items-center gap-1`}
+              >
+                Testimonials
+                <ChevronDown size={14} className={`transition-transform duration-200 ${testimonialsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {testimonialsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                  >
+                    <button
+                      onClick={() => navigate('/testimonials')}
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                    >
+                      Student Testimonials
+                    </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      onClick={() => navigate('/verify-certificate')}
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                    >
+                      <img src="/images/actd-logo.png" alt="" className="h-5 w-auto" />
+                      <span className="font-medium">Verify Certificate</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           <div className="hidden md:flex items-center space-x-3">
@@ -107,6 +154,19 @@ const Navbar = () => {
                   {link.name}
                 </button>
               ))}
+              <button
+                onClick={() => { navigate('/testimonials'); setIsOpen(false); }}
+                className="block w-full text-left px-3 py-2 text-base font-medium text-white cursor-pointer"
+              >
+                Testimonials
+              </button>
+              <button
+                onClick={() => { navigate('/verify-certificate'); setIsOpen(false); }}
+                className="block w-full text-left px-3 py-2 text-base font-medium text-white/80 cursor-pointer flex items-center gap-2"
+              >
+                <img src="/images/actd-logo.png" alt="" className="h-5 w-auto opacity-80" />
+                Verify Certificate
+              </button>
               <div className="pt-4 flex flex-col space-y-4">
                 <button
                   onClick={() => { navigate('/apply'); setIsOpen(false); }}

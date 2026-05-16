@@ -54,6 +54,14 @@ const faqs = [
     q: 'Can someone help me choose a program?',
     a: 'Yes. If you are unsure, the admissions team can guide you toward a program that fits your goals and current level.',
   },
+  {
+    q: 'Is GITB accredited by ACTD?',
+    a: 'Yes. GITB holds accreditation from the American Council of Training and Development (ACTD), ensuring our qualifications are recognised internationally and meet rigorous quality standards.',
+  },
+  {
+    q: 'How do I verify my certificate?',
+    a: 'All issued GITB certificates carry a unique certificate ID. You can verify any certificate through our online verification portal at any time.',
+  },
 ];
 
 const Admissions = () => {
@@ -201,12 +209,13 @@ const Admissions = () => {
           >
             <div className="flex items-center gap-6 shrink-0">
               <img src="/images/eu-flag.png" alt="EU" className="h-12 w-auto rounded" />
-              <img src="/images/eahea-badge.png" alt="EAHEA" className="h-14 w-auto opacity-80" />
+              <img src="/images/actd-logo.png" alt="ACTD Accredited" className="h-16 w-auto" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">Accreditation and quality standards</h3>
+              <h3 className="text-xl font-bold text-[#1a1a1a] mb-1">ACTD Accredited Institution</h3>
+              <p className="text-xs text-[#0B3B2C] font-semibold uppercase tracking-wide mb-2">American Council of Training and Development</p>
               <p className="text-gray-500 text-sm leading-relaxed">
-                GITB aligns its learning experience with high standards of structure, academic credibility, and student support, helping learners pursue training with greater confidence.
+                GITB holds accreditation from ACTD, ensuring our programs meet rigorous standards of quality, credibility, and professional relevance. Our certificates are recognised internationally.
               </p>
             </div>
           </motion.div>

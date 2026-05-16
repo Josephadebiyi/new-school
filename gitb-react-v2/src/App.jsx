@@ -25,6 +25,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StaffDashboard from './pages/StaffDashboard';
+import VerifyCertificate from './pages/VerifyCertificate';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function ScrollToTop() {
@@ -61,6 +62,7 @@ function AppShell() {
           <Route path="/events" element={<Events />} />
           <Route path="/testimonials" element={<Testimonials />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/verify-certificate" element={<VerifyCertificate />} />
           
           {/* Public Auth Routes */}
           <Route path="/login" element={<Login />} />

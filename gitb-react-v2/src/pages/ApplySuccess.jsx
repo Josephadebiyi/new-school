@@ -19,20 +19,38 @@ const ApplySuccess = () => {
       return;
     }
 
-    checkApplicationStatus(sessionId)
-      .then((data) => {
-        if (data.status === 'paid' || data.status === 'complete' || data.payment_status === 'paid') {
-          setStatus('success');
-        } else if (data.status === 'pending' || data.payment_status === 'unpaid') {
-          setStatus('pending');
-        } else {
-          setStatus('success'); // assume success if we got a response
-        }
-      })
-      .catch(() => {
-        // If status check fails but user landed here, likely payment succeeded
-        setStatus('success');
-      });
+    let attempts = 0;
+    const MAX_ATTEMPTS = 8;
+    const DELAY_MS = 2500;
+    let timer = null;
+
+    const poll = () => {
+      checkApplicationStatus(sessionId)
+        .then((data) => {
+          if (data.status === 'paid' || data.status === 'complete' || data.payment_status === 'paid') {
+            setStatus('success');
+          } else if (attempts < MAX_ATTEMPTS) {
+            // Webhook may not have fired yet — retry
+            attempts += 1;
+            timer = setTimeout(poll, DELAY_MS);
+          } else {
+            // Exhausted retries — show pending with contact option
+            setStatus('pending');
+          }
+        })
+        .catch(() => {
+          if (attempts < MAX_ATTEMPTS) {
+            attempts += 1;
+            timer = setTimeout(poll, DELAY_MS);
+          } else {
+            // Landed here from Stripe success URL — almost certainly paid
+            setStatus('success');
+          }
+        });
+    };
+
+    poll();
+    return () => { if (timer) clearTimeout(timer); };
   }, [sessionId]);
 
   return (
@@ -110,23 +128,28 @@ const ApplySuccess = () => {
             </div>
 
             <h1 className="text-3xl font-bold text-[#1a1a1a] mb-3">Payment Processing</h1>
-            <p className="text-gray-500 mb-8 leading-relaxed">
-              Your payment is still being processed. This can take a few minutes, and you’ll receive confirmation once everything is complete.
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              Your payment is being verified. This usually takes just a moment. If you paid successfully, you will receive a confirmation email shortly — please also check your spam folder.
             </p>
 
-            <p className="text-sm text-gray-400 mb-6">
-              If you believe this is an error, please contact us at{' '}
-              <a href="mailto:admissions@gitb.lt" className="text-[#0B3B2C] font-medium hover:underline">
-                admissions@gitb.lt
+            <p className="text-sm text-gray-400 mb-8">
+              Still waiting? Contact us at <a href="mailto:admissions@gitb.lt" className="text-[#0B3B2C] font-medium hover:underline">admissions@gitb.lt</a> and we will resolve it quickly.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="flex-1 py-3 rounded-full font-bold text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Check Again
+              </button>
+              <a
+                href="mailto:admissions@gitb.lt"
+                className="flex-1 py-3 rounded-full font-bold text-sm bg-[#0B3B2C] text-white hover:bg-[#164E3E] transition-colors text-center"
+              >
+                Contact Admissions
               </a>
-            </p>
-
-            <button
-              onClick={() => navigate('/')}
-              className="bg-[#0B3B2C] text-white px-8 py-3 rounded-full font-bold hover:bg-[#164E3E] transition-colors cursor-pointer text-sm"
-            >
-              Back to Home
-            </button>
+            </div>
           </motion.div>
         )}
 

@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import {
   getAdminDashboard, getApplications, getAdminCourses, approveApplication,
-  rejectApplication, getUsers, createCourse, updateCourse, getSystemSettings,
+  rejectApplication, resendCredentials, getUsers, createCourse, updateCourse, getSystemSettings,
   updateSystemSettings, updateProfile, getCourseMaterials, addCourseMaterial,
   uploadFile, createUser, adminEnrollStudent,
   assignCourseToTeacher, removeTeacherCourse, sendTestEmails,
@@ -535,6 +535,16 @@ export default function AdminDashboard() {
     catch (err) { alert(err.message); }
   }
 
+  async function handleResendCredentials(appId, email) {
+    if (!confirm(`Resend login credentials to ${email}? This will reset their temporary password.`)) return;
+    try {
+      const result = await resendCredentials(token, appId);
+      alert(result.message || 'Credentials resent successfully.');
+    } catch (err) {
+      alert('Failed to resend: ' + err.message);
+    }
+  }
+
   // ─── USERS ─────────────────────────────────────────────────────────────────
 
   function openUserEdit(u) {
@@ -775,6 +785,17 @@ export default function AdminDashboard() {
                           </button>
                           <button onClick={() => handleReject(app.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors">
                             <XCircle size={12} /> Reject
+                          </button>
+                        </div>
+                      ) : app.status === 'approved' ? (
+                        <div className="flex items-center gap-2">
+                          <Badge status={app.status} />
+                          <button
+                            onClick={() => handleResendCredentials(app.id, app.email)}
+                            title="Resend login credentials to student"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors"
+                          >
+                            <RefreshCw size={11} /> Resend
                           </button>
                         </div>
                       ) : (

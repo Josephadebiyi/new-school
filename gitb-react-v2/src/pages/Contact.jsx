@@ -49,6 +49,14 @@ const faqs = [
     q: 'Can I get help choosing a program?',
     a: 'Yes. The admissions team can help you choose a path based on your background, interests, and career goals.',
   },
+  {
+    q: 'Is GITB accredited by ACTD?',
+    a: 'Yes. GITB is accredited by the American Council of Training and Development (ACTD), confirming that our programs meet internationally recognised standards for quality education and professional training.',
+  },
+  {
+    q: 'Can I verify my GITB certificate?',
+    a: 'Yes. All GITB certificates can be verified online through our certificate verification portal. Visit the Verify Certificate page and enter your certificate ID.',
+  },
 ];
 
 const Contact = () => {
@@ -111,12 +119,13 @@ const Contact = () => {
           <div className="flex flex-col md:flex-row items-center gap-10 border border-gray-100 rounded-3xl p-10">
             <div className="flex items-center gap-6 shrink-0">
               <img src="/images/eu-flag.png" alt="EU" className="h-12 w-auto rounded" />
-              <img src="/images/eahea-badge.png" alt="EAHEA" className="h-14 w-auto opacity-80" />
+              <img src="/images/actd-logo.png" alt="ACTD Accredited" className="h-16 w-auto" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">Accreditation and institutional confidence</h3>
+              <h3 className="text-xl font-bold text-[#1a1a1a] mb-1">ACTD Accredited Institution</h3>
+              <p className="text-xs text-[#0B3B2C] font-semibold uppercase tracking-wide mb-2">American Council of Training and Development</p>
               <p className="text-gray-500 text-sm leading-relaxed">
-                GITB is committed to structured, credible, and learner-focused education. Our academic positioning and support systems are designed to give students confidence from enquiry through enrollment.
+                GITB holds accreditation from ACTD, ensuring our programs meet rigorous standards of quality, credibility, and professional relevance. Our certificates are recognised internationally.
               </p>
             </div>
           </div>

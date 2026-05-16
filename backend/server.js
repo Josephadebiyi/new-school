@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const path = require("path");
 const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcryptjs");
@@ -152,13 +154,66 @@ try {
     resend = new Resend(process.env.RESEND_API_KEY);
     console.log("Resend initialized successfully");
   } else {
-    console.warn("Resend not configured - emails will be disabled");
+    console.error("========================================");
+    console.error("WARNING: RESEND_API_KEY is not set.");
+    console.error("ALL EMAILS ARE DISABLED — students will");
+    console.error("receive NO notifications, confirmations,");
+    console.error("or credentials. Set RESEND_API_KEY now.");
+    console.error("========================================");
   }
 } catch (err) {
-  console.warn("Resend initialization failed:", err.message);
+  console.error("FATAL: Resend initialization failed:", err.message);
 }
 
-// Middleware
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  console.error("========================================");
+  console.error("WARNING: STRIPE_WEBHOOK_SECRET is not set.");
+  console.error("Webhook signature verification is DISABLED.");
+  console.error("Any HTTP request can fake a payment event.");
+  console.error("Set STRIPE_WEBHOOK_SECRET in production.");
+  console.error("========================================");
+}
+
+// ============ SECURITY MIDDLEWARE ============
+
+// Security headers (helmet)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // allow images/assets served from API
+  contentSecurityPolicy: false, // handled by frontend separately
+}));
+
+// Rate limiters
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { detail: "Too many attempts. Please try again in 15 minutes." },
+});
+
+const applicationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { detail: "Too many application submissions from this IP. Please try again later." },
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { detail: "Too many requests. Please slow down." },
+});
+
+app.use(generalLimiter);
+
+if (CORS_ORIGINS === "*") {
+  console.warn("Warning: CORS_ORIGINS is set to '*' — all origins allowed. Set CORS_ORIGINS in production.");
+}
+
+// CORS
 app.use(cors({
   origin: CORS_ORIGINS === "*" ? "*" : CORS_ORIGINS.split(","),
   credentials: true
@@ -173,15 +228,23 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
 
     let event;
 
-    if (webhookSecret && sig) {
+    if (webhookSecret) {
+      if (!sig) {
+        console.error("Webhook rejected: missing stripe-signature header");
+        return res.status(400).send("Webhook Error: missing stripe-signature header");
+      }
       try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
       } catch (err) {
         console.error("Webhook signature verification failed:", err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      // In production, refuse unsigned events entirely
+      console.error("Webhook rejected in production: STRIPE_WEBHOOK_SECRET not configured");
+      return res.status(400).send("Webhook Error: webhook secret not configured");
     } else {
-      // For testing without webhook secret
+      // Development only — accept unsigned for local testing via Stripe CLI
       event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     }
 
@@ -254,6 +317,43 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
       }
     }
 
+    if (event.type === 'payment_intent.payment_failed') {
+      const intent = event.data.object;
+      const metadata = intent.metadata || {};
+      const email = metadata.email || intent.receipt_email;
+      const firstName = metadata.first_name || "Applicant";
+      const courseTitle = metadata.course_title || "your chosen programme";
+
+      if (email) {
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+            ${getEmailHeader("Payment Failed")}
+            <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <h2 style="color: #c0392b; margin-top: 0;">Payment Was Not Successful</h2>
+              <p>Dear ${firstName},</p>
+              <p>We were unable to process your payment for <strong>${courseTitle}</strong> at the Global Institute of Technology and Business.</p>
+              <div style="background: #fff5f5; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #c0392b;">
+                <p style="margin: 0; color: #555;">Reason: ${intent.last_payment_error?.message || "Payment declined by your bank or card issuer."}</p>
+              </div>
+              <h3 style="color: #333;">What to do next:</h3>
+              <ul style="color: #555; line-height: 1.9;">
+                <li>Check that your card details are correct and up to date.</li>
+                <li>Ensure you have sufficient funds available.</li>
+                <li>Try a different payment method.</li>
+                <li>Contact your bank if the issue persists.</li>
+              </ul>
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="${FRONTEND_URL}/apply" style="display: inline-block; padding: 12px 30px; background: #0B3B2C; color: white; text-decoration: none; border-radius: 25px; font-weight: bold;">Try Again</a>
+              </div>
+              <p style="color: #555;">Need help? Email us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
+              <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+            </div>
+          </div>`;
+        await sendEmail(email, `Payment Failed — ${courseTitle} | GITB`, html);
+        console.log(`Payment failure email sent to ${email}`);
+      }
+    }
+
     res.json({ received: true });
   } catch (error) {
     console.error("Webhook error:", error);
@@ -312,7 +412,14 @@ app.set("trust proxy", true);
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Generic File Upload Endpoint
-app.post("/api/upload", documentUpload.single("file"), async (req, res) => {
+const requireAuthToken = (req, res, next) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ detail: "Authentication required" });
+  try { jwt.verify(auth.split(" ")[1], JWT_SECRET); next(); }
+  catch { return res.status(401).json({ detail: "Invalid or expired token" }); }
+};
+
+app.post("/api/upload", requireAuthToken, documentUpload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ detail: "No file uploaded" });
     const fileUrl = `${req.protocol}://${req.get('host')}/api/uploads/${req.file.filename}`;
@@ -323,7 +430,7 @@ app.post("/api/upload", documentUpload.single("file"), async (req, res) => {
 });
 
 // ============ DOCUMENT UPLOAD ENDPOINT (Legacy Support) ============
-app.post("/api/upload/document", documentUpload.single("file"), async (req, res) => {
+app.post("/api/upload/document", requireAuthToken, documentUpload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ detail: "No file uploaded" });
@@ -462,6 +569,11 @@ const authenticate = async (req, res, next) => {
     if (user._id) {
       user.id = user.id || user._id.toString();
       delete user._id;
+    }
+
+    // Reject locked or deactivated accounts even if JWT is still valid
+    if (!user.is_active || user.account_status === "locked" || user.account_status === "banned") {
+      return res.status(401).json({ detail: "Account is inactive or locked. Please contact admissions@gitb.lt." });
     }
 
     req.user = user;
@@ -909,17 +1021,21 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
   </html>
   `;
 
+  let attachments = [];
   try {
     const pdfBuffer = await generateAcceptanceLetter(firstName, lastName, courseTitle, tuitionAmount);
-    const attachments = [{
+    attachments = [{
       filename: `GITB_Acceptance_Letter_${firstName}_${lastName}.pdf`,
       content: pdfBuffer.toString('base64'),
     }];
-    return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html, attachments);
   } catch (pdfErr) {
-    console.error("PDF generation failed, sending email without attachment:", pdfErr.message);
-    return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html);
+    console.error("PDF generation failed — sending email without attachment:", pdfErr.message);
+    // Strip the attachment reference from the email body so we don't lie to the student
+    html = html.replace(/<[^>]*attachment[^>]*>.*?<\/[^>]*>/gis, '');
+    html = html.replace(/your acceptance letter is attached[^<.]*/gi, 'your acceptance letter will be sent separately');
+    html = html.replace(/attached.*acceptance letter/gi, 'acceptance letter (being prepared)');
   }
+  return await sendEmail(email, `Welcome to GITB - Your Admission is Confirmed!`, html, attachments);
 };
 
 // Login notification email - DISABLED per user request
@@ -1092,18 +1208,19 @@ app.post("/api/newsletter/subscribe", async (req, res) => {
 });
 
 // ============ AUTH ROUTES ============
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     if (!db) {
       return res.status(503).json({ detail: "Database not available" });
     }
 
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
 
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       return res.status(422).json({ detail: "Email and password are required" });
     }
 
+    const email = rawEmail.toLowerCase().trim();
     const user = await db.collection("users").findOne({ email });
     if (!user) {
       return res.status(401).json({ detail: "Invalid credentials" });
@@ -1169,7 +1286,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-app.post("/api/auth/forgot-password", async (req, res) => {
+app.post("/api/auth/forgot-password", authLimiter, async (req, res) => {
   try {
     if (!db) {
       return res.status(503).json({ detail: "Database not available" });
@@ -1571,16 +1688,32 @@ app.get("/api/users/:userId", authenticate, async (req, res) => {
 app.put("/api/users/:userId", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
   try {
     const { userId } = req.params;
-    const updates = req.body;
+    const body = req.body;
 
-    // Handle password update separately (hash it)
-    if (updates.password) {
-      updates.password = await bcrypt.hash(updates.password, 12);
+    // Whitelist updatable fields — prevent mass-assignment of role/permissions by non-super-admin
+    const SAFE_FIELDS = ["first_name", "last_name", "phone", "department", "program",
+      "is_active", "account_status", "payment_status", "notes"];
+    const ADMIN_ONLY_FIELDS = ["role", "permissions", "must_change_password"];
+
+    const updates = {};
+    for (const field of SAFE_FIELDS) {
+      if (field in body) updates[field] = body[field];
+    }
+    // Only super_admin can change role/permissions
+    if (["admin", "super_admin"].includes(req.user.role)) {
+      for (const field of ADMIN_ONLY_FIELDS) {
+        if (field in body) updates[field] = body[field];
+      }
     }
 
-    delete updates.id;
-    delete updates._id;
-    delete updates.email;
+    // Handle password update separately (hash it)
+    if (body.password && ["admin", "super_admin"].includes(req.user.role)) {
+      updates.password = await bcrypt.hash(body.password, 12);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ detail: "No valid fields to update" });
+    }
 
     const result = await db.collection("users").updateOne({ id: userId }, { $set: updates });
 
@@ -1994,7 +2127,7 @@ app.post("/api/courses/:courseId/materials", authenticate, requireRoles(["admin"
 // ============ APPLICATION ROUTES ============
 // STRIPE-FIRST FLOW: Application is only stored in DB after payment confirmed by webhook.
 // This prevents "already applied" loops and keeps admissions table clean.
-app.post("/api/applications/create", async (req, res) => {
+app.post("/api/applications/create", applicationLimiter, async (req, res) => {
   try {
     if (!db) return res.status(503).json({ detail: "Database not available" });
     if (!stripe) return res.status(503).json({ detail: "Payment service not available. Please contact admissions@gitb.lt" });
@@ -2211,7 +2344,14 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       return res.status(400).json({ detail: "Application is not pending" });
     }
 
-    let existingUser = await db.collection("users").findOne({ email: application.email });
+    if (application.payment_status !== "paid") {
+      return res.status(400).json({ detail: "Cannot approve an application where the application fee has not been paid. Payment status: " + (application.payment_status || "unknown") });
+    }
+
+    // Normalise email to lowercase before creating/looking up user account
+    const normalizedEmail = (application.email || "").toLowerCase().trim();
+
+    let existingUser = await db.collection("users").findOne({ email: normalizedEmail });
 
     const tempPassword = generatePassword();
     const hashedPassword = await bcrypt.hash(tempPassword, 12);
@@ -2220,12 +2360,12 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
     if (existingUser) {
       userId = existingUser.id;
       await db.collection("users").updateOne(
-        { email: application.email },
+        { email: normalizedEmail },
         {
           $set: {
             password: hashedPassword,
             must_change_password: true,
-            payment_status: "unpaid" // Tuition not yet paid
+            payment_status: "unpaid"
           }
         }
       );
@@ -2233,7 +2373,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       userId = uuidv4();
       const newUser = {
         id: userId,
-        email: application.email,
+        email: normalizedEmail,
         password: hashedPassword,
         first_name: application.first_name,
         last_name: application.last_name,
@@ -2292,14 +2432,17 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
     );
 
     // Send welcome email with credentials and tuition info
-    await sendWelcomeEmail(
-      application.email,
+    const emailSent = await sendWelcomeEmail(
+      normalizedEmail,
       application.first_name,
       application.last_name,
       application.course_title,
       tempPassword,
       coursePrice
     );
+    if (!emailSent) {
+      console.error(`Welcome email FAILED for ${normalizedEmail} — credentials not delivered`);
+    }
 
     logActivity(
       req.user.id,
@@ -2389,6 +2532,61 @@ app.post("/api/applications/:applicationId/reject", authenticate, requireRoles([
     res.json({ message: "Application rejected" });
   } catch (error) {
     console.error("Reject application error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// Resend credentials to an approved student (admin only)
+app.post("/api/applications/:applicationId/resend-email", authenticate, requireRoles(["admin", "registrar"]), async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+
+    const application = await db.collection("applications").findOne({ id: applicationId });
+    if (!application) return res.status(404).json({ detail: "Application not found" });
+    if (application.status !== "approved") return res.status(400).json({ detail: "Can only resend email for approved applications" });
+
+    const normalizedEmail = (application.email || "").toLowerCase().trim();
+    const user = await db.collection("users").findOne({ email: normalizedEmail });
+    if (!user) return res.status(404).json({ detail: "Student account not found — the application may not have been fully approved yet" });
+
+    // Generate a fresh temporary password
+    const tempPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+    await db.collection("users").updateOne(
+      { email: normalizedEmail },
+      { $set: { password: hashedPassword, must_change_password: true } }
+    );
+
+    const enrollment = await db.collection("enrollments").findOne({ application_id: applicationId });
+    const coursePrice = enrollment?.tuition_amount || 0;
+
+    const emailSent = await sendWelcomeEmail(
+      normalizedEmail,
+      application.first_name,
+      application.last_name,
+      application.course_title,
+      tempPassword,
+      coursePrice
+    );
+
+    if (!emailSent) {
+      return res.status(502).json({ detail: "Email service unavailable — credentials were reset but email could not be sent. Check RESEND_API_KEY." });
+    }
+
+    logActivity(
+      req.user.id,
+      `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+      'resent_credentials',
+      'application',
+      applicationId,
+      `${application.first_name} ${application.last_name} (${normalizedEmail})`,
+      `Credentials resent for course: ${application.course_title}`
+    );
+
+    res.json({ message: `Credentials resent successfully to ${normalizedEmail}` });
+  } catch (error) {
+    console.error("Resend credentials error:", error);
     res.status(500).json({ detail: "Internal server error" });
   }
 });
@@ -2664,7 +2862,7 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
                   <p>Your tuition payment for <strong>${course.title}</strong> has been successfully processed.</p>
                   <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
                     <p style="margin: 0; color: #2e7d32; font-size: 18px;">✓ Course Unlocked</p>
-                    <p style="margin: 10px 0 0 0; color: #666;">Amount: €${course.price}</p>
+                    <p style="margin: 10px 0 0 0; color: #666;">Amount: €${enrollment.tuition_amount || (typeof course.price === 'object' ? (course.price.upfront || course.price.monthly || 0) : (course.price || 0))}</p>
                   </div>
                   <p>You now have <strong>lifetime access</strong> to this course. Log in to start learning!</p>
                   <div style="text-align: center; margin: 25px 0;">

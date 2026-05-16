@@ -212,6 +212,16 @@ export async function rejectApplication(token, appId) {
   return data;
 }
 
+export async function resendCredentials(token, appId) {
+  const res = await fetch(`${API_BASE}/api/applications/${appId}/resend-email`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || data.detail || 'Failed to resend credentials');
+  return data;
+}
+
 export async function getUsers(token) {
   const res = await fetch(`${API_BASE}/api/users`, {
     headers: { Authorization: `Bearer ${token}` },

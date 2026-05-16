@@ -46,10 +46,10 @@ export default function Apply() {
     setError('');
     try {
       const data = await createApplication({
-        first_name: form.firstName,
-        last_name: form.lastName,
-        email: form.email,
-        phone: form.phone,
+        first_name: form.firstName.trim(),
+        last_name: form.lastName.trim(),
+        email: form.email.toLowerCase().trim(),
+        phone: form.phone.trim(),
         course_id: form.courseId,
         motivation: form.motivation,
         origin_url: window.location.origin,
