@@ -572,7 +572,8 @@ const authenticate = async (req, res, next) => {
     }
 
     // Reject locked or deactivated accounts even if JWT is still valid
-    if (!user.is_active || user.account_status === "locked" || user.account_status === "banned") {
+    // Use strict === false so accounts without the field set are not blocked
+    if (user.is_active === false || user.account_status === "locked" || user.account_status === "banned") {
       return res.status(401).json({ detail: "Account is inactive or locked. Please contact admissions@gitb.lt." });
     }
 
