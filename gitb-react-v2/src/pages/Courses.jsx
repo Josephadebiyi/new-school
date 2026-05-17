@@ -139,7 +139,13 @@ const Courses = () => {
                   </div>
 
                   <div className="flex items-center justify-between pt-5 border-t border-gray-100">
-                    <span className="text-[#0B3B2C] font-bold">From EUR {course.price.monthly}/month</span>
+                    <span className="text-[#0B3B2C] font-bold">
+                      {course.price.monthly > 0
+                        ? `From €${course.price.monthly}/month`
+                        : course.price.upfront > 0
+                        ? `€${course.price.upfront} one-time`
+                        : 'Contact for pricing'}
+                    </span>
                     <span className="inline-flex items-center gap-2 font-semibold text-[#0B3B2C] group-hover:gap-3 transition-all">
                       View details <ArrowRight size={16} />
                     </span>
