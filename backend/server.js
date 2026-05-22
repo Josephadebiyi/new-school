@@ -10,10 +10,21 @@ const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
 const fs = require("fs");
+const cloudinary = require("cloudinary").v2;
 
-// Multer storage config for document uploads
+// Multer: memory storage for images (uploaded to Cloudinary), disk for documents
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error('Only image files are allowed here.'));
+  }
+});
 
 const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
@@ -419,11 +430,34 @@ const requireAuthToken = (req, res, next) => {
   catch { return res.status(401).json({ detail: "Invalid or expired token" }); }
 };
 
-app.post("/api/upload", requireAuthToken, documentUpload.single("file"), async (req, res) => {
+app.post("/api/upload", requireAuthToken, imageUpload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ detail: "No file uploaded" });
-    const fileUrl = `${req.protocol}://${req.get('host')}/api/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl, filename: req.file.filename });
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+    if (cloudName && apiKey && apiSecret) {
+      // Upload buffer to Cloudinary — permanent URL, survives server restarts
+      cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "gitb-courses", resource_type: "image" },
+          (err, res) => (err ? reject(err) : resolve(res))
+        );
+        stream.end(req.file.buffer);
+      });
+      return res.json({ url: result.secure_url, filename: result.public_id });
+    }
+
+    // Fallback: save to local disk (note: not persistent on Render)
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(req.file.originalname)}`;
+    const dest = path.join(uploadsDir, filename);
+    fs.writeFileSync(dest, req.file.buffer);
+    const fileUrl = `${req.protocol}://${req.get('host')}/api/uploads/${filename}`;
+    console.warn("⚠️  CLOUDINARY not configured — image saved locally and will be lost on restart.");
+    res.json({ url: fileUrl, filename });
   } catch (error) {
     res.status(500).json({ detail: error.message });
   }
