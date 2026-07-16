@@ -79,7 +79,7 @@ const HeroSection = ({ navigate, stats }) => (
   <section className="bg-[#0B3B2C] pt-28 pb-20 relative overflow-hidden">
     <video
       className="absolute inset-0 w-full h-full object-cover opacity-20"
-      src="/videos/gitb-full-render.mp4"
+      src="/video/gitb-full-render.mp4"
       autoPlay
       loop
       muted
