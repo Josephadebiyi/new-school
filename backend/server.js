@@ -264,27 +264,51 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
       const metadata = session.metadata || {};
 
       if (metadata.type === 'tuition' && metadata.enrollment_id) {
-        // Update enrollment to paid
-        await db.collection("enrollments").updateOne(
-          { id: metadata.enrollment_id },
-          {
-            $set: {
-              status: "active",
-              payment_status: "paid",
-              tuition_paid_at: new Date().toISOString()
+        if (session.mode === "subscription") {
+          // First of 12 monthly installments — unlock the course now, but don't
+          // mark tuition fully "paid" until invoice.paid confirms all 12 cycles.
+          await db.collection("enrollments").updateOne(
+            { id: metadata.enrollment_id },
+            {
+              $set: {
+                status: "active",
+                payment_status: "partial",
+                payment_plan: "monthly",
+                total_installments: 12,
+                installments_paid: 0,
+                stripe_subscription_id: session.subscription,
+                stripe_customer_id: session.customer,
+                tuition_paid_at: new Date().toISOString()
+              }
             }
-          }
-        );
-
-        // Update user payment status
-        if (metadata.user_id) {
-          await db.collection("users").updateOne(
-            { id: metadata.user_id },
-            { $set: { payment_status: "paid" } }
           );
+          if (metadata.user_id) {
+            await db.collection("users").updateOne(
+              { id: metadata.user_id },
+              { $set: { payment_status: "partial" } }
+            );
+          }
+          console.log(`Tuition subscription started for enrollment ${metadata.enrollment_id}`);
+        } else {
+          await db.collection("enrollments").updateOne(
+            { id: metadata.enrollment_id },
+            {
+              $set: {
+                status: "active",
+                payment_status: "paid",
+                payment_plan: "one_time",
+                tuition_paid_at: new Date().toISOString()
+              }
+            }
+          );
+          if (metadata.user_id) {
+            await db.collection("users").updateOne(
+              { id: metadata.user_id },
+              { $set: { payment_status: "paid" } }
+            );
+          }
+          console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
         }
-
-        console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
       } else if (metadata.type === "application_fee" && metadata.application_id) {
         // Stripe-first flow: Application record does NOT exist yet — create it now.
         // Idempotency check: skip if already created (webhook may fire twice).
@@ -331,7 +355,8 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
     if (event.type === 'payment_intent.payment_failed') {
       const intent = event.data.object;
       const metadata = intent.metadata || {};
-      const email = metadata.email || intent.receipt_email;
+      // Subscription installment failures are handled by invoice.payment_failed below.
+      const email = metadata.type !== 'tuition' ? (metadata.email || intent.receipt_email) : null;
       const firstName = metadata.first_name || "Applicant";
       const courseTitle = metadata.course_title || "your chosen programme";
 
@@ -362,6 +387,66 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
           </div>`;
         await sendEmail(email, `Payment Failed — ${courseTitle} | GITB`, html);
         console.log(`Payment failure email sent to ${email}`);
+      }
+    }
+
+    // Recurring monthly tuition installments (2nd through 12th) land here —
+    // the 1st installment is confirmed via checkout.session.completed above.
+    if (event.type === 'invoice.paid') {
+      const invoice = event.data.object;
+      if (invoice.subscription) {
+        const enrollment = await db.collection("enrollments").findOne({ stripe_subscription_id: invoice.subscription });
+        if (enrollment) {
+          const totalInstallments = enrollment.total_installments || 12;
+          const installmentsPaid = Math.min((enrollment.installments_paid || 0) + 1, totalInstallments);
+          const fullyPaid = installmentsPaid >= totalInstallments;
+
+          await db.collection("enrollments").updateOne(
+            { id: enrollment.id },
+            { $set: { installments_paid: installmentsPaid, ...(fullyPaid && { payment_status: "paid" }) } }
+          );
+
+          if (fullyPaid) {
+            const studentUserId = enrollment.student_id || enrollment.user_id;
+            if (studentUserId) {
+              await db.collection("users").updateOne({ id: studentUserId }, { $set: { payment_status: "paid" } });
+            }
+            // Safety net — the subscription also has a cancel_at set at creation.
+            try { await stripe.subscriptions.cancel(invoice.subscription); } catch (e) { /* already canceled/expired */ }
+            console.log(`Tuition fully paid for enrollment ${enrollment.id} (${installmentsPaid}/${totalInstallments} installments)`);
+          } else {
+            console.log(`Tuition installment ${installmentsPaid}/${totalInstallments} paid for enrollment ${enrollment.id}`);
+          }
+        }
+      }
+    }
+
+    if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object;
+      if (invoice.subscription) {
+        const enrollment = await db.collection("enrollments").findOne({ stripe_subscription_id: invoice.subscription });
+        if (enrollment) {
+          const studentUserId = enrollment.student_id || enrollment.user_id;
+          const student = studentUserId ? await db.collection("users").findOne({ id: studentUserId }) : null;
+          const course = await db.collection("courses").findOne({ id: enrollment.course_id });
+
+          if (student?.email) {
+            const html = `
+              <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+                ${getEmailHeader("Tuition Payment Failed")}
+                <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  <h2 style="color: #c0392b; margin-top: 0;">Monthly Installment Payment Failed</h2>
+                  <p>Dear ${student.first_name || "Student"},</p>
+                  <p>We were unable to process this month's tuition installment for <strong>${course?.title || "your course"}</strong>.</p>
+                  <p style="color: #555;">Stripe will automatically retry the charge over the next few days. Please make sure your card details are up to date to avoid an interruption to your course access.</p>
+                  <p style="color: #555;">Need help? Email us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
+                  <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+                </div>
+              </div>`;
+            await sendEmail(student.email, `Tuition Payment Failed — ${course?.title || "GITB"} | GITB`, html);
+          }
+          console.log(`Tuition installment payment failed for enrollment ${enrollment.id}`);
+        }
       }
     }
 
@@ -423,11 +508,33 @@ app.set("trust proxy", true);
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Generic File Upload Endpoint
-const requireAuthToken = (req, res, next) => {
+const requireAuthToken = async (req, res, next) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ detail: "Authentication required" });
-  try { jwt.verify(auth.split(" ")[1], JWT_SECRET); next(); }
-  catch { return res.status(401).json({ detail: "Invalid or expired token" }); }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(auth.split(" ")[1], JWT_SECRET);
+  } catch {
+    return res.status(401).json({ detail: "Invalid or expired token" });
+  }
+
+  if (!db) return res.status(503).json({ detail: "Database not available" });
+
+  let user = await db.collection("users").findOne({ id: decoded.sub }, { projection: { password: 0 } });
+  if (!user) {
+    try {
+      user = await db.collection("users").findOne({ _id: new ObjectId(decoded.sub) }, { projection: { password: 0 } });
+    } catch (e) { }
+  }
+  if (!user) return res.status(401).json({ detail: "User not found" });
+
+  if (user.is_active === false || user.account_status === "locked" || user.account_status === "banned" || user.account_status === "expelled") {
+    return res.status(401).json({ detail: "Account is inactive or locked. Please contact admissions@gitb.lt." });
+  }
+
+  req.user = user;
+  next();
 };
 
 app.post("/api/upload", requireAuthToken, imageUpload.single("file"), async (req, res) => {
@@ -459,7 +566,8 @@ app.post("/api/upload", requireAuthToken, imageUpload.single("file"), async (req
     console.warn("⚠️  CLOUDINARY not configured — image saved locally and will be lost on restart.");
     res.json({ url: fileUrl, filename });
   } catch (error) {
-    res.status(500).json({ detail: error.message });
+    console.error("Image upload error:", error);
+    res.status(500).json({ detail: "Upload failed. Please try again." });
   }
 });
 
@@ -473,7 +581,7 @@ app.post("/api/upload/document", requireAuthToken, documentUpload.single("file")
     res.json({ url: fileUrl, filename: req.file.filename });
   } catch (error) {
     console.error("Document upload error:", error);
-    res.status(500).json({ detail: error.message || "Upload failed" });
+    res.status(500).json({ detail: "Upload failed. Please try again." });
   }
 });
 
@@ -605,10 +713,14 @@ const authenticate = async (req, res, next) => {
       delete user._id;
     }
 
-    // Reject locked or deactivated accounts even if JWT is still valid
+    // Reject locked, banned, expelled, or deactivated accounts even if JWT is still valid
     // Use strict === false so accounts without the field set are not blocked
     if (user.is_active === false || user.account_status === "locked" || user.account_status === "banned") {
       return res.status(401).json({ detail: "Account is inactive or locked. Please contact admissions@gitb.lt." });
+    }
+
+    if (user.account_status === "expelled") {
+      return res.status(401).json({ detail: "Your account has been expelled. Please contact admissions@gitb.lt." });
     }
 
     req.user = user;
@@ -1270,6 +1382,14 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       return res.status(401).json({ detail: "Account is inactive" });
     }
 
+    if (user.account_status === "locked" || user.account_status === "banned") {
+      return res.status(401).json({ detail: "Account is inactive or locked. Please contact admissions@gitb.lt." });
+    }
+
+    if (user.account_status === "expelled") {
+      return res.status(401).json({ detail: "Your account has been expelled. Please contact admissions@gitb.lt." });
+    }
+
     const userId = user.id || user._id.toString();
 
     const token = jwt.sign(
@@ -1402,6 +1522,10 @@ app.post("/api/auth/reset-password", async (req, res) => {
       return res.status(422).json({ detail: "Token and new password are required" });
     }
 
+    if (new_password.length < 8) {
+      return res.status(422).json({ detail: "Password must be at least 8 characters" });
+    }
+
     const resetRecord = await db.collection("password_resets").findOne({ token });
     if (!resetRecord) {
       return res.status(400).json({ detail: "Invalid or expired reset token" });
@@ -1450,6 +1574,10 @@ app.post("/api/auth/change-password", authenticate, async (req, res) => {
 
     if (!current_password || !new_password) {
       return res.status(422).json({ detail: "Current and new password are required" });
+    }
+
+    if (new_password.length < 8) {
+      return res.status(422).json({ detail: "Password must be at least 8 characters" });
     }
 
     const user = await db.collection("users").findOne({ id: req.user.id });
@@ -2284,7 +2412,7 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (session.payment_status === "paid" && session.metadata?.application_id) {
-          await db.collection("applications").updateOne(
+          const updateResult = await db.collection("applications").updateOne(
             { id: session.metadata.application_id },
             {
               $set: {
@@ -2295,10 +2423,20 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
             }
           );
 
+          if (updateResult.matchedCount > 0) {
+            return res.json({
+              status: "pending",
+              payment_status: "paid",
+              message: "Application submitted successfully! Our admissions team will review your application."
+            });
+          }
+
+          // Payment is confirmed by Stripe, but the application record hasn't been
+          // created yet (webhook hasn't run). Don't claim success prematurely.
           return res.json({
-            status: "pending",
+            status: "processing",
             payment_status: "paid",
-            message: "Application submitted successfully! Our admissions team will review your application."
+            message: "Your payment was received and is being processed. This page will update automatically."
           });
         }
 
@@ -2686,6 +2824,7 @@ app.post("/api/student/add-course", authenticate, async (req, res) => {
     const enrollment = {
       id: uuidv4(),
       user_id: userId,
+      student_id: userId,
       course_id: course.id || course._id.toString(),
       status: "pending_payment",
       payment_status: "unpaid",
@@ -2696,7 +2835,7 @@ app.post("/api/student/add-course", authenticate, async (req, res) => {
     res.json({ success: true, enrollment_id: enrollment.id, course_title: course.title });
   } catch (error) {
     console.error("Add course error:", error);
-    res.status(500).json({ detail: error.message || "Internal server error" });
+    res.status(500).json({ detail: "Could not add course. Please try again." });
   }
 });
 
@@ -2729,6 +2868,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       enrollment = {
         id: uuidv4(),
         user_id: userId,
+        student_id: userId,
         course_id: course_id,
         application_id: application ? application.id : null,
         status: "pending_payment",
@@ -2740,6 +2880,10 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
 
     if (enrollment.payment_status === "paid") {
       return res.status(400).json({ detail: "Tuition already paid for this course" });
+    }
+
+    if (enrollment.payment_status === "partial" && enrollment.stripe_subscription_id) {
+      return res.status(400).json({ detail: "You already have an active monthly payment plan for this course. Remaining installments will be charged automatically." });
     }
 
     // Get course details - try multiple lookup methods
@@ -2777,45 +2921,79 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       });
     }
 
-    const paymentDescription = isMonthly
-      ? `Monthly installment 1 of 12 - ${course.title}`
-      : `Full tuition - ${course.title}`;
-
     if (!stripe) {
       return res.status(503).json({ detail: "Payment service not available" });
     }
 
-    // Create Stripe checkout session for tuition
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [{
-        price_data: {
-          currency: "eur",
-          product_data: {
-            name: `Tuition Fee - ${course.title}`,
-            description: paymentDescription
-          },
-          unit_amount: Math.round(chargeAmount * 100)
-        },
-        quantity: 1
-      }],
-      mode: "payment",
-      success_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=success&course=${course_id}`,
-      cancel_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=cancelled`,
-      customer_email: user.email,
-      metadata: {
-        type: "tuition",
-        enrollment_id: enrollment.id,
-        course_id: course_id,
-        user_id: userId,
-        user_email: user.email
-      }
-    });
+    const baseMetadata = {
+      type: "tuition",
+      enrollment_id: enrollment.id,
+      course_id: course_id,
+      user_id: userId,
+      user_email: user.email
+    };
 
-    // Update enrollment with stripe session
+    let session;
+    if (isMonthly) {
+      // 12 monthly installments via a real Stripe subscription. The subscription
+      // auto-cancels ~3 days after the 12th cycle would be due, so it never
+      // silently keeps billing past the agreed term.
+      const cancelAt = new Date();
+      cancelAt.setUTCMonth(cancelAt.getUTCMonth() + 12);
+      cancelAt.setUTCDate(cancelAt.getUTCDate() + 3);
+
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [{
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: `Tuition Fee - ${course.title}`,
+              description: `Monthly installment - ${course.title}`
+            },
+            unit_amount: Math.round(chargeAmount * 100),
+            recurring: { interval: "month" }
+          },
+          quantity: 1
+        }],
+        mode: "subscription",
+        subscription_data: {
+          metadata: baseMetadata,
+          cancel_at: Math.floor(cancelAt.getTime() / 1000)
+        },
+        success_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=success&course=${course_id}`,
+        cancel_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=cancelled`,
+        customer_email: user.email,
+        metadata: baseMetadata
+      });
+    } else {
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [{
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: `Tuition Fee - ${course.title}`,
+              description: `Full tuition - ${course.title}`
+            },
+            unit_amount: Math.round(chargeAmount * 100)
+          },
+          quantity: 1
+        }],
+        mode: "payment",
+        success_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=success&course=${course_id}`,
+        cancel_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=cancelled`,
+        customer_email: user.email,
+        metadata: baseMetadata
+      });
+    }
+
+    // Update enrollment with stripe session. installments_paid/total_installments/
+    // payment_status are only advanced once Stripe actually confirms payment
+    // (via webhook or the status-poll fallback below), never here.
     await db.collection("enrollments").updateOne(
       { id: enrollment.id },
-      { $set: { stripe_session_id: session.id, payment_plan: isMonthly ? 'monthly' : 'one_time', installments_paid: isMonthly ? 1 : null, total_installments: isMonthly ? 12 : null } }
+      { $set: { stripe_session_id: session.id, payment_plan: isMonthly ? 'monthly' : 'one_time' } }
     );
 
     // Wrap in `data` object - frontend expects response.data.checkout_url
@@ -2859,32 +3037,42 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
       return res.status(404).json({ detail: "Enrollment not found" });
     }
 
-    // Verify payment with Stripe
-    if (stripe && enrollment.stripe_session_id) {
+    // Verify payment with Stripe — only handle the initial unpaid → paid/partial
+    // transition here. Once a monthly plan is underway, later installments are
+    // only ever advanced by the invoice.paid webhook, never by this status poll.
+    if (stripe && enrollment.stripe_session_id && enrollment.payment_status === "unpaid") {
       try {
         const session = await stripe.checkout.sessions.retrieve(enrollment.stripe_session_id);
+        const isSubscription = session.mode === "subscription";
 
-        if (session.payment_status === "paid" && enrollment.payment_status !== "paid") {
-          // Update enrollment to paid
+        if (session.payment_status === "paid") {
+          const userId = enrollment.student_id || enrollment.user_id;
+
           await db.collection("enrollments").updateOne(
             { id: enrollment.id },
             {
               $set: {
                 status: "active",
-                payment_status: "paid",
+                payment_status: isSubscription ? "partial" : "paid",
+                payment_plan: isSubscription ? "monthly" : "one_time",
+                ...(isSubscription && {
+                  total_installments: 12,
+                  installments_paid: 0,
+                  stripe_subscription_id: session.subscription,
+                  stripe_customer_id: session.customer
+                }),
                 tuition_paid_at: new Date().toISOString()
               }
             }
           );
 
-          // Update user payment status
           await db.collection("users").updateOne(
-            { id: enrollment.user_id },
-            { $set: { payment_status: "paid" } }
+            { id: userId },
+            { $set: { payment_status: isSubscription ? "partial" : "paid" } }
           );
 
           // Send confirmation email
-          const user = await db.collection("users").findOne({ id: enrollment.user_id });
+          const user = await db.collection("users").findOne({ id: userId });
           const course = await db.collection("courses").findOne({ id: enrollment.course_id });
 
           if (user && course) {
@@ -2897,9 +3085,11 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
                   <p>Your tuition payment for <strong>${course.title}</strong> has been successfully processed.</p>
                   <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
                     <p style="margin: 0; color: #2e7d32; font-size: 18px;">✓ Course Unlocked</p>
-                    <p style="margin: 10px 0 0 0; color: #666;">Amount: €${enrollment.tuition_amount || (typeof course.price === 'object' ? (course.price.upfront || course.price.monthly || 0) : (course.price || 0))}</p>
+                    <p style="margin: 10px 0 0 0; color: #666;">Amount: €${enrollment.tuition_amount || (typeof course.price === 'object' ? (course.price.upfront || course.price.monthly || 0) : (course.price || 0))}${isSubscription ? " / month (installment 1 of 12)" : ""}</p>
                   </div>
-                  <p>You now have <strong>lifetime access</strong> to this course. Log in to start learning!</p>
+                  <p>${isSubscription
+                    ? "Your monthly payment plan is now active and your course is unlocked. We'll automatically charge your card each month for the remaining installments."
+                    : "You now have <strong>lifetime access</strong> to this course."} Log in to start learning!</p>
                   <div style="text-align: center; margin: 25px 0;">
                     <a href="${FRONTEND_URL}/dashboard/student" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
                       Go to Dashboard
@@ -2913,9 +3103,9 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
           }
 
           return res.json({
-            status: "paid",
-            payment_status: "paid",
-            message: "Course unlocked successfully"
+            status: "active",
+            payment_status: isSubscription ? "partial" : "paid",
+            message: isSubscription ? "Course unlocked — monthly plan active" : "Course unlocked successfully"
           });
         }
       } catch (e) {
@@ -3155,18 +3345,6 @@ function sanitizeError(error) {
   return sanitized;
 }
 
-app.use((err, req, res, next) => {
-  // Log the full error internally
-  console.error("Unhandled error:", err);
-
-  // Return sanitized message to client
-  const statusCode = err.status || err.statusCode || 500;
-  res.status(statusCode).json({
-    detail: sanitizeError(err),
-    ...(process.env.NODE_ENV !== "production" && { stack: err.stack })
-  });
-});
-
 // ============ SYSTEM SETTINGS ENDPOINTS ============
 app.get("/api/system/settings", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
   try {
@@ -3219,6 +3397,7 @@ app.get("/api/courses/:courseId/quizzes", authenticate, async (req, res) => {
     }, { projection: { questions: 0 } }).toArray();
     res.json(quizzes);
   } catch (err) {
+    console.error("Fetch quizzes error:", err);
     res.status(500).json({ detail: "Failed to fetch quizzes" });
   }
 });
@@ -3322,6 +3501,7 @@ app.get("/api/quizzes/:quizId", authenticate, async (req, res) => {
     };
     res.json(safeQuiz);
   } catch (err) {
+    console.error("Fetch quiz error:", err);
     res.status(500).json({ detail: "Failed to fetch quiz" });
   }
 });
@@ -3341,6 +3521,16 @@ app.post("/api/quizzes/:quizId/submit", authenticate, async (req, res) => {
 
     const quiz = await db.collection("quizzes").findOne({ id: quizId, is_active: true });
     if (!quiz) return res.status(404).json({ detail: "Quiz not found" });
+
+    if (req.user.role === "student") {
+      const enrollment = await db.collection("enrollments").findOne({
+        $or: [{ user_id: userId }, { student_id: userId }],
+        course_id: quiz.course_id
+      });
+      if (!enrollment) {
+        return res.status(403).json({ detail: "You are not enrolled in this course" });
+      }
+    }
 
     // Grade answers
     let score = 0;
@@ -3392,6 +3582,7 @@ app.get("/api/my-quiz-results", authenticate, async (req, res) => {
       .toArray();
     res.json(results);
   } catch (err) {
+    console.error("Fetch quiz results error:", err);
     res.status(500).json({ detail: "Failed to fetch results" });
   }
 });
@@ -3406,6 +3597,7 @@ app.get("/api/my-quiz-results/:quizId", authenticate, async (req, res) => {
     if (!result) return res.status(404).json({ detail: "No result found" });
     res.json(result);
   } catch (err) {
+    console.error("Fetch quiz result error:", err);
     res.status(500).json({ detail: "Failed to fetch result" });
   }
 });
@@ -3426,6 +3618,7 @@ app.post("/api/progress/complete", authenticate, async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
+    console.error("Update progress error:", err);
     res.status(500).json({ detail: "Failed to update progress" });
   }
 });
@@ -3451,6 +3644,7 @@ app.get("/api/progress/:courseId", authenticate, async (req, res) => {
       percentage: total > 0 ? Math.round((completed / total) * 100) : 0
     });
   } catch (err) {
+    console.error("Fetch progress error:", err);
     res.status(500).json({ detail: "Failed to fetch progress" });
   }
 });
@@ -3478,6 +3672,7 @@ app.get("/api/my-enrollments", authenticate, async (req, res) => {
 
     res.json(enriched);
   } catch (err) {
+    console.error("Fetch enrollments error:", err);
     res.status(500).json({ detail: "Failed to fetch enrollments" });
   }
 });
@@ -3969,6 +4164,20 @@ app.use((req, res) => {
   } else {
     res.sendFile(path.join(__dirname, "..", "static", "index.html"));
   }
+});
+
+// Must be registered last so it catches errors from every route above,
+// including next(err) calls from multer and other middleware.
+app.use((err, req, res, next) => {
+  // Log the full error internally
+  console.error("Unhandled error:", err);
+
+  // Return sanitized message to client
+  const statusCode = err.status || err.statusCode || 500;
+  res.status(statusCode).json({
+    detail: sanitizeError(err),
+    ...(process.env.NODE_ENV !== "production" && { stack: err.stack })
+  });
 });
 
 // ============ START SERVER ============

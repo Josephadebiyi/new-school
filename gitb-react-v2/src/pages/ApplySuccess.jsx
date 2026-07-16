@@ -27,10 +27,11 @@ const ApplySuccess = () => {
     const poll = () => {
       checkApplicationStatus(sessionId)
         .then((data) => {
-          if (data.status === 'paid' || data.status === 'complete' || data.payment_status === 'paid') {
+          // 'processing' means Stripe confirmed payment but the application
+          // record hasn't been created yet (webhook still in flight) — keep polling.
+          if (data.payment_status === 'paid' && data.status !== 'processing') {
             setStatus('success');
           } else if (attempts < MAX_ATTEMPTS) {
-            // Webhook may not have fired yet — retry
             attempts += 1;
             timer = setTimeout(poll, DELAY_MS);
           } else {
@@ -43,8 +44,9 @@ const ApplySuccess = () => {
             attempts += 1;
             timer = setTimeout(poll, DELAY_MS);
           } else {
-            // Landed here from Stripe success URL — almost certainly paid
-            setStatus('success');
+            // Could not confirm status after repeated attempts — don't claim
+            // success without confirmation, let the student follow up instead.
+            setStatus('pending');
           }
         });
     };
