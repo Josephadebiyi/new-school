@@ -2246,7 +2246,7 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
     } catch (stripeErr) {
       console.error("Stripe session creation failed:", stripeErr.message, stripeErr.type);
       return res.status(502).json({
-        detail: `Payment session could not be created: ${stripeErr.message}. Please try again or contact admissions@gitb.lt`,
+        detail: "Payment session could not be created. Please try again or contact admissions@gitb.lt",
       });
     }
 
@@ -2831,7 +2831,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error("Create tuition payment error:", error);
-    res.status(500).json({ detail: error.message || "Internal server error" });
+    res.status(500).json({ detail: "Payment could not be processed. Please try again or contact admissions@gitb.lt" });
   }
 });
 
