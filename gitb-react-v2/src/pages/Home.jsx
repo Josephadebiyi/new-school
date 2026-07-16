@@ -4,25 +4,6 @@ import { ArrowRight, Award, Briefcase, CheckCircle2, Clock3, GraduationCap, Play
 import { useNavigate } from 'react-router-dom';
 import { fetchCourses, fetchStats } from '../services/api';
 
-const heroSlides = [
-  {
-    image: '/images/classroom-lead.jpg',
-    label: 'Student-centered learning',
-  },
-  {
-    image: '/images/events-hero-1.jpg',
-    label: 'Academic ambition and career readiness',
-  },
-  {
-    image: '/images/graduate-portrait.jpg',
-    label: 'Practical digital education',
-  },
-  {
-    image: '/images/vr-lab.jpg',
-    label: 'Career growth and future opportunity',
-  },
-];
-
 const outcomes = [
   'Beginner-friendly learning paths',
   'Hands-on projects and guided practice',
@@ -94,16 +75,17 @@ const faqs = [
   },
 ];
 
-const HeroSection = ({ navigate, stats, currentSlide }) => (
+const HeroSection = ({ navigate, stats }) => (
   <section className="bg-[#0B3B2C] pt-28 pb-20 relative overflow-hidden">
-    {heroSlides.map((slide, index) => (
-      <div
-        key={slide.image}
-        className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-20' : 'opacity-0'}`}
-      >
-        <img src={slide.image} alt="" aria-hidden="true" className="w-full h-full object-cover" />
-      </div>
-    ))}
+    <video
+      className="absolute inset-0 w-full h-full object-cover opacity-20"
+      src="/videos/gitb-full-render.mp4"
+      autoPlay
+      loop
+      muted
+      playsInline
+      aria-hidden="true"
+    />
     <div className="absolute -top-20 right-0 w-[32rem] h-[32rem] rounded-full bg-[#6B5B4F] blur-3xl opacity-25" />
     <div className="absolute bottom-0 left-0 w-[24rem] h-[24rem] rounded-full bg-[#D4F542] blur-3xl opacity-20" />
 
@@ -116,7 +98,7 @@ const HeroSection = ({ navigate, stats, currentSlide }) => (
             className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium mb-6"
           >
             <Star size={14} className="text-[#D4F542]" />
-            {heroSlides[currentSlide]?.label}
+            Practical, career-ready education
           </motion.div>
 
           <motion.h1
@@ -167,15 +149,6 @@ const HeroSection = ({ navigate, stats, currentSlide }) => (
                 <p className="text-3xl font-bold text-white">{item.value}</p>
                 <p className="text-sm text-white/60">{item.label}</p>
               </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 mt-6">
-            {heroSlides.map((slide, index) => (
-              <span
-                key={slide.label}
-                className={`h-2 rounded-full transition-all duration-500 ${index === currentSlide ? 'w-8 bg-[#D4F542]' : 'w-2 bg-white/35'}`}
-              />
             ))}
           </div>
 
@@ -568,24 +541,15 @@ const Home = () => {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState({ graduates: 1200, countries: 20, courses: 12 });
-  const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
     fetchCourses().then(setCourses).catch(() => {});
     fetchStats().then(setStats).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 4500);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
   return (
     <>
-      <HeroSection navigate={navigate} stats={stats} currentSlide={currentSlide} />
+      <HeroSection navigate={navigate} stats={stats} />
       <OutcomesSection />
       <WhyChooseSection />
       <FeaturedProgramsSection courses={courses} navigate={navigate} />
