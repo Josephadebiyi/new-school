@@ -209,6 +209,7 @@ export default function AdminDashboard() {
       if (target === 'course') setEditingCourse((p) => ({ ...p, img: res.url, image_url: res.url }));
       if (target === 'profile') setProfileForm((p) => ({ ...p, profilePicture: res.url }));
       if (target === 'user') setEditingUser((p) => ({ ...p, profilePicture: res.url }));
+      if (target === 'banner') setSystemSettings((p) => ({ ...p, dashboard_banner_image_url: res.url }));
     } catch (err) { alert(err.message || 'Upload failed'); }
     finally { setUploading(false); }
   }
@@ -1139,6 +1140,20 @@ export default function AdminDashboard() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
             <input type="email" value={systemSettings.contact_email || ''} onChange={(e) => setSystemSettings((p) => ({ ...p, contact_email: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="admissions@gitb.lt" />
+          </div>
+          <div className="pt-2 border-t border-gray-100">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Student Dashboard Banner</label>
+            <p className="text-xs text-gray-400 mb-2">Shown at the top of every student's dashboard. Upload an image and optionally link it to a page.</p>
+            {systemSettings.dashboard_banner_image_url && (
+              <img src={systemSettings.dashboard_banner_image_url} alt="Banner preview" className="w-full h-auto rounded-lg border border-gray-200 mb-2" />
+            )}
+            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e.target.files[0], 'banner')} disabled={uploading} className="w-full text-sm mb-2" />
+            <input type="text" value={systemSettings.dashboard_banner_link_url || ''} onChange={(e) => setSystemSettings((p) => ({ ...p, dashboard_banner_link_url: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="/courses (optional link when banner is clicked)" />
+            {systemSettings.dashboard_banner_image_url && (
+              <button type="button" onClick={() => setSystemSettings((p) => ({ ...p, dashboard_banner_image_url: '', dashboard_banner_link_url: '' }))} className="mt-2 text-xs font-medium text-red-600 hover:underline">
+                Remove banner
+              </button>
+            )}
           </div>
           <button type="submit" className="w-full py-2.5 rounded-xl text-white font-semibold text-sm" style={{ backgroundColor: '#0B3B2C' }}>Save Settings</button>
         </form>

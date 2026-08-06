@@ -12,7 +12,7 @@ import {
   getMyCourses, getMyEnrollments, getCourseMaterials, getCourseQuizzes,
   getQuizById, submitQuiz, getMyQuizResults, markLessonComplete,
   getCourseProgress, createTuitionPayment, updateProfile, uploadFile,
-  fetchCourses, studentAddCourse,
+  fetchCourses, studentAddCourse, getMyReferrals, fetchConfig,
 } from '../services/api';
 
 function isYouTube(url) {
@@ -71,6 +71,9 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [quizTimeLeft, setQuizTimeLeft] = useState(null);
+  const [referrals, setReferrals] = useState(null);
+  const [referralCopied, setReferralCopied] = useState(false);
+  const [banner, setBanner] = useState(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -96,13 +99,16 @@ export default function StudentDashboard() {
   async function loadInitial() {
     setLoading(true); setError('');
     try {
-      const [coursesData, enrollData, resultsData, allCoursesData] = await Promise.allSettled([
+      const [coursesData, enrollData, resultsData, allCoursesData, referralsData, configData] = await Promise.allSettled([
         getMyCourses(token), getMyEnrollments(token), getMyQuizResults(token), fetchCourses(),
+        getMyReferrals(token), fetchConfig(),
       ]);
       const c = coursesData.status === 'fulfilled' ? coursesData.value : [];
       const e = enrollData.status === 'fulfilled' ? enrollData.value : [];
       const r = resultsData.status === 'fulfilled' ? resultsData.value : [];
       if (allCoursesData.status === 'fulfilled') setAllCourses(Array.isArray(allCoursesData.value) ? allCoursesData.value : []);
+      if (referralsData.status === 'fulfilled') setReferrals(referralsData.value);
+      if (configData.status === 'fulfilled' && configData.value?.dashboardBanner?.imageUrl) setBanner(configData.value.dashboardBanner);
       setCourses(c);
       setEnrollments(Array.isArray(e) ? e : []);
       setMyResults(Array.isArray(r) ? r : []);
@@ -191,9 +197,15 @@ export default function StudentDashboard() {
         || (typeof courseIdOrEnrollment === 'object' ? courseIdOrEnrollment.payment_plan : null)
         || 'one_time';
       const data = await createTuitionPayment(token, courseId, plan, window.location.origin);
-      const url = data?.checkout_url || data?.data?.checkout_url;
-      if (url) window.location.href = url;
-      else setError('No checkout URL returned. Please contact support.');
+      const payload = data?.data || data;
+      if (payload?.fully_covered) {
+        setPaymentSuccess(true);
+        await loadInitial();
+      } else if (payload?.checkout_url) {
+        window.location.href = payload.checkout_url;
+      } else {
+        setError('No checkout URL returned. Please contact support.');
+      }
     } catch (err) { setError(err.message || 'Payment failed. Please try again.'); }
     finally { setPaymentLoading(false); }
   }
@@ -249,6 +261,17 @@ export default function StudentDashboard() {
           <h2 className="text-2xl font-bold mb-1">Welcome back, {user?.first_name || 'Student'}!</h2>
           <p className="text-green-200 text-sm">Keep up the great work. You're on your way to success.</p>
         </div>
+        {banner?.imageUrl && (
+          banner.linkUrl ? (
+            <a href={banner.linkUrl} target={banner.linkUrl.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="block rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <img src={banner.imageUrl} alt="" className="w-full h-auto" />
+            </a>
+          ) : (
+            <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <img src={banner.imageUrl} alt="" className="w-full h-auto" />
+            </div>
+          )
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'Enrolled Courses', value: total, icon: BookOpen, bg: 'bg-green-50', fg: 'text-green-700' },
@@ -308,6 +331,45 @@ export default function StudentDashboard() {
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {referrals && (
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">Refer a Friend, Earn Tuition Credit</h3>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-sm text-gray-500 mb-3">
+                Share your link. When a friend enrolls and pays their tuition, you earn a 10% credit toward your own — credits stack and apply automatically to your next payment.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                <input readOnly value={referrals.referral_link} className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 bg-gray-50" />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(referrals.referral_link); setReferralCopied(true); setTimeout(() => setReferralCopied(false), 2000); }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white whitespace-nowrap"
+                  style={{ backgroundColor: '#0C4E3A' }}
+                >
+                  {referralCopied ? 'Copied!' : 'Copy Link'}
+                </button>
+              </div>
+              <div className="flex items-center justify-between bg-green-50 rounded-lg px-4 py-3 mb-4">
+                <span className="text-sm text-green-800 font-medium">Your referral balance</span>
+                <span className="text-lg font-bold text-green-700">€{referrals.balance_eur.toFixed(2)}</span>
+              </div>
+              {referrals.referrals?.length > 0 && (
+                <div className="divide-y divide-gray-50">
+                  {referrals.referrals.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between py-2.5">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{r.referred_name || 'Referred student'}</p>
+                        <p className="text-xs text-gray-400">{r.course_title}</p>
+                      </div>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${r.status === 'rewarded' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {r.status === 'rewarded' ? `+€${r.reward_eur.toFixed(2)}` : 'Pending tuition payment'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

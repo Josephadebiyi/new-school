@@ -16,6 +16,7 @@ const labelClass = 'block text-sm font-semibold text-[#1a1a1a] mb-2';
 export default function Apply() {
   const [searchParams] = useSearchParams();
   const initCourse = searchParams.get('course') || '';
+  const referralCode = searchParams.get('ref') || '';
 
   const [step, setStep] = useState(0);
   const [courses, setCourses] = useState([]);
@@ -53,6 +54,7 @@ export default function Apply() {
         course_id: form.courseId,
         motivation: form.motivation,
         origin_url: window.location.origin,
+        referral_code: referralCode,
       });
       if (data?.checkout_url) {
         window.location.href = data.checkout_url;
@@ -78,6 +80,11 @@ export default function Apply() {
           <p className="text-gray-500 max-w-xl mx-auto">
             Complete your application to begin the admissions process for one of our practical, career-focused programs.
           </p>
+          {referralCode && (
+            <p className="mt-3 inline-block text-xs font-bold text-[#0B3B2C] bg-[#D4F542] px-3 py-1.5 rounded-full">
+              You were referred by a GITB student
+            </p>
+          )}
         </motion.div>
 
         <div className="flex items-center justify-center mb-10 gap-3 flex-wrap">

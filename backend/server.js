@@ -124,7 +124,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://gitb.lt";
 const CORS_ORIGINS = process.env.CORS_ORIGINS || "*";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "noreply@gitb.lt";
-const APPLICATION_FEE = parseFloat(process.env.APPLICATION_FEE_EUR || "50");
+const APPLICATION_FEE = parseFloat(process.env.APPLICATION_FEE_EUR || "35");
 
 // System Settings Cache (simple)
 let systemSettings = {
@@ -135,7 +135,9 @@ let systemSettings = {
   bank_account_name: "Global Institute of Technology and Business",
   bank_iban: "LT12 3456 7890 1234 5678",
   bank_swift: "AGBLLT2X",
-  bank_address: "Konstitucijos pr. 21A, Vilnius, Lithuania"
+  bank_address: "Konstitucijos pr. 21A, Vilnius, Lithuania",
+  dashboard_banner_image_url: "",
+  dashboard_banner_link_url: ""
 };
 
 const refreshSystemSettings = async () => {
@@ -264,6 +266,8 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
       const metadata = session.metadata || {};
 
       if (metadata.type === 'tuition' && metadata.enrollment_id) {
+        const discountAppliedCents = parseInt(metadata.discount_applied_cents || "0", 10) || 0;
+
         if (session.mode === "subscription") {
           // First of 12 monthly installments — unlock the course now, but don't
           // mark tuition fully "paid" until invoice.paid confirms all 12 cycles.
@@ -278,6 +282,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
                 installments_paid: 0,
                 stripe_subscription_id: session.subscription,
                 stripe_customer_id: session.customer,
+                referral_discount_applied_cents: discountAppliedCents,
                 tuition_paid_at: new Date().toISOString()
               }
             }
@@ -285,8 +290,27 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
           if (metadata.user_id) {
             await db.collection("users").updateOne(
               { id: metadata.user_id },
-              { $set: { payment_status: "partial" } }
+              { $set: { payment_status: "partial" }, $inc: { referral_balance_cents: -discountAppliedCents } }
             );
+
+            // The "once" coupon only discounted this first installment. Any
+            // referral balance left over (e.g. the student had a larger
+            // balance than one installment covers) is pushed to Stripe's
+            // customer balance now that we finally have a customer ID, so it
+            // auto-applies to installments 2-12 — invoice.paid reconciles it.
+            const updatedUser = await db.collection("users").findOne({ id: metadata.user_id });
+            const remainingBalanceCents = updatedUser?.referral_balance_cents || 0;
+            if (stripe && remainingBalanceCents > 0 && session.customer) {
+              try {
+                await stripe.customers.createBalanceTransaction(session.customer, {
+                  amount: -remainingBalanceCents,
+                  currency: "eur",
+                  description: "Referral credit carried over to future installments"
+                });
+              } catch (e) {
+                console.error("Failed to sync carried-over referral balance to Stripe:", e.message);
+              }
+            }
           }
           console.log(`Tuition subscription started for enrollment ${metadata.enrollment_id}`);
         } else {
@@ -297,6 +321,8 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
                 status: "active",
                 payment_status: "paid",
                 payment_plan: "one_time",
+                stripe_customer_id: session.customer,
+                referral_discount_applied_cents: discountAppliedCents,
                 tuition_paid_at: new Date().toISOString()
               }
             }
@@ -304,10 +330,14 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
           if (metadata.user_id) {
             await db.collection("users").updateOne(
               { id: metadata.user_id },
-              { $set: { payment_status: "paid" } }
+              { $set: { payment_status: "paid" }, $inc: { referral_balance_cents: -discountAppliedCents } }
             );
           }
           console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
+        }
+
+        if (metadata.user_id) {
+          await tryRewardReferral(metadata.user_id);
         }
       } else if (metadata.type === "application_fee" && metadata.application_id) {
         // Stripe-first flow: Application record does NOT exist yet — create it now.
@@ -329,6 +359,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
             identification_url: metadata.identification_url || null,
             high_school_certificate_url: metadata.high_school_certificate_url || null,
             motivation: metadata.motivation || null,
+            referred_by_code: metadata.referred_by_code || null,
             status: "pending",
             payment_status: "paid",
             stripe_session_id: session.id,
@@ -405,6 +436,19 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
             { id: enrollment.id },
             { $set: { installments_paid: installmentsPaid, ...(fullyPaid && { payment_status: "paid" }) } }
           );
+
+          // If a referral reward was credited to this customer's Stripe balance
+          // mid-subscription (see tryRewardReferral), Stripe auto-applies it to
+          // whichever invoice comes next. Mirror that consumption back into our
+          // own balance so it isn't shown/spent twice.
+          const balanceConsumedCents = Math.max(0, (invoice.ending_balance ?? 0) - (invoice.starting_balance ?? 0));
+          if (balanceConsumedCents > 0) {
+            const studentUserId = enrollment.student_id || enrollment.user_id;
+            await db.collection("users").updateOne(
+              { id: studentUserId },
+              { $inc: { referral_balance_cents: -balanceConsumedCents } }
+            );
+          }
 
           if (fullyPaid) {
             const studentUserId = enrollment.student_id || enrollment.user_id;
@@ -667,7 +711,11 @@ app.get("/api/config", (req, res) => {
   res.json({
     stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
     applicationFee: APPLICATION_FEE,
-    currency: process.env.DEFAULT_CURRENCY || "EUR"
+    currency: process.env.DEFAULT_CURRENCY || "EUR",
+    dashboardBanner: {
+      imageUrl: systemSettings.dashboard_banner_image_url || "",
+      linkUrl: systemSettings.dashboard_banner_link_url || ""
+    }
   });
 });
 
@@ -780,6 +828,115 @@ const generatePassword = () => {
   }
   return password;
 };
+
+const generateReferralCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
+// Assigns a unique referral_code to a student if they don't already have one.
+async function assignReferralCode(userId) {
+  const user = await db.collection("users").findOne({ id: userId });
+  if (user?.referral_code) return user.referral_code;
+
+  let code;
+  let clash;
+  do {
+    code = generateReferralCode();
+    clash = await db.collection("users").findOne({ referral_code: code });
+  } while (clash);
+
+  await db.collection("users").updateOne(
+    { id: userId },
+    { $set: { referral_code: code } }
+  );
+  return code;
+}
+
+// Called whenever a student's tuition payment succeeds for the first time.
+// If they were referred and the referral hasn't been rewarded yet, credits
+// the referrer with 10% of the REFERRER's own tuition price.
+async function tryRewardReferral(referredUserId) {
+  try {
+    const referral = await db.collection("referrals").findOne({ referred_user_id: referredUserId, status: "pending" });
+    if (!referral) return;
+
+    const referrer = await db.collection("users").findOne({ id: referral.referrer_id });
+    if (!referrer) return;
+
+    const referrerEnrollment = await db.collection("enrollments").findOne({
+      $or: [{ user_id: referrer.id }, { student_id: referrer.id }]
+    });
+    const course = referrerEnrollment
+      ? await db.collection("courses").findOne({ id: referrerEnrollment.course_id })
+      : null;
+    const coursePrice = course
+      ? (typeof course.price === "object" && course.price !== null
+          ? Number(course.price.upfront ?? course.price.monthly ?? 0)
+          : Number(course.price) || 0)
+      : 0;
+
+    if (!coursePrice || coursePrice <= 0) {
+      console.error(`Referral reward skipped for referrer ${referrer.id}: no priced enrollment found`);
+      return;
+    }
+
+    const rewardCents = Math.round(coursePrice * 0.10 * 100);
+
+    await db.collection("referrals").updateOne(
+      { id: referral.id },
+      { $set: { status: "rewarded", reward_amount_cents: rewardCents, rewarded_at: new Date().toISOString() } }
+    );
+
+    await db.collection("users").updateOne(
+      { id: referrer.id },
+      { $inc: { referral_balance_cents: rewardCents } }
+    );
+
+    // If the referrer is already mid-subscription, also credit Stripe's own
+    // customer balance so it auto-applies to whichever installment is next —
+    // the invoice.paid webhook mirrors that consumption back into our DB.
+    if (stripe && referrerEnrollment?.stripe_customer_id) {
+      try {
+        await stripe.customers.createBalanceTransaction(referrerEnrollment.stripe_customer_id, {
+          amount: -rewardCents,
+          currency: "eur",
+          description: `Referral reward — ${referral.referred_name || referral.referred_email || "referred student"}`
+        });
+      } catch (e) {
+        console.error("Failed to sync referral credit to Stripe customer balance:", e.message);
+      }
+    }
+
+    if (referrer.email) {
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${getEmailHeader("Referral Reward Earned!")}
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #3d7a4a; margin-top: 0;">You earned €${(rewardCents / 100).toFixed(2)} in tuition credit!</h2>
+            <p>Dear ${referrer.first_name || "there"},</p>
+            <p>Great news — someone you referred to GITB has completed their tuition payment. You've earned a 10% tuition credit (€${(rewardCents / 100).toFixed(2)}) toward your own course.</p>
+            <p>This credit is automatically applied the next time you make a tuition payment. Log in to your dashboard to see your referral balance.</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${FRONTEND_URL}/student/dashboard" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
+                View My Dashboard
+              </a>
+            </div>
+            <p>Best regards,<br><strong>GITB Team</strong></p>
+          </div>
+        </div>`;
+      await sendEmail(referrer.email, "You earned a referral reward — GITB", html);
+    }
+
+    console.log(`Referral reward: referrer ${referrer.id} credited €${(rewardCents / 100).toFixed(2)} for referred user ${referredUserId}`);
+  } catch (e) {
+    console.error("tryRewardReferral error:", e);
+  }
+}
 
 const getClientIP = (req) => {
   return req.ip ||
@@ -1020,7 +1177,7 @@ const sendEmail = async (to, subject, html, attachments = []) => {
 };
 
 // Welcome email when application is approved
-const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword, tuitionAmount = 0) => {
+const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPassword, tuitionAmount = 0, referralCode = null) => {
   const html = `
   <!DOCTYPE html>
   <html>
@@ -1135,6 +1292,19 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
           Access Student Portal →
         </a>
       </div>
+
+      ${referralCode ? `
+      <!-- Referral program -->
+      <div style="background:#f0f9f2;border:1px dashed #0B3B2C;border-radius:12px;padding:22px 24px;margin:0 0 28px;">
+        <p style="margin:0 0 8px;color:#0B3B2C;font-size:14px;font-weight:bold;">💚 Earn tuition credit by referring friends</p>
+        <p style="margin:0 0 14px;color:#444;font-size:13px;line-height:1.7;">
+          Share your referral link below. For every friend who enrolls and pays their tuition, you'll earn a 10% credit toward your own tuition fees — credits stack, and are applied automatically to your next payment.
+        </p>
+        <div style="background:#ffffff;border-radius:8px;padding:12px 16px;text-align:center;">
+          <a href="${FRONTEND_URL}/apply?ref=${referralCode}" style="color:#0B3B2C;font-size:13px;font-weight:bold;word-break:break-all;text-decoration:underline;">${FRONTEND_URL}/apply?ref=${referralCode}</a>
+        </div>
+      </div>
+      ` : ''}
 
       <hr style="border:none;border-top:1px solid #e8ede8;margin:0 0 24px;" />
 
@@ -2299,11 +2469,22 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       first_name, last_name, email, phone, course_id,
       country, city, address, date_of_birth,
       identification_url, high_school_certificate_url,
-      motivation, origin_url
+      motivation, origin_url, referral_code
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
       return res.status(422).json({ detail: "Missing required fields: first_name, last_name, email, course_id" });
+    }
+
+    // Validate referral code, if provided. A referrer can't refer themselves,
+    // and an unknown/typo'd code is just silently ignored rather than blocking
+    // the application.
+    let referredByCode = "";
+    if (referral_code) {
+      const referrer = await db.collection("users").findOne({ referral_code: referral_code.toUpperCase().trim() });
+      if (referrer && referrer.email.toLowerCase() !== email.toLowerCase().trim()) {
+        referredByCode = referrer.referral_code;
+      }
     }
 
     // Find the course (by UUID id, slug, or title)
@@ -2369,6 +2550,7 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
           identification_url: identification_url || "",
           high_school_certificate_url: high_school_certificate_url || "",
           motivation: (motivation || "").slice(0, 500), // Stripe metadata values max 500 chars
+          referred_by_code: referredByCode,
         },
       });
     } catch (stripeErr) {
@@ -2568,6 +2750,31 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       await db.collection("users").insertOne(newUser);
     }
 
+    // Give every student a referral code, and if they were referred by
+    // someone, record it (the reward itself isn't granted until this student
+    // pays their tuition — see tryRewardReferral).
+    const studentReferralCode = await assignReferralCode(userId);
+    if (application.referred_by_code) {
+      const referrer = await db.collection("users").findOne({ referral_code: application.referred_by_code });
+      if (referrer && referrer.id !== userId) {
+        const alreadyLinked = await db.collection("referrals").findOne({ referred_user_id: userId });
+        if (!alreadyLinked) {
+          await db.collection("referrals").insertOne({
+            id: uuidv4(),
+            referrer_id: referrer.id,
+            referred_user_id: userId,
+            referred_name: `${application.first_name} ${application.last_name}`,
+            referred_email: normalizedEmail,
+            course_id: application.course_id,
+            course_title: application.course_title,
+            status: "pending",
+            reward_amount_cents: 0,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
+    }
+
     // Get course info for price
     const course = await db.collection("courses").findOne({ id: application.course_id });
     const coursePrice = course ? (
@@ -2611,7 +2818,8 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       application.last_name,
       application.course_title,
       tempPassword,
-      coursePrice
+      coursePrice,
+      studentReferralCode
     );
     if (!emailSent) {
       console.error(`Welcome email FAILED for ${normalizedEmail} — credentials not delivered`);
@@ -2733,6 +2941,7 @@ app.post("/api/applications/:applicationId/resend-email", authenticate, requireR
 
     const enrollment = await db.collection("enrollments").findOne({ application_id: applicationId });
     const coursePrice = enrollment?.tuition_amount || 0;
+    const referralCode = await assignReferralCode(user.id);
 
     const emailSent = await sendWelcomeEmail(
       normalizedEmail,
@@ -2740,7 +2949,8 @@ app.post("/api/applications/:applicationId/resend-email", authenticate, requireR
       application.last_name,
       application.course_title,
       tempPassword,
-      coursePrice
+      coursePrice,
+      referralCode
     );
 
     if (!emailSent) {
@@ -2925,12 +3135,57 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(503).json({ detail: "Payment service not available" });
     }
 
+    // Apply any referral balance the student has earned as a discount on this
+    // charge. Stripe won't process a sub-50-cent charge, so a monthly
+    // installment is never discounted all the way to zero — the remainder of
+    // the balance simply carries over to the next payment.
+    const MIN_CHARGE_CENTS = 50;
+    const chargeAmountCents = Math.round(chargeAmount * 100);
+    const referralBalanceCents = Math.max(0, user.referral_balance_cents || 0);
+    let discountCents = Math.min(referralBalanceCents, chargeAmountCents);
+    let finalChargeCents = chargeAmountCents - discountCents;
+
+    if (isMonthly && finalChargeCents > 0 && finalChargeCents < MIN_CHARGE_CENTS) {
+      discountCents = Math.max(0, chargeAmountCents - MIN_CHARGE_CENTS);
+      finalChargeCents = chargeAmountCents - discountCents;
+    }
+
+    if (!isMonthly && finalChargeCents <= 0) {
+      // One-time tuition fully covered by referral balance — no card charge needed.
+      await db.collection("enrollments").updateOne(
+        { id: enrollment.id },
+        {
+          $set: {
+            status: "active",
+            payment_status: "paid",
+            payment_plan: "one_time",
+            referral_discount_applied_cents: discountCents,
+            tuition_paid_at: new Date().toISOString()
+          }
+        }
+      );
+      await db.collection("users").updateOne(
+        { id: userId },
+        { $set: { payment_status: "paid" }, $inc: { referral_balance_cents: -discountCents } }
+      );
+      await tryRewardReferral(userId);
+      return res.json({
+        data: {
+          checkout_url: null,
+          fully_covered: true,
+          amount: 0,
+          message: "Your tuition is fully covered by your referral balance!"
+        }
+      });
+    }
+
     const baseMetadata = {
       type: "tuition",
       enrollment_id: enrollment.id,
       course_id: course_id,
       user_id: userId,
-      user_email: user.email
+      user_email: user.email,
+      discount_applied_cents: String(discountCents)
     };
 
     let session;
@@ -2942,6 +3197,21 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       cancelAt.setUTCMonth(cancelAt.getUTCMonth() + 12);
       cancelAt.setUTCDate(cancelAt.getUTCDate() + 3);
 
+      // The line item's unit_amount applies to every recurring cycle, so a
+      // referral discount can't be baked into it — that would discount all 12
+      // installments, not just the first. A "once" coupon applies to exactly
+      // the first invoice instead, leaving cycles 2-12 at full price.
+      let discounts;
+      if (discountCents > 0) {
+        const coupon = await stripe.coupons.create({
+          amount_off: discountCents,
+          currency: "eur",
+          duration: "once",
+          name: "Referral credit"
+        });
+        discounts = [{ coupon: coupon.id }];
+      }
+
       session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [{
@@ -2951,11 +3221,12 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
               name: `Tuition Fee - ${course.title}`,
               description: `Monthly installment - ${course.title}`
             },
-            unit_amount: Math.round(chargeAmount * 100),
+            unit_amount: chargeAmountCents,
             recurring: { interval: "month" }
           },
           quantity: 1
         }],
+        ...(discounts && { discounts }),
         mode: "subscription",
         subscription_data: {
           metadata: baseMetadata,
@@ -2976,7 +3247,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
               name: `Tuition Fee - ${course.title}`,
               description: `Full tuition - ${course.title}`
             },
-            unit_amount: Math.round(chargeAmount * 100)
+            unit_amount: finalChargeCents
           },
           quantity: 1
         }],
@@ -3003,7 +3274,8 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         session_id: session.id,
         enrollment_id: enrollment.id,
         course_title: course.title,
-        amount: chargeAmount,
+        amount: finalChargeCents / 100,
+        referral_discount_applied: discountCents / 100,
         payment_plan: isMonthly ? 'monthly' : 'one_time'
       }
     });
@@ -3047,6 +3319,7 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
 
         if (session.payment_status === "paid") {
           const userId = enrollment.student_id || enrollment.user_id;
+          const discountAppliedCents = parseInt(session.metadata?.discount_applied_cents || "0", 10) || 0;
 
           await db.collection("enrollments").updateOne(
             { id: enrollment.id },
@@ -3055,11 +3328,12 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
                 status: "active",
                 payment_status: isSubscription ? "partial" : "paid",
                 payment_plan: isSubscription ? "monthly" : "one_time",
+                stripe_customer_id: session.customer,
+                referral_discount_applied_cents: discountAppliedCents,
                 ...(isSubscription && {
                   total_installments: 12,
                   installments_paid: 0,
-                  stripe_subscription_id: session.subscription,
-                  stripe_customer_id: session.customer
+                  stripe_subscription_id: session.subscription
                 }),
                 tuition_paid_at: new Date().toISOString()
               }
@@ -3068,8 +3342,10 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
 
           await db.collection("users").updateOne(
             { id: userId },
-            { $set: { payment_status: isSubscription ? "partial" : "paid" } }
+            { $set: { payment_status: isSubscription ? "partial" : "paid" }, $inc: { referral_balance_cents: -discountAppliedCents } }
           );
+
+          await tryRewardReferral(userId);
 
           // Send confirmation email
           const user = await db.collection("users").findOne({ id: userId });
@@ -3674,6 +3950,41 @@ app.get("/api/my-enrollments", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Fetch enrollments error:", err);
     res.status(500).json({ detail: "Failed to fetch enrollments" });
+  }
+});
+
+// ============ REFERRAL ROUTES ============
+
+// Get the current student's referral code/link, balance, and referral history
+app.get("/api/referrals/my", authenticate, async (req, res) => {
+  try {
+    let user = await db.collection("users").findOne({ id: req.user.id });
+    if (!user?.referral_code) {
+      await assignReferralCode(req.user.id);
+      user = await db.collection("users").findOne({ id: req.user.id });
+    }
+
+    const referrals = await db.collection("referrals")
+      .find({ referrer_id: req.user.id }, { projection: { _id: 0 } })
+      .sort({ created_at: -1 })
+      .toArray();
+
+    res.json({
+      referral_code: user.referral_code,
+      referral_link: `${FRONTEND_URL}/apply?ref=${user.referral_code}`,
+      balance_eur: (user.referral_balance_cents || 0) / 100,
+      referrals: referrals.map(r => ({
+        referred_name: r.referred_name,
+        course_title: r.course_title,
+        status: r.status,
+        reward_eur: (r.reward_amount_cents || 0) / 100,
+        created_at: r.created_at,
+        rewarded_at: r.rewarded_at || null
+      }))
+    });
+  } catch (err) {
+    console.error("Fetch referrals error:", err);
+    res.status(500).json({ detail: "Failed to fetch referral information" });
   }
 });
 

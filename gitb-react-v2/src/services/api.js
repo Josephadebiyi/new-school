@@ -66,6 +66,16 @@ export async function fetchCourses() {
   }
 }
 
+export async function fetchConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/config`);
+    if (!res.ok) throw new Error('Failed to fetch config');
+    return res.json();
+  } catch {
+    return { dashboardBanner: { imageUrl: '', linkUrl: '' } };
+  }
+}
+
 export async function fetchStats() {
   try {
     const res = await fetch(`${API_BASE}/api/public/stats`);
@@ -385,6 +395,14 @@ export async function getMyEnrollments(token) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to fetch enrollments');
+  return res.json();
+}
+
+export async function getMyReferrals(token) {
+  const res = await fetch(`${API_BASE}/api/referrals/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch referral information');
   return res.json();
 }
 
