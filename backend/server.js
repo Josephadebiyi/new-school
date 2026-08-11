@@ -363,7 +363,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
             status: "pending",
             payment_status: "paid",
             stripe_session_id: session.id,
-            payment_amount: APPLICATION_FEE,
+            payment_amount: (session.amount_total || 0) / 100, // actual amount charged, not the current live setting
             created_at: new Date().toISOString(),
             paid_at: new Date().toISOString(),
           });
@@ -710,7 +710,7 @@ app.get("/api", (req, res) => {
 app.get("/api/config", (req, res) => {
   res.json({
     stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
-    applicationFee: APPLICATION_FEE,
+    applicationFee: systemSettings.application_fee ?? APPLICATION_FEE,
     currency: process.env.DEFAULT_CURRENCY || "EUR",
     dashboardBanner: {
       imageUrl: systemSettings.dashboard_banner_image_url || "",
@@ -2514,6 +2514,12 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
     const applicationId = uuidv4();
     const frontendBase = origin_url || FRONTEND_URL || 'https://gitb.lt';
 
+    // Read the live, admin-editable fee rather than the env-var default, so
+    // changes made in the admin Settings panel take effect immediately.
+    const currentApplicationFee = Number(systemSettings.application_fee) > 0
+      ? Number(systemSettings.application_fee)
+      : APPLICATION_FEE;
+
     // Create Stripe Checkout Session — NO DB write until webhook confirms payment
     let session;
     try {
@@ -2526,7 +2532,7 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
               name: `Application Fee — ${course.title}`,
               description: `One-time non-refundable application fee for ${course.title} at GITB`,
             },
-            unit_amount: Math.round(APPLICATION_FEE * 100),
+            unit_amount: Math.round(currentApplicationFee * 100),
           },
           quantity: 1,
         }],
