@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, CheckCircle, CreditCard, User } from 'lucide-react';
+import { BookOpen, CheckCircle, CreditCard, Globe, User } from 'lucide-react';
 import { createApplication, fetchCourses } from '../services/api';
+import PaymentMethodPicker, { isPaymentMethodComplete, buildCountryCode } from '../components/PaymentMethodPicker';
 
 const steps = [
   { label: 'Personal Details', icon: User },
   { label: 'Program Selection', icon: BookOpen },
+  { label: 'Payment Method', icon: Globe },
   { label: 'Review', icon: CreditCard },
 ];
 
@@ -31,6 +33,7 @@ export default function Apply() {
     courseId: initCourse,
     motivation: '',
   });
+  const [payment, setPayment] = useState({ country: '', payment_method: { type: 'card' } });
 
   useEffect(() => {
     fetchCourses().then(setCourses).catch(() => {});
@@ -40,12 +43,17 @@ export default function Apply() {
 
   const canAdvanceStep1 = form.firstName && form.lastName && form.email;
   const canAdvanceStep2 = form.courseId;
+  const canAdvanceStep3 = isPaymentMethodComplete(payment);
   const selectedCourse = courses.find((course) => course.id === form.courseId);
 
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
     try {
+      const paymentMethod = { ...payment.payment_method };
+      if (paymentMethod.type === 'mobile_money') {
+        paymentMethod.country_code = buildCountryCode(payment.country);
+      }
       const data = await createApplication({
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
@@ -55,6 +63,8 @@ export default function Apply() {
         motivation: form.motivation,
         origin_url: window.location.origin,
         referral_code: referralCode,
+        country: payment.country,
+        payment_method: paymentMethod,
       });
       if (data?.checkout_url) {
         window.location.href = data.checkout_url;
@@ -200,7 +210,7 @@ export default function Apply() {
                     disabled={!canAdvanceStep2}
                     className="flex-grow py-4 rounded-full font-bold text-base bg-[#0B3B2C] text-white hover:bg-[#164E3E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    Review application
+                    Continue
                   </button>
                 </div>
               </motion.div>
@@ -208,6 +218,33 @@ export default function Apply() {
 
             {step === 2 && (
               <motion.div key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Where are you paying from?</h2>
+                <p className="text-sm text-gray-500 mb-6">This tells us which currency and payment methods to offer you for the application fee.</p>
+
+                <div className="mb-6">
+                  <PaymentMethodPicker value={payment} onChange={setPayment} />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setStep(1)}
+                    className="flex-1 py-4 rounded-full font-bold text-base border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setStep(3)}
+                    disabled={!canAdvanceStep3}
+                    className="flex-grow py-4 rounded-full font-bold text-base bg-[#0B3B2C] text-white hover:bg-[#164E3E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    Review application
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Review and submit</h2>
 
                 <div className="space-y-3 mb-6">
@@ -223,6 +260,13 @@ export default function Apply() {
                     <p className="font-semibold text-[#1a1a1a]">{selectedCourse?.title || 'Selected course'}</p>
                     {selectedCourse && <p className="text-sm text-gray-500">{selectedCourse.duration} · {selectedCourse.level}</p>}
                   </div>
+
+                  <div className="bg-[#F3F4F6] rounded-2xl p-4">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Payment Method</p>
+                    <p className="font-semibold text-[#1a1a1a]">
+                      {payment.payment_method?.type === 'mobile_money' ? 'Mobile Money' : 'Debit/Credit Card'}
+                    </p>
+                  </div>
                 </div>
 
                 {error && (
@@ -237,7 +281,7 @@ export default function Apply() {
 
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setStep(1)}
+                    onClick={() => setStep(2)}
                     className="flex-1 py-4 rounded-full font-bold text-base border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     Back

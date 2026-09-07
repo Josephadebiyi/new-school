@@ -76,6 +76,26 @@ export async function fetchConfig() {
   }
 }
 
+export async function fetchCountries() {
+  try {
+    const res = await fetch(`${API_BASE}/api/countries`);
+    if (!res.ok) throw new Error('Failed to fetch countries');
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPaymentMethods(countryCode) {
+  try {
+    const res = await fetch(`${API_BASE}/api/payment-methods?country=${encodeURIComponent(countryCode)}`);
+    if (!res.ok) throw new Error('Failed to fetch payment methods');
+    return res.json();
+  } catch {
+    return { currency: 'USD', methods: [{ type: 'card', label: 'Debit/Credit Card' }] };
+  }
+}
+
 export async function fetchStats() {
   try {
     const res = await fetch(`${API_BASE}/api/public/stats`);
@@ -406,11 +426,11 @@ export async function getMyReferrals(token) {
   return res.json();
 }
 
-export async function createTuitionPayment(token, courseId, paymentPlan, originUrl) {
+export async function createTuitionPayment(token, courseId, paymentPlan, originUrl, country, paymentMethod) {
   const res = await fetch(`${API_BASE}/api/tuition/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ course_id: courseId, payment_plan: paymentPlan, origin_url: originUrl }),
+    body: JSON.stringify({ course_id: courseId, payment_plan: paymentPlan, origin_url: originUrl, country, payment_method: paymentMethod }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || 'Payment failed');

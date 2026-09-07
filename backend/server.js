@@ -45,7 +45,6 @@ const documentUpload = multer({
   }
 });
 const { Resend } = require("resend");
-const Stripe = require("stripe");
 const PDFDocument = require("pdfkit");
 
 // Load environment variables
@@ -55,8 +54,9 @@ require("dotenv").config();
 const REQUIRED_ENV_VARS = [
   "MONGO_URL",
   "JWT_SECRET",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_PUBLIC_KEY"
+  "FLW_CLIENT_ID",
+  "FLW_CLIENT_SECRET",
+  "FLW_ENCRYPTION_KEY"
 ];
 
 const OPTIONAL_ENV_VARS = [
@@ -65,7 +65,10 @@ const OPTIONAL_ENV_VARS = [
   "CORS_ORIGINS",
   "ADMIN_EMAIL",
   "APPLICATION_FEE_EUR",
-  "DB_NAME"
+  "DB_NAME",
+  "FLW_WEBHOOK_HASH",
+  "FLW_API_BASE",
+  "CRON_SECRET"
 ];
 
 function validateEnvironment() {
@@ -96,17 +99,6 @@ function validateEnvironment() {
   if (warnings.length > 0) {
     console.warn("Warning: Optional environment variables not set (using defaults):");
     warnings.forEach(v => console.warn(`  - ${v}`));
-  }
-
-  // Validate Stripe keys format
-  if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.startsWith("sk_")) {
-    console.error("FATAL: STRIPE_SECRET_KEY must start with 'sk_'");
-    process.exit(1);
-  }
-
-  if (process.env.STRIPE_PUBLIC_KEY && !process.env.STRIPE_PUBLIC_KEY.startsWith("pk_")) {
-    console.error("FATAL: STRIPE_PUBLIC_KEY must start with 'pk_'");
-    process.exit(1);
   }
 
   console.log("Environment validation passed");
@@ -151,16 +143,14 @@ const refreshSystemSettings = async () => {
 };
 
 // Initialize services
-let stripe = null;
-let resend = null;
+const FLW_CLIENT_ID = process.env.FLW_CLIENT_ID;
+const FLW_CLIENT_SECRET = process.env.FLW_CLIENT_SECRET;
+const FLW_ENCRYPTION_KEY = process.env.FLW_ENCRYPTION_KEY;
+const flutterwaveEnabled = !!(FLW_CLIENT_ID && FLW_CLIENT_SECRET && FLW_ENCRYPTION_KEY);
+console.log(flutterwaveEnabled ? "Flutterwave configured" : "FATAL: FLW_CLIENT_ID/FLW_CLIENT_SECRET/FLW_ENCRYPTION_KEY missing");
+if (!flutterwaveEnabled) process.exit(1);
 
-try {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  console.log("Stripe initialized successfully");
-} catch (err) {
-  console.error("FATAL: Stripe initialization failed:", err.message);
-  process.exit(1);
-}
+let resend = null;
 
 try {
   if (process.env.RESEND_API_KEY) {
@@ -178,14 +168,264 @@ try {
   console.error("FATAL: Resend initialization failed:", err.message);
 }
 
-if (!process.env.STRIPE_WEBHOOK_SECRET) {
+if (!process.env.FLW_WEBHOOK_HASH) {
   console.error("========================================");
-  console.error("WARNING: STRIPE_WEBHOOK_SECRET is not set.");
-  console.error("Webhook signature verification is DISABLED.");
+  console.error("WARNING: FLW_WEBHOOK_HASH is not set.");
+  console.error("Webhook verification is DISABLED.");
   console.error("Any HTTP request can fake a payment event.");
-  console.error("Set STRIPE_WEBHOOK_SECRET in production.");
+  console.error("Set FLW_WEBHOOK_HASH in production, matching");
+  console.error("the 'Secret Hash' configured in your");
+  console.error("Flutterwave dashboard webhook settings.");
   console.error("========================================");
 }
+
+// ============ FLUTTERWAVE PAYMENTS ============
+// Sandbox by default — set FLW_API_BASE to your confirmed production base URL
+// once you've verified it in your Flutterwave dashboard.
+const FLW_API_BASE = process.env.FLW_API_BASE || "https://developersandbox-api.flutterwave.com";
+const FLW_TOKEN_URL = "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
+
+// OAuth2 client-credentials token, cached until ~30s before it expires
+// (Flutterwave issues 10-minute tokens).
+let flwTokenCache = { token: null, expiresAt: 0 };
+async function getFlutterwaveAccessToken() {
+  if (flwTokenCache.token && flwTokenCache.expiresAt > Date.now() + 30000) {
+    return flwTokenCache.token;
+  }
+  const res = await fetch(FLW_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: FLW_CLIENT_ID,
+      client_secret: FLW_CLIENT_SECRET,
+      grant_type: "client_credentials"
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.access_token) {
+    throw new Error("Failed to obtain Flutterwave access token");
+  }
+  flwTokenCache = { token: data.access_token, expiresAt: Date.now() + (data.expires_in || 600) * 1000 };
+  return flwTokenCache.token;
+}
+
+// Constant-time secret comparison — avoids leaking secret bytes via response
+// timing, for the webhook signature and cron-secret checks.
+function timingSafeStringEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function generateFlutterwaveNonce() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let nonce = "";
+  for (let i = 0; i < 12; i++) nonce += chars.charAt(Math.floor(Math.random() * chars.length));
+  return nonce;
+}
+
+// AES-256-GCM, per Flutterwave's encryption spec — card fields never leave
+// our server unencrypted, but our server does briefly hold the raw values
+// (see the PCI compliance discussion — this is a known, accepted tradeoff).
+// NOTE: verify this against a real sandbox card transaction before relying on
+// it in production — Flutterwave's docs don't fully specify whether the auth
+// tag is appended to the ciphertext or handled separately; this implementation
+// assumes the common convention of ciphertext+tag concatenated then base64'd.
+function encryptCardField(plaintext, nonce) {
+  const key = Buffer.from(FLW_ENCRYPTION_KEY, "base64");
+  const iv = Buffer.from(nonce, "utf8");
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(String(plaintext), "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([encrypted, authTag]).toString("base64");
+}
+
+// Builds the payment_method object for the direct-charge request based on
+// the type the student picked on our own country/method picker. Only "card"
+// and "mobile_money" are implemented — bank_account/ussd field names weren't
+// confirmable from public docs and need testing against a real sandbox
+// account before being enabled.
+function buildFlutterwavePaymentMethod(input) {
+  if (input.type === "card") {
+    const nonce = generateFlutterwaveNonce();
+    return {
+      type: "card",
+      card: {
+        encrypted_card_number: encryptCardField(input.card_number, nonce),
+        encrypted_expiry_month: encryptCardField(input.expiry_month, nonce),
+        encrypted_expiry_year: encryptCardField(input.expiry_year, nonce),
+        encrypted_cvv: encryptCardField(input.cvv, nonce),
+        nonce
+      }
+    };
+  }
+  if (input.type === "mobile_money") {
+    // Local numbers are usually entered with a leading 0 (e.g. "0712345678"),
+    // but Flutterwave expects it without, since country_code is sent separately.
+    const digitsOnly = (input.phone_number || "").replace(/[^0-9]/g, "");
+    const phoneNumber = digitsOnly.startsWith("0") ? digitsOnly.slice(1) : digitsOnly;
+    return {
+      type: "mobile_money",
+      mobile_money: {
+        country_code: input.country_code,
+        network: (input.network || "").toUpperCase(),
+        phone_number: phoneNumber
+      }
+    };
+  }
+  throw new Error(`Unsupported payment method type: ${input.type}`);
+}
+
+async function createFlutterwaveCharge({ amount, currency, reference, redirectUrl, customerEmail, customerName, customerPhone, paymentMethod, meta }) {
+  const token = await getFlutterwaveAccessToken();
+  const [firstName, ...rest] = (customerName || "").trim().split(" ");
+  const res = await fetch(`${FLW_API_BASE}/orchestration/direct-charges`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Trace-Id": reference,
+      "X-Idempotency-Key": reference
+    },
+    body: JSON.stringify({
+      amount,
+      currency,
+      reference,
+      customer: {
+        email: customerEmail,
+        name: { first: firstName || customerName || "Student", last: rest.join(" ") || "-" },
+        ...(customerPhone && { phone: customerPhone })
+      },
+      payment_method: buildFlutterwavePaymentMethod(paymentMethod),
+      redirect_url: redirectUrl,
+      meta
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== "success") {
+    throw new Error(data.message || "Flutterwave charge creation failed");
+  }
+  return data.data; // { id, status, next_action, ... }
+}
+
+async function getFlutterwaveCharge(chargeId) {
+  const token = await getFlutterwaveAccessToken();
+  const res = await fetch(`${FLW_API_BASE}/charges/${chargeId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== "success") return null;
+  return data.data;
+}
+
+// Country -> ISO currency code. Anything not listed here falls back to USD,
+// which Flutterwave supports broadly (card payments work almost everywhere;
+// local methods like mobile money/bank transfer are only offered for
+// countries where the currency actually matches a local payment rail).
+const COUNTRY_CURRENCY = {
+  // West Africa
+  NG: "NGN", GH: "GHS", SL: "SLL", LR: "LRD", GM: "GMD", GN: "GNF",
+  CI: "XOF", SN: "XOF", BJ: "XOF", BF: "XOF", ML: "XOF", NE: "XOF", TG: "XOF", GW: "XOF",
+  // Central Africa
+  CM: "XAF", GA: "XAF", CG: "XAF", TD: "XAF", CF: "XAF", GQ: "XAF", CD: "CDF",
+  // East Africa
+  KE: "KES", UG: "UGX", TZ: "TZS", RW: "RWF", ET: "ETB", SO: "SOS", DJ: "DJF", BI: "BIF", SS: "SSP",
+  // Southern Africa
+  ZA: "ZAR", ZM: "ZMW", ZW: "ZWL", MW: "MWK", MZ: "MZN", NA: "NAD", BW: "BWP", LS: "LSL", SZ: "SZL", AO: "AOA", MG: "MGA", MU: "MUR",
+  // North Africa / Middle East
+  EG: "EGP", MA: "MAD", TN: "TND", DZ: "DZD", SD: "SDG",
+  AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD", BH: "BHD", OM: "OMR", JO: "JOD", LB: "LBP", IL: "ILS", TR: "TRY",
+  // Europe (EEA -> EUR; others their own currency)
+  AT: "EUR", BE: "EUR", HR: "EUR", CY: "EUR", EE: "EUR", FI: "EUR", FR: "EUR", DE: "EUR",
+  GR: "EUR", IE: "EUR", IT: "EUR", LV: "EUR", LT: "EUR", LU: "EUR", MT: "EUR", NL: "EUR",
+  PT: "EUR", SK: "EUR", SI: "EUR", ES: "EUR", LI: "EUR", MC: "EUR", SM: "EUR", VA: "EUR", AD: "EUR",
+  GB: "GBP", CH: "CHF", NO: "NOK", SE: "SEK", DK: "DKK", PL: "PLN", CZ: "CZK", HU: "HUF",
+  RO: "RON", BG: "BGN", IS: "ISK", UA: "UAH", RS: "RSD", AL: "ALL", MK: "MKD", BA: "BAM", MD: "MDL",
+  // Americas
+  US: "USD", CA: "CAD", MX: "MXN", BR: "BRL", AR: "ARS", CO: "COP", CL: "CLP", PE: "PEN",
+  // Asia-Pacific
+  IN: "INR", PK: "PKR", BD: "BDT", LK: "LKR", NP: "NPR", CN: "CNY", JP: "JPY", KR: "KRW",
+  SG: "SGD", MY: "MYR", ID: "IDR", PH: "PHP", TH: "THB", VN: "VND", AU: "AUD", NZ: "NZD", HK: "HKD",
+};
+
+function getCurrencyForCountry(countryCode) {
+  return COUNTRY_CURRENCY[(countryCode || "").toUpperCase()] || "USD";
+}
+
+// Human-readable names for the countries above, used to populate the
+// frontend's country picker via GET /api/countries (single source of truth).
+const COUNTRY_NAMES = {
+  NG: "Nigeria", GH: "Ghana", SL: "Sierra Leone", LR: "Liberia", GM: "Gambia", GN: "Guinea",
+  CI: "Côte d'Ivoire", SN: "Senegal", BJ: "Benin", BF: "Burkina Faso", ML: "Mali", NE: "Niger", TG: "Togo", GW: "Guinea-Bissau",
+  CM: "Cameroon", GA: "Gabon", CG: "Congo-Brazzaville", TD: "Chad", CF: "Central African Republic", GQ: "Equatorial Guinea", CD: "DR Congo",
+  KE: "Kenya", UG: "Uganda", TZ: "Tanzania", RW: "Rwanda", ET: "Ethiopia", SO: "Somalia", DJ: "Djibouti", BI: "Burundi", SS: "South Sudan",
+  ZA: "South Africa", ZM: "Zambia", ZW: "Zimbabwe", MW: "Malawi", MZ: "Mozambique", NA: "Namibia", BW: "Botswana", LS: "Lesotho", SZ: "Eswatini", AO: "Angola", MG: "Madagascar", MU: "Mauritius",
+  EG: "Egypt", MA: "Morocco", TN: "Tunisia", DZ: "Algeria", SD: "Sudan",
+  AE: "United Arab Emirates", SA: "Saudi Arabia", QA: "Qatar", KW: "Kuwait", BH: "Bahrain", OM: "Oman", JO: "Jordan", LB: "Lebanon", IL: "Israel", TR: "Turkey",
+  AT: "Austria", BE: "Belgium", HR: "Croatia", CY: "Cyprus", EE: "Estonia", FI: "Finland", FR: "France", DE: "Germany",
+  GR: "Greece", IE: "Ireland", IT: "Italy", LV: "Latvia", LT: "Lithuania", LU: "Luxembourg", MT: "Malta", NL: "Netherlands",
+  PT: "Portugal", SK: "Slovakia", SI: "Slovenia", ES: "Spain", LI: "Liechtenstein", MC: "Monaco", SM: "San Marino", VA: "Vatican City", AD: "Andorra",
+  GB: "United Kingdom", CH: "Switzerland", NO: "Norway", SE: "Sweden", DK: "Denmark", PL: "Poland", CZ: "Czechia", HU: "Hungary",
+  RO: "Romania", BG: "Bulgaria", IS: "Iceland", UA: "Ukraine", RS: "Serbia", AL: "Albania", MK: "North Macedonia", BA: "Bosnia and Herzegovina", MD: "Moldova",
+  US: "United States", CA: "Canada", MX: "Mexico", BR: "Brazil", AR: "Argentina", CO: "Colombia", CL: "Chile", PE: "Peru",
+  IN: "India", PK: "Pakistan", BD: "Bangladesh", LK: "Sri Lanka", NP: "Nepal", CN: "China", JP: "Japan", KR: "South Korea",
+  SG: "Singapore", MY: "Malaysia", ID: "Indonesia", PH: "Philippines", TH: "Thailand", VN: "Vietnam", AU: "Australia", NZ: "New Zealand", HK: "Hong Kong",
+};
+
+// Which payment methods to offer on our OWN country/method picker, per
+// currency. Only "card" and "mobile_money" are wired up to Flutterwave today
+// (see buildFlutterwavePaymentMethod) — bank_transfer/ussd need their exact
+// field names confirmed against a sandbox account before being added here.
+const MOBILE_MONEY_CURRENCIES = ["KES", "UGX", "TZS", "GHS", "ZMW", "RWF", "XOF", "XAF", "MWK"];
+const MOBILE_MONEY_NETWORKS = {
+  KES: ["MPESA", "AIRTEL"], UGX: ["MTN", "AIRTEL"], TZS: ["MPESA", "TIGO", "AIRTEL"],
+  GHS: ["MTN", "AIRTEL", "VODAFONE"], ZMW: ["MTN", "AIRTEL"], RWF: ["MTN", "AIRTEL"],
+  XOF: ["MTN", "ORANGE", "MOOV"], XAF: ["MTN", "ORANGE"], MWK: ["AIRTEL", "TNM"]
+};
+function getAvailablePaymentMethods(currency) {
+  const methods = [{ type: "card", label: "Debit/Credit Card" }];
+  if (MOBILE_MONEY_CURRENCIES.includes(currency)) {
+    methods.push({ type: "mobile_money", label: "Mobile Money", networks: MOBILE_MONEY_NETWORKS[currency] || [] });
+  }
+  return methods;
+}
+
+// Simple in-memory FX rate cache (1 hour) — avoids hammering the rate API on
+// every single checkout request. Rates are approximate; Flutterwave applies
+// its own settlement rate/fees on top regardless of what we display.
+const fxRateCache = new Map();
+async function getEurExchangeRate(targetCurrency) {
+  if (targetCurrency === "EUR") return 1;
+  const cached = fxRateCache.get(targetCurrency);
+  if (cached && cached.expiresAt > Date.now()) return cached.rate;
+
+  const res = await fetch("https://open.er-api.com/v6/latest/EUR");
+  if (!res.ok) throw new Error("Exchange rate lookup failed");
+  const data = await res.json();
+  const rate = data?.rates?.[targetCurrency];
+  if (!rate) throw new Error(`No exchange rate available for ${targetCurrency}`);
+
+  fxRateCache.set(targetCurrency, { rate, expiresAt: Date.now() + 60 * 60 * 1000 });
+  return rate;
+}
+
+// GITB's own margin on top of the raw exchange rate — applied before
+// quoting/charging any non-EUR amount. Separate from whatever settlement
+// spread Flutterwave itself applies converting collected funds to payout.
+const FX_MARGIN = 0.03;
+
+// Converts a EUR amount (our canonical pricing currency) into the target
+// currency, including our margin, rounded to 2 decimals. No margin applied
+// when the target currency is already EUR — there's no real conversion (or
+// FX risk) happening, so EU students still pay the exact listed price.
+async function convertEurToCurrency(eurAmount, targetCurrency) {
+  if (targetCurrency === "EUR") return Math.round(eurAmount * 100) / 100;
+  const rate = await getEurExchangeRate(targetCurrency);
+  return Math.round(eurAmount * rate * (1 + FX_MARGIN) * 100) / 100;
+}
+
 
 // ============ SECURITY MIDDLEWARE ============
 
@@ -232,264 +472,98 @@ app.use(cors({
   credentials: true
 }));
 
-// Stripe webhook MUST be registered before express.json() so it receives the raw body buffer.
-// stripe.webhooks.constructEvent() requires the raw bytes to verify the signature.
-app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+// Must be registered before express.json() so it receives the raw body buffer —
+// HMAC signature verification requires the exact raw bytes, not re-serialized JSON.
+app.post("/api/webhooks/flutterwave", express.raw({ type: "application/json" }), async (req, res) => {
   try {
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookHash = process.env.FLW_WEBHOOK_HASH;
+    const signature = req.headers["flutterwave-signature"];
 
-    let event;
-
-    if (webhookSecret) {
-      if (!sig) {
-        console.error("Webhook rejected: missing stripe-signature header");
-        return res.status(400).send("Webhook Error: missing stripe-signature header");
+    if (webhookHash) {
+      if (!signature) {
+        console.error("Webhook rejected: missing flutterwave-signature header");
+        return res.status(401).send("Unauthorized");
       }
-      try {
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-      } catch (err) {
-        console.error("Webhook signature verification failed:", err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+      const computed = crypto.createHmac("sha256", webhookHash).update(req.body).digest("base64");
+      if (!timingSafeStringEqual(computed, signature)) {
+        console.error("Webhook rejected: signature mismatch");
+        return res.status(401).send("Unauthorized");
       }
-    } else if (process.env.NODE_ENV === 'production') {
-      // In production, refuse unsigned events entirely
-      console.error("Webhook rejected in production: STRIPE_WEBHOOK_SECRET not configured");
-      return res.status(400).send("Webhook Error: webhook secret not configured");
-    } else {
-      // Development only — accept unsigned for local testing via Stripe CLI
-      event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    } else if (process.env.NODE_ENV === "production") {
+      console.error("Webhook rejected in production: FLW_WEBHOOK_HASH not configured");
+      return res.status(400).send("Webhook Error: webhook hash not configured");
     }
 
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const metadata = session.metadata || {};
+    const event = JSON.parse(req.body.toString());
 
-      if (metadata.type === 'tuition' && metadata.enrollment_id) {
-        const discountAppliedCents = parseInt(metadata.discount_applied_cents || "0", 10) || 0;
+    if (event.type === "charge.completed" && event.data?.id) {
+      // Never trust the webhook payload's amount/status directly — Flutterwave
+      // themselves recommend re-fetching the charge server-side to confirm.
+      const verified = await getFlutterwaveCharge(event.data.id);
 
-        if (session.mode === "subscription") {
-          // First of 12 monthly installments — unlock the course now, but don't
-          // mark tuition fully "paid" until invoice.paid confirms all 12 cycles.
-          await db.collection("enrollments").updateOne(
-            { id: metadata.enrollment_id },
-            {
-              $set: {
-                status: "active",
-                payment_status: "partial",
-                payment_plan: "monthly",
-                total_installments: 12,
-                installments_paid: 0,
-                stripe_subscription_id: session.subscription,
-                stripe_customer_id: session.customer,
-                referral_discount_applied_cents: discountAppliedCents,
-                tuition_paid_at: new Date().toISOString()
-              }
-            }
-          );
-          if (metadata.user_id) {
-            await db.collection("users").updateOne(
-              { id: metadata.user_id },
-              { $set: { payment_status: "partial" }, $inc: { referral_balance_cents: -discountAppliedCents } }
-            );
+      if (!verified) {
+        console.error(`Webhook: could not verify charge ${event.data.id}`);
+        return res.json({ received: true });
+      }
 
-            // The "once" coupon only discounted this first installment. Any
-            // referral balance left over (e.g. the student had a larger
-            // balance than one installment covers) is pushed to Stripe's
-            // customer balance now that we finally have a customer ID, so it
-            // auto-applies to installments 2-12 — invoice.paid reconciles it.
-            const updatedUser = await db.collection("users").findOne({ id: metadata.user_id });
-            const remainingBalanceCents = updatedUser?.referral_balance_cents || 0;
-            if (stripe && remainingBalanceCents > 0 && session.customer) {
-              try {
-                await stripe.customers.createBalanceTransaction(session.customer, {
-                  amount: -remainingBalanceCents,
-                  currency: "eur",
-                  description: "Referral credit carried over to future installments"
-                });
-              } catch (e) {
-                console.error("Failed to sync carried-over referral balance to Stripe:", e.message);
-              }
-            }
-          }
-          console.log(`Tuition subscription started for enrollment ${metadata.enrollment_id}`);
-        } else {
-          await db.collection("enrollments").updateOne(
-            { id: metadata.enrollment_id },
-            {
-              $set: {
-                status: "active",
-                payment_status: "paid",
-                payment_plan: "one_time",
-                stripe_customer_id: session.customer,
-                referral_discount_applied_cents: discountAppliedCents,
-                tuition_paid_at: new Date().toISOString()
-              }
-            }
-          );
-          if (metadata.user_id) {
-            await db.collection("users").updateOne(
-              { id: metadata.user_id },
-              { $set: { payment_status: "paid" }, $inc: { referral_balance_cents: -discountAppliedCents } }
-            );
-          }
-          console.log(`Tuition payment completed for enrollment ${metadata.enrollment_id}`);
+      const meta = verified.meta || {};
+      const isSuccessful = verified.status === "succeeded";
+
+      if (meta.type === "tuition" && meta.enrollment_id) {
+        if (!isSuccessful) {
+          await sendTuitionFailedEmail(meta.enrollment_id);
+          return res.json({ received: true });
         }
 
-        if (metadata.user_id) {
-          await tryRewardReferral(metadata.user_id);
+        const result = await confirmTuitionInstallment(meta, verified.reference);
+        if (result) {
+          console.log(`Tuition installment ${result.installmentsPaid}/${result.totalInstallments} paid for enrollment ${meta.enrollment_id}`);
         }
-      } else if (metadata.type === "application_fee" && metadata.application_id) {
-        // Stripe-first flow: Application record does NOT exist yet — create it now.
-        // Idempotency check: skip if already created (webhook may fire twice).
-        const exists = await db.collection("applications").findOne({ id: metadata.application_id });
+      } else if (meta.type === "application_fee" && meta.application_id) {
+        if (!isSuccessful) {
+          await sendApplicationFeeFailedEmail(meta);
+          return res.json({ received: true });
+        }
+
+        // Flutterwave-first flow: application record doesn't exist yet — create it now.
+        const exists = await db.collection("applications").findOne({ id: meta.application_id });
         if (!exists) {
           await db.collection("applications").insertOne({
-            id: metadata.application_id,
-            first_name: metadata.first_name || "",
-            last_name: metadata.last_name || "",
-            email: metadata.email || "",
-            phone: metadata.phone || null,
-            course_id: metadata.course_id || null,
-            course_title: metadata.course_title || null,
-            country: metadata.country || null,
-            city: metadata.city || null,
-            address: metadata.address || null,
-            date_of_birth: metadata.date_of_birth || null,
-            identification_url: metadata.identification_url || null,
-            high_school_certificate_url: metadata.high_school_certificate_url || null,
-            motivation: metadata.motivation || null,
-            referred_by_code: metadata.referred_by_code || null,
+            id: meta.application_id,
+            first_name: meta.first_name || "",
+            last_name: meta.last_name || "",
+            email: meta.email || "",
+            phone: meta.phone || null,
+            course_id: meta.course_id || null,
+            course_title: meta.course_title || null,
+            country: meta.country || null,
+            city: meta.city || null,
+            address: meta.address || null,
+            date_of_birth: meta.date_of_birth || null,
+            identification_url: meta.identification_url || null,
+            high_school_certificate_url: meta.high_school_certificate_url || null,
+            motivation: meta.motivation || null,
+            referred_by_code: meta.referred_by_code || null,
             status: "pending",
             payment_status: "paid",
-            stripe_session_id: session.id,
-            payment_amount: (session.amount_total || 0) / 100, // actual amount charged, not the current live setting
+            flw_reference: verified.reference,
+            payment_amount: parseFloat(meta.eur_amount) || 0, // canonical EUR reference amount
+            payment_amount_local: verified.amount,
+            payment_currency: verified.currency,
             created_at: new Date().toISOString(),
             paid_at: new Date().toISOString(),
           });
-          console.log(`Application created for ${metadata.email} → course ${metadata.course_id} (id: ${metadata.application_id})`);
+          console.log(`Application created for ${meta.email} → course ${meta.course_id} (id: ${meta.application_id})`);
 
-          // Send confirmation email to the applicant
-          if (metadata.email && metadata.first_name) {
-            const courseTitle = metadata.course_title ||
-              (await db.collection("courses").findOne({ id: metadata.course_id }))?.title ||
+          if (meta.email && meta.first_name) {
+            const courseTitle = meta.course_title ||
+              (await db.collection("courses").findOne({ id: meta.course_id }))?.title ||
               "your chosen programme";
-            await sendApplicationReceivedEmail(metadata.email, metadata.first_name, courseTitle);
-            console.log(`Confirmation email sent to ${metadata.email}`);
+            await sendApplicationReceivedEmail(meta.email, meta.first_name, courseTitle);
+            console.log(`Confirmation email sent to ${meta.email}`);
           }
         } else {
-          console.log(`Duplicate webhook for application ${metadata.application_id} — skipping`);
-        }
-      }
-    }
-
-    if (event.type === 'payment_intent.payment_failed') {
-      const intent = event.data.object;
-      const metadata = intent.metadata || {};
-      // Subscription installment failures are handled by invoice.payment_failed below.
-      const email = metadata.type !== 'tuition' ? (metadata.email || intent.receipt_email) : null;
-      const firstName = metadata.first_name || "Applicant";
-      const courseTitle = metadata.course_title || "your chosen programme";
-
-      if (email) {
-        const html = `
-          <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
-            ${getEmailHeader("Payment Failed")}
-            <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <h2 style="color: #c0392b; margin-top: 0;">Payment Was Not Successful</h2>
-              <p>Dear ${firstName},</p>
-              <p>We were unable to process your payment for <strong>${courseTitle}</strong> at the Global Institute of Technology and Business.</p>
-              <div style="background: #fff5f5; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #c0392b;">
-                <p style="margin: 0; color: #555;">Reason: ${intent.last_payment_error?.message || "Payment declined by your bank or card issuer."}</p>
-              </div>
-              <h3 style="color: #333;">What to do next:</h3>
-              <ul style="color: #555; line-height: 1.9;">
-                <li>Check that your card details are correct and up to date.</li>
-                <li>Ensure you have sufficient funds available.</li>
-                <li>Try a different payment method.</li>
-                <li>Contact your bank if the issue persists.</li>
-              </ul>
-              <div style="text-align: center; margin: 25px 0;">
-                <a href="${FRONTEND_URL}/apply" style="display: inline-block; padding: 12px 30px; background: #0B3B2C; color: white; text-decoration: none; border-radius: 25px; font-weight: bold;">Try Again</a>
-              </div>
-              <p style="color: #555;">Need help? Email us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
-              <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
-            </div>
-          </div>`;
-        await sendEmail(email, `Payment Failed — ${courseTitle} | GITB`, html);
-        console.log(`Payment failure email sent to ${email}`);
-      }
-    }
-
-    // Recurring monthly tuition installments (2nd through 12th) land here —
-    // the 1st installment is confirmed via checkout.session.completed above.
-    if (event.type === 'invoice.paid') {
-      const invoice = event.data.object;
-      if (invoice.subscription) {
-        const enrollment = await db.collection("enrollments").findOne({ stripe_subscription_id: invoice.subscription });
-        if (enrollment) {
-          const totalInstallments = enrollment.total_installments || 12;
-          const installmentsPaid = Math.min((enrollment.installments_paid || 0) + 1, totalInstallments);
-          const fullyPaid = installmentsPaid >= totalInstallments;
-
-          await db.collection("enrollments").updateOne(
-            { id: enrollment.id },
-            { $set: { installments_paid: installmentsPaid, ...(fullyPaid && { payment_status: "paid" }) } }
-          );
-
-          // If a referral reward was credited to this customer's Stripe balance
-          // mid-subscription (see tryRewardReferral), Stripe auto-applies it to
-          // whichever invoice comes next. Mirror that consumption back into our
-          // own balance so it isn't shown/spent twice.
-          const balanceConsumedCents = Math.max(0, (invoice.ending_balance ?? 0) - (invoice.starting_balance ?? 0));
-          if (balanceConsumedCents > 0) {
-            const studentUserId = enrollment.student_id || enrollment.user_id;
-            await db.collection("users").updateOne(
-              { id: studentUserId },
-              { $inc: { referral_balance_cents: -balanceConsumedCents } }
-            );
-          }
-
-          if (fullyPaid) {
-            const studentUserId = enrollment.student_id || enrollment.user_id;
-            if (studentUserId) {
-              await db.collection("users").updateOne({ id: studentUserId }, { $set: { payment_status: "paid" } });
-            }
-            // Safety net — the subscription also has a cancel_at set at creation.
-            try { await stripe.subscriptions.cancel(invoice.subscription); } catch (e) { /* already canceled/expired */ }
-            console.log(`Tuition fully paid for enrollment ${enrollment.id} (${installmentsPaid}/${totalInstallments} installments)`);
-          } else {
-            console.log(`Tuition installment ${installmentsPaid}/${totalInstallments} paid for enrollment ${enrollment.id}`);
-          }
-        }
-      }
-    }
-
-    if (event.type === 'invoice.payment_failed') {
-      const invoice = event.data.object;
-      if (invoice.subscription) {
-        const enrollment = await db.collection("enrollments").findOne({ stripe_subscription_id: invoice.subscription });
-        if (enrollment) {
-          const studentUserId = enrollment.student_id || enrollment.user_id;
-          const student = studentUserId ? await db.collection("users").findOne({ id: studentUserId }) : null;
-          const course = await db.collection("courses").findOne({ id: enrollment.course_id });
-
-          if (student?.email) {
-            const html = `
-              <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
-                ${getEmailHeader("Tuition Payment Failed")}
-                <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                  <h2 style="color: #c0392b; margin-top: 0;">Monthly Installment Payment Failed</h2>
-                  <p>Dear ${student.first_name || "Student"},</p>
-                  <p>We were unable to process this month's tuition installment for <strong>${course?.title || "your course"}</strong>.</p>
-                  <p style="color: #555;">Stripe will automatically retry the charge over the next few days. Please make sure your card details are up to date to avoid an interruption to your course access.</p>
-                  <p style="color: #555;">Need help? Email us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
-                  <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
-                </div>
-              </div>`;
-            await sendEmail(student.email, `Tuition Payment Failed — ${course?.title || "GITB"} | GITB`, html);
-          }
-          console.log(`Tuition installment payment failed for enrollment ${enrollment.id}`);
+          console.log(`Duplicate webhook for application ${meta.application_id} — skipping`);
         }
       }
     }
@@ -500,6 +574,132 @@ app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), asyn
     res.status(500).json({ detail: "Webhook processing failed" });
   }
 });
+
+async function sendApplicationFeeFailedEmail(meta) {
+  if (!meta.email) return;
+  const firstName = meta.first_name || "Applicant";
+  const courseTitle = meta.course_title || "your chosen programme";
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      ${getEmailHeader("Payment Failed")}
+      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: #c0392b; margin-top: 0;">Payment Was Not Successful</h2>
+        <p>Dear ${firstName},</p>
+        <p>We were unable to process your payment for <strong>${courseTitle}</strong> at the Global Institute of Technology and Business.</p>
+        <h3 style="color: #333;">What to do next:</h3>
+        <ul style="color: #555; line-height: 1.9;">
+          <li>Check that your payment details are correct and up to date.</li>
+          <li>Ensure you have sufficient funds available.</li>
+          <li>Try a different payment method.</li>
+          <li>Contact your bank/provider if the issue persists.</li>
+        </ul>
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${FRONTEND_URL}/apply" style="display: inline-block; padding: 12px 30px; background: #0B3B2C; color: white; text-decoration: none; border-radius: 25px; font-weight: bold;">Try Again</a>
+        </div>
+        <p style="color: #555;">Need help? Email us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
+        <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+      </div>
+    </div>`;
+  await sendEmail(meta.email, `Payment Failed — ${courseTitle} | GITB`, html);
+  console.log(`Payment failure email sent to ${meta.email}`);
+}
+
+async function sendTuitionFailedEmail(enrollmentId) {
+  const enrollment = await db.collection("enrollments").findOne({ id: enrollmentId });
+  if (!enrollment) return;
+  const userId = enrollment.student_id || enrollment.user_id;
+  const student = userId ? await db.collection("users").findOne({ id: userId }) : null;
+  const course = await db.collection("courses").findOne({ id: enrollment.course_id });
+  if (!student?.email) return;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      ${getEmailHeader("Payment Failed")}
+      <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: #c0392b; margin-top: 0;">Tuition Payment Not Successful</h2>
+        <p>Dear ${student.first_name || "Student"},</p>
+        <p>We were unable to process your tuition payment for <strong>${course?.title || "your course"}</strong>.</p>
+        <p style="color: #555;">Please log in to your dashboard and try again with a different payment method if needed.</p>
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${FRONTEND_URL}/student/dashboard" style="display: inline-block; padding: 12px 30px; background: #0B3B2C; color: white; text-decoration: none; border-radius: 25px; font-weight: bold;">Go to Dashboard</a>
+        </div>
+        <p style="color: #555;">Need help? Email us at <a href="mailto:admissions@gitb.lt" style="color: #3d7a4a;">admissions@gitb.lt</a>.</p>
+        <p style="color: #333;">Best regards,<br><strong>GITB Admissions Team</strong></p>
+      </div>
+    </div>`;
+  await sendEmail(student.email, `Tuition Payment Failed — ${course?.title || "GITB"} | GITB`, html);
+}
+
+// Shared by the webhook and the tuition status-poll fallback. Idempotent —
+// safe to call twice for the same reference (e.g. webhook AND poll both
+// observe the same successful charge).
+async function confirmTuitionInstallment(meta, reference) {
+  const enrollment = await db.collection("enrollments").findOne({ id: meta.enrollment_id });
+  if (!enrollment) return null;
+  if (enrollment.flw_last_reference === reference) {
+    return { installmentsPaid: enrollment.installments_paid, totalInstallments: enrollment.total_installments, fullyPaid: enrollment.payment_status === "paid" };
+  }
+
+  const discountAppliedCents = parseInt(meta.discount_applied_cents || "0", 10) || 0;
+  const totalInstallments = enrollment.total_installments || (meta.is_monthly === "true" ? 12 : 1);
+  const installmentsPaid = Math.min((enrollment.installments_paid || 0) + 1, totalInstallments);
+  const fullyPaid = installmentsPaid >= totalInstallments;
+  const userId = enrollment.student_id || enrollment.user_id;
+
+  await db.collection("enrollments").updateOne(
+    { id: meta.enrollment_id },
+    {
+      $set: {
+        status: "active",
+        payment_status: fullyPaid ? "paid" : "partial",
+        payment_plan: meta.is_monthly === "true" ? "monthly" : "one_time",
+        total_installments: totalInstallments,
+        installments_paid: installmentsPaid,
+        flw_last_reference: reference,
+        referral_discount_applied_cents: discountAppliedCents,
+        tuition_paid_at: new Date().toISOString()
+      }
+    }
+  );
+
+  if (userId) {
+    await db.collection("users").updateOne(
+      { id: userId },
+      { $set: { payment_status: fullyPaid ? "paid" : "partial" }, $inc: { referral_balance_cents: -discountAppliedCents } }
+    );
+    await tryRewardReferral(userId);
+
+    const student = await db.collection("users").findOne({ id: userId });
+    const course = await db.collection("courses").findOne({ id: enrollment.course_id });
+    if (student && course) {
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${getEmailHeader("Enrollment Confirmed")}
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #3d7a4a; margin-top: 0;">Payment Confirmed!</h2>
+            <p>Dear ${student.first_name},</p>
+            <p>Your tuition payment for <strong>${course.title}</strong> has been successfully processed.</p>
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+              <p style="margin: 0; color: #2e7d32; font-size: 18px;">✓ Course Unlocked</p>
+              <p style="margin: 10px 0 0 0; color: #666;">${totalInstallments > 1 ? `Installment ${installmentsPaid} of ${totalInstallments}` : "Full tuition paid"}</p>
+            </div>
+            <p>${!fullyPaid
+              ? `Your monthly payment plan is active and your course is unlocked. We'll email you when your next installment (${installmentsPaid + 1} of ${totalInstallments}) is due — there's no auto-billing, so please pay it manually from your dashboard to keep access uninterrupted.`
+              : "You now have <strong>lifetime access</strong> to this course."} Log in to start learning!</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${FRONTEND_URL}/student/dashboard" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
+                Go to Dashboard
+              </a>
+            </div>
+            <p>Best regards,<br><strong>GITB Team</strong></p>
+          </div>
+        </div>`;
+      await sendEmail(student.email, `Enrollment Confirmed - ${course.title}`, html);
+    }
+  }
+
+  return { installmentsPaid, totalInstallments, fullyPaid };
+}
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -709,7 +909,6 @@ app.get("/api", (req, res) => {
 // Public config endpoint (safe to expose)
 app.get("/api/config", (req, res) => {
   res.json({
-    stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
     applicationFee: systemSettings.application_fee ?? APPLICATION_FEE,
     currency: process.env.DEFAULT_CURRENCY || "EUR",
     dashboardBanner: {
@@ -897,20 +1096,9 @@ async function tryRewardReferral(referredUserId) {
       { $inc: { referral_balance_cents: rewardCents } }
     );
 
-    // If the referrer is already mid-subscription, also credit Stripe's own
-    // customer balance so it auto-applies to whichever installment is next —
-    // the invoice.paid webhook mirrors that consumption back into our DB.
-    if (stripe && referrerEnrollment?.stripe_customer_id) {
-      try {
-        await stripe.customers.createBalanceTransaction(referrerEnrollment.stripe_customer_id, {
-          amount: -rewardCents,
-          currency: "eur",
-          description: `Referral reward — ${referral.referred_name || referral.referred_email || "referred student"}`
-        });
-      } catch (e) {
-        console.error("Failed to sync referral credit to Stripe customer balance:", e.message);
-      }
-    }
+    // No external processor balance to sync to — since every tuition payment
+    // (one-time or the next installment) is a fresh charge created on demand,
+    // this balance is simply read and applied at whatever payment comes next.
 
     if (referrer.email) {
       const html = `
@@ -2458,22 +2646,41 @@ app.post("/api/courses/:courseId/materials", authenticate, requireRoles(["admin"
 });
 
 // ============ APPLICATION ROUTES ============
-// STRIPE-FIRST FLOW: Application is only stored in DB after payment confirmed by webhook.
+// FLUTTERWAVE-FIRST FLOW: Application is only stored in DB after payment confirmed by webhook.
 // This prevents "already applied" loops and keeps admissions table clean.
+// Public: country list + suggested payment methods, for the frontend's picker
+app.get("/api/countries", (req, res) => {
+  const countries = Object.keys(COUNTRY_CURRENCY).map(code => ({
+    code,
+    name: COUNTRY_NAMES[code] || code,
+    currency: COUNTRY_CURRENCY[code]
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  res.json(countries);
+});
+
+// Public: which payment methods we can offer for a given country
+app.get("/api/payment-methods", (req, res) => {
+  const currency = getCurrencyForCountry(req.query.country);
+  res.json({ currency, methods: getAvailablePaymentMethods(currency) });
+});
+
 app.post("/api/applications/create", applicationLimiter, async (req, res) => {
   try {
     if (!db) return res.status(503).json({ detail: "Database not available" });
-    if (!stripe) return res.status(503).json({ detail: "Payment service not available. Please contact admissions@gitb.lt" });
+    if (!flutterwaveEnabled) return res.status(503).json({ detail: "Payment service not available. Please contact admissions@gitb.lt" });
 
     const {
       first_name, last_name, email, phone, course_id,
       country, city, address, date_of_birth,
       identification_url, high_school_certificate_url,
-      motivation, origin_url, referral_code
+      motivation, origin_url, referral_code, payment_method
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
       return res.status(422).json({ detail: "Missing required fields: first_name, last_name, email, course_id" });
+    }
+    if (!country || !payment_method?.type) {
+      return res.status(422).json({ detail: "Country and payment method are required" });
     }
 
     // Validate referral code, if provided. A referrer can't refer themselves,
@@ -2510,7 +2717,7 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       return res.status(400).json({ detail: "You have already paid the application fee for this course. Please contact admissions@gitb.lt if you believe this is an error." });
     }
 
-    // Generate a unique application ID to embed in Stripe metadata
+    // Generate a unique application ID up front, and use it as the payment reference
     const applicationId = uuidv4();
     const frontendBase = origin_url || FRONTEND_URL || 'https://gitb.lt';
 
@@ -2520,27 +2727,30 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       ? Number(systemSettings.application_fee)
       : APPLICATION_FEE;
 
-    // Create Stripe Checkout Session — NO DB write until webhook confirms payment
-    let session;
+    const currency = getCurrencyForCountry(country);
+    let localAmount;
     try {
-      session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        line_items: [{
-          price_data: {
-            currency: "eur",
-            product_data: {
-              name: `Application Fee — ${course.title}`,
-              description: `One-time non-refundable application fee for ${course.title} at GITB`,
-            },
-            unit_amount: Math.round(currentApplicationFee * 100),
-          },
-          quantity: 1,
-        }],
-        mode: "payment",
-        success_url: `${frontendBase}/apply/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${frontendBase}/apply?cancelled=true`,
-        customer_email: email,
-        metadata: {
+      localAmount = await convertEurToCurrency(currentApplicationFee, currency);
+    } catch (fxErr) {
+      console.error("FX conversion failed:", fxErr.message);
+      return res.status(502).json({ detail: "Could not determine payment amount for your country. Please try again shortly." });
+    }
+
+    let charge;
+    try {
+      charge = await createFlutterwaveCharge({
+        amount: localAmount,
+        currency,
+        reference: applicationId,
+        redirectUrl: `${frontendBase}/apply/success?ref=${applicationId}`,
+        customerEmail: email,
+        customerName: `${first_name} ${last_name}`,
+        // Not sending customerPhone: Flutterwave requires it as a structured
+        // {country_code, number} object, and free-text phone input can't be
+        // reliably split into that shape — a malformed one risks the whole
+        // charge request being rejected. Email is the only required customer field.
+        paymentMethod: payment_method,
+        meta: {
           type: "application_fee",
           application_id: applicationId,
           course_id: course.id,
@@ -2555,26 +2765,51 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
           date_of_birth: date_of_birth || "",
           identification_url: identification_url || "",
           high_school_certificate_url: high_school_certificate_url || "",
-          motivation: (motivation || "").slice(0, 500), // Stripe metadata values max 500 chars
+          motivation: (motivation || "").slice(0, 490),
           referred_by_code: referredByCode,
-        },
+          eur_amount: String(currentApplicationFee)
+        }
       });
-    } catch (stripeErr) {
-      console.error("Stripe session creation failed:", stripeErr.message, stripeErr.type);
+    } catch (flwErr) {
+      console.error("Flutterwave charge creation failed:", flwErr.message);
       return res.status(502).json({
-        detail: "Payment session could not be created. Please try again or contact admissions@gitb.lt",
+        detail: "Payment could not be created. Please try again or contact admissions@gitb.lt",
       });
     }
 
-    console.log(`Stripe session created for ${email} → ${course.title} (session: ${session.id})`);
+    await db.collection("payment_intents").insertOne({
+      reference: applicationId,
+      flw_charge_id: charge.id,
+      type: "application_fee",
+      created_at: new Date().toISOString()
+    });
 
-    // Return checkout URL — application will be created in DB by webhook on payment success
-    res.json({
-      data: {
-        checkout_url: session.url,
-        session_id: session.id,
-        application_id: applicationId,
-      },
+    console.log(`Flutterwave charge created for ${email} → ${course.title} (ref: ${applicationId}, status: ${charge.status})`);
+
+    if (charge.next_action?.type === "redirect_url" && charge.next_action.redirect_url?.url) {
+      return res.json({
+        data: {
+          checkout_url: charge.next_action.redirect_url.url,
+          application_id: applicationId,
+        },
+      });
+    }
+
+    if (charge.status === "succeeded" || charge.next_action?.type === "payment_instruction") {
+      // Either already confirmed, or the customer just needs to approve a push
+      // notification on their phone (mobile money) — no redirect needed either way.
+      return res.json({
+        data: {
+          checkout_url: `${frontendBase}/apply/success?ref=${applicationId}`,
+          application_id: applicationId,
+        },
+      });
+    }
+
+    // requires_otp / requires_pin / requires_additional_fields aren't wired up yet.
+    console.error(`Unsupported next_action for application ${applicationId}:`, charge.next_action);
+    return res.status(502).json({
+      detail: "This payment method needs an additional verification step we don't support yet. Please try a different method or contact admissions@gitb.lt",
     });
   } catch (error) {
     console.error("Create application error:", error);
@@ -2588,54 +2823,35 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
       return res.status(503).json({ detail: "Database not available" });
     }
 
-    const { sessionId } = req.params;
+    // sessionId is actually our own reference (== the application id we
+    // generate up front — see /api/applications/create).
+    const reference = req.params.sessionId;
 
     const application = await db.collection("applications").findOne(
-      { stripe_session_id: sessionId },
+      { id: reference },
       { projection: { _id: 0 } }
     );
 
-    if (!application && stripe) {
+    if (!application) {
+      const intent = await db.collection("payment_intents").findOne({ reference, type: "application_fee" });
+      if (!intent) {
+        return res.status(404).json({ detail: "Application not found" });
+      }
       try {
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-        if (session.payment_status === "paid" && session.metadata?.application_id) {
-          const updateResult = await db.collection("applications").updateOne(
-            { id: session.metadata.application_id },
-            {
-              $set: {
-                status: "pending",
-                payment_status: "paid",
-                paid_at: new Date().toISOString()
-              }
-            }
-          );
-
-          if (updateResult.matchedCount > 0) {
-            return res.json({
-              status: "pending",
-              payment_status: "paid",
-              message: "Application submitted successfully! Our admissions team will review your application."
-            });
-          }
-
-          // Payment is confirmed by Stripe, but the application record hasn't been
-          // created yet (webhook hasn't run). Don't claim success prematurely.
+        const charge = await getFlutterwaveCharge(intent.flw_charge_id);
+        if (charge?.status === "succeeded") {
+          // Payment is confirmed by Flutterwave, but the application record
+          // hasn't been created yet (webhook hasn't run). Don't claim success prematurely.
           return res.json({
             status: "processing",
             payment_status: "paid",
             message: "Your payment was received and is being processed. This page will update automatically."
           });
         }
-
-        return res.json({ status: "pending_payment", payment_status: session.payment_status });
+        return res.json({ status: "pending_payment", payment_status: charge?.status || "pending" });
       } catch (e) {
         return res.status(404).json({ detail: "Application not found" });
       }
-    }
-
-    if (!application) {
-      return res.status(404).json({ detail: "Application not found" });
     }
 
     res.json({
@@ -3060,10 +3276,13 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = req.user;
-    const { course_id, origin_url, payment_plan } = req.body;
+    const { course_id, origin_url, payment_plan, country, payment_method } = req.body;
 
     if (!course_id) {
       return res.status(422).json({ detail: "Course ID is required" });
+    }
+    if (!country || !payment_method?.type) {
+      return res.status(422).json({ detail: "Country and payment method are required" });
     }
 
     // Check enrollment exists and is pending payment
@@ -3098,10 +3317,6 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(400).json({ detail: "Tuition already paid for this course" });
     }
 
-    if (enrollment.payment_status === "partial" && enrollment.stripe_subscription_id) {
-      return res.status(400).json({ detail: "You already have an active monthly payment plan for this course. Remaining installments will be charged automatically." });
-    }
-
     // Get course details - try multiple lookup methods
     let course = await db.collection("courses").findOne({ id: course_id });
     if (!course) {
@@ -3116,8 +3331,15 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(404).json({ detail: "Course not found" });
     }
 
-
-    const isMonthly = payment_plan === 'monthly';
+    // Once a monthly plan is underway, every subsequent call here pays the
+    // NEXT installment — there's no auto-billing, the student pays each
+    // installment manually (we email a reminder — see the tuition-reminders cron).
+    const isMonthly = enrollment.payment_plan === "monthly" || (!enrollment.payment_plan && payment_plan === "monthly");
+    const totalInstallments = enrollment.total_installments || (isMonthly ? 12 : 1);
+    const installmentsPaidSoFar = enrollment.installments_paid || 0;
+    if (isMonthly && installmentsPaidSoFar >= totalInstallments) {
+      return res.status(400).json({ detail: "Tuition already fully paid for this course" });
+    }
 
     // Safely extract numeric price — course.price may be a number, an object {monthly,upfront}, or null/undefined
     const rawUpfront =
@@ -3137,34 +3359,32 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       });
     }
 
-    if (!stripe) {
+    if (!flutterwaveEnabled) {
       return res.status(503).json({ detail: "Payment service not available" });
     }
 
-    // Apply any referral balance the student has earned as a discount on this
-    // charge. Stripe won't process a sub-50-cent charge, so a monthly
-    // installment is never discounted all the way to zero — the remainder of
-    // the balance simply carries over to the next payment.
-    const MIN_CHARGE_CENTS = 50;
+    // Apply any referral balance the student has earned as a discount on
+    // this installment. Every tuition payment (whether the only one, or the
+    // Nth of 12) is a single discrete charge, so the discount just applies
+    // directly — no more subscription-vs-first-cycle complexity.
     const chargeAmountCents = Math.round(chargeAmount * 100);
     const referralBalanceCents = Math.max(0, user.referral_balance_cents || 0);
-    let discountCents = Math.min(referralBalanceCents, chargeAmountCents);
-    let finalChargeCents = chargeAmountCents - discountCents;
+    const discountCents = Math.min(referralBalanceCents, chargeAmountCents);
+    const finalChargeCents = chargeAmountCents - discountCents;
+    const installmentNumber = installmentsPaidSoFar + 1;
 
-    if (isMonthly && finalChargeCents > 0 && finalChargeCents < MIN_CHARGE_CENTS) {
-      discountCents = Math.max(0, chargeAmountCents - MIN_CHARGE_CENTS);
-      finalChargeCents = chargeAmountCents - discountCents;
-    }
-
-    if (!isMonthly && finalChargeCents <= 0) {
-      // One-time tuition fully covered by referral balance — no card charge needed.
+    if (finalChargeCents <= 0) {
+      // Fully covered by referral balance — no charge needed for this installment.
+      const fullyPaid = installmentNumber >= totalInstallments;
       await db.collection("enrollments").updateOne(
         { id: enrollment.id },
         {
           $set: {
             status: "active",
-            payment_status: "paid",
-            payment_plan: "one_time",
+            payment_status: fullyPaid ? "paid" : "partial",
+            payment_plan: isMonthly ? "monthly" : "one_time",
+            total_installments: totalInstallments,
+            installments_paid: installmentNumber,
             referral_discount_applied_cents: discountCents,
             tuition_paid_at: new Date().toISOString()
           }
@@ -3172,7 +3392,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       );
       await db.collection("users").updateOne(
         { id: userId },
-        { $set: { payment_status: "paid" }, $inc: { referral_balance_cents: -discountCents } }
+        { $set: { payment_status: fullyPaid ? "paid" : "partial" }, $inc: { referral_balance_cents: -discountCents } }
       );
       await tryRewardReferral(userId);
       return res.json({
@@ -3180,110 +3400,84 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
           checkout_url: null,
           fully_covered: true,
           amount: 0,
-          message: "Your tuition is fully covered by your referral balance!"
+          installment: installmentNumber,
+          total_installments: totalInstallments,
+          message: isMonthly
+            ? `Installment ${installmentNumber} of ${totalInstallments} is fully covered by your referral balance!`
+            : "Your tuition is fully covered by your referral balance!"
         }
       });
     }
 
-    const baseMetadata = {
-      type: "tuition",
-      enrollment_id: enrollment.id,
-      course_id: course_id,
-      user_id: userId,
-      user_email: user.email,
-      discount_applied_cents: String(discountCents)
-    };
-
-    let session;
-    if (isMonthly) {
-      // 12 monthly installments via a real Stripe subscription. The subscription
-      // auto-cancels ~3 days after the 12th cycle would be due, so it never
-      // silently keeps billing past the agreed term.
-      const cancelAt = new Date();
-      cancelAt.setUTCMonth(cancelAt.getUTCMonth() + 12);
-      cancelAt.setUTCDate(cancelAt.getUTCDate() + 3);
-
-      // The line item's unit_amount applies to every recurring cycle, so a
-      // referral discount can't be baked into it — that would discount all 12
-      // installments, not just the first. A "once" coupon applies to exactly
-      // the first invoice instead, leaving cycles 2-12 at full price.
-      let discounts;
-      if (discountCents > 0) {
-        const coupon = await stripe.coupons.create({
-          amount_off: discountCents,
-          currency: "eur",
-          duration: "once",
-          name: "Referral credit"
-        });
-        discounts = [{ coupon: coupon.id }];
-      }
-
-      session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        line_items: [{
-          price_data: {
-            currency: "eur",
-            product_data: {
-              name: `Tuition Fee - ${course.title}`,
-              description: `Monthly installment - ${course.title}`
-            },
-            unit_amount: chargeAmountCents,
-            recurring: { interval: "month" }
-          },
-          quantity: 1
-        }],
-        ...(discounts && { discounts }),
-        mode: "subscription",
-        subscription_data: {
-          metadata: baseMetadata,
-          cancel_at: Math.floor(cancelAt.getTime() / 1000)
-        },
-        success_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=success&course=${course_id}`,
-        cancel_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=cancelled`,
-        customer_email: user.email,
-        metadata: baseMetadata
-      });
-    } else {
-      session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        line_items: [{
-          price_data: {
-            currency: "eur",
-            product_data: {
-              name: `Tuition Fee - ${course.title}`,
-              description: `Full tuition - ${course.title}`
-            },
-            unit_amount: finalChargeCents
-          },
-          quantity: 1
-        }],
-        mode: "payment",
-        success_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=success&course=${course_id}`,
-        cancel_url: `${origin_url || FRONTEND_URL}/student/dashboard?payment=cancelled`,
-        customer_email: user.email,
-        metadata: baseMetadata
-      });
+    const currency = getCurrencyForCountry(country);
+    let localAmount;
+    try {
+      localAmount = await convertEurToCurrency(finalChargeCents / 100, currency);
+    } catch (fxErr) {
+      console.error("FX conversion failed:", fxErr.message);
+      return res.status(502).json({ detail: "Could not determine payment amount for your country. Please try again shortly." });
     }
 
-    // Update enrollment with stripe session. installments_paid/total_installments/
-    // payment_status are only advanced once Stripe actually confirms payment
-    // (via webhook or the status-poll fallback below), never here.
+    const reference = uuidv4();
+    const frontendBase = origin_url || FRONTEND_URL;
+    let charge;
+    try {
+      charge = await createFlutterwaveCharge({
+        amount: localAmount,
+        currency,
+        reference,
+        redirectUrl: `${frontendBase}/student/dashboard?payment=success&course=${course_id}&ref=${reference}`,
+        customerEmail: user.email,
+        customerName: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email,
+        paymentMethod: payment_method,
+        meta: {
+          type: "tuition",
+          enrollment_id: enrollment.id,
+          course_id: course_id,
+          user_id: userId,
+          user_email: user.email,
+          discount_applied_cents: String(discountCents),
+          is_monthly: String(isMonthly),
+          eur_amount: String(chargeAmount)
+        }
+      });
+    } catch (flwErr) {
+      console.error("Create tuition payment error:", flwErr.message);
+      return res.status(502).json({ detail: "Payment could not be processed. Please try again or contact admissions@gitb.lt" });
+    }
+
+    await db.collection("payment_intents").insertOne({
+      reference,
+      flw_charge_id: charge.id,
+      type: "tuition",
+      created_at: new Date().toISOString()
+    });
+
     await db.collection("enrollments").updateOne(
       { id: enrollment.id },
-      { $set: { stripe_session_id: session.id, payment_plan: isMonthly ? 'monthly' : 'one_time' } }
+      { $set: { flw_last_reference_pending: reference, payment_plan: isMonthly ? 'monthly' : 'one_time', total_installments: totalInstallments } }
     );
 
-    // Wrap in `data` object - frontend expects response.data.checkout_url
-    res.json({
-      data: {
-        checkout_url: session.url,
-        session_id: session.id,
-        enrollment_id: enrollment.id,
-        course_title: course.title,
-        amount: finalChargeCents / 100,
-        referral_discount_applied: discountCents / 100,
-        payment_plan: isMonthly ? 'monthly' : 'one_time'
-      }
+    const responsePayload = {
+      enrollment_id: enrollment.id,
+      course_title: course.title,
+      amount: finalChargeCents / 100,
+      referral_discount_applied: discountCents / 100,
+      payment_plan: isMonthly ? 'monthly' : 'one_time',
+      installment: installmentNumber,
+      total_installments: totalInstallments
+    };
+
+    if (charge.next_action?.type === "redirect_url" && charge.next_action.redirect_url?.url) {
+      return res.json({ data: { ...responsePayload, checkout_url: charge.next_action.redirect_url.url } });
+    }
+    if (charge.status === "succeeded" || charge.next_action?.type === "payment_instruction") {
+      return res.json({ data: { ...responsePayload, checkout_url: `${frontendBase}/student/dashboard?payment=success&course=${course_id}&ref=${reference}` } });
+    }
+
+    console.error(`Unsupported next_action for tuition payment ${reference}:`, charge.next_action);
+    return res.status(502).json({
+      detail: "This payment method needs an additional verification step we don't support yet. Please try a different method or contact admissions@gitb.lt",
     });
   } catch (error) {
     console.error("Create tuition payment error:", error);
@@ -3294,118 +3488,41 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
 // Check tuition payment status
 app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // sessionId here is our own payment reference (see /api/tuition/pay).
+    const reference = req.params.sessionId;
 
-    // Find enrollment by stripe session
-    const enrollment = await db.collection("enrollments").findOne({ stripe_session_id: sessionId });
-
-    if (!enrollment) {
-      // Check Stripe directly
-      if (stripe) {
-        try {
-          const session = await stripe.checkout.sessions.retrieve(sessionId);
-          return res.json({
-            status: session.payment_status === "paid" ? "paid" : "pending",
-            payment_status: session.payment_status
-          });
-        } catch (e) {
-          return res.status(404).json({ detail: "Payment session not found" });
-        }
-      }
-      return res.status(404).json({ detail: "Enrollment not found" });
+    const intent = await db.collection("payment_intents").findOne({ reference, type: "tuition" });
+    if (!intent) {
+      return res.status(404).json({ detail: "Payment reference not found" });
     }
 
-    // Verify payment with Stripe — only handle the initial unpaid → paid/partial
-    // transition here. Once a monthly plan is underway, later installments are
-    // only ever advanced by the invoice.paid webhook, never by this status poll.
-    if (stripe && enrollment.stripe_session_id && enrollment.payment_status === "unpaid") {
-      try {
-        const session = await stripe.checkout.sessions.retrieve(enrollment.stripe_session_id);
-        const isSubscription = session.mode === "subscription";
-
-        if (session.payment_status === "paid") {
-          const userId = enrollment.student_id || enrollment.user_id;
-          const discountAppliedCents = parseInt(session.metadata?.discount_applied_cents || "0", 10) || 0;
-
-          await db.collection("enrollments").updateOne(
-            { id: enrollment.id },
-            {
-              $set: {
-                status: "active",
-                payment_status: isSubscription ? "partial" : "paid",
-                payment_plan: isSubscription ? "monthly" : "one_time",
-                stripe_customer_id: session.customer,
-                referral_discount_applied_cents: discountAppliedCents,
-                ...(isSubscription && {
-                  total_installments: 12,
-                  installments_paid: 0,
-                  stripe_subscription_id: session.subscription
-                }),
-                tuition_paid_at: new Date().toISOString()
-              }
-            }
-          );
-
-          await db.collection("users").updateOne(
-            { id: userId },
-            { $set: { payment_status: isSubscription ? "partial" : "paid" }, $inc: { referral_balance_cents: -discountAppliedCents } }
-          );
-
-          await tryRewardReferral(userId);
-
-          // Send confirmation email
-          const user = await db.collection("users").findOne({ id: userId });
-          const course = await db.collection("courses").findOne({ id: enrollment.course_id });
-
-          if (user && course) {
-            const html = `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                ${getEmailHeader("Enrollment Confirmed")}
-                <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                  <h2 style="color: #3d7a4a; margin-top: 0;">Payment Confirmed!</h2>
-                  <p>Dear ${user.first_name},</p>
-                  <p>Your tuition payment for <strong>${course.title}</strong> has been successfully processed.</p>
-                  <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-                    <p style="margin: 0; color: #2e7d32; font-size: 18px;">✓ Course Unlocked</p>
-                    <p style="margin: 10px 0 0 0; color: #666;">Amount: €${enrollment.tuition_amount || (typeof course.price === 'object' ? (course.price.upfront || course.price.monthly || 0) : (course.price || 0))}${isSubscription ? " / month (installment 1 of 12)" : ""}</p>
-                  </div>
-                  <p>${isSubscription
-                    ? "Your monthly payment plan is now active and your course is unlocked. We'll automatically charge your card each month for the remaining installments."
-                    : "You now have <strong>lifetime access</strong> to this course."} Log in to start learning!</p>
-                  <div style="text-align: center; margin: 25px 0;">
-                    <a href="${FRONTEND_URL}/dashboard/student" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
-                      Go to Dashboard
-                    </a>
-                  </div>
-                  <p>Best regards,<br><strong>GITB Team</strong></p>
-                </div>
-              </div>
-            `;
-            await sendEmail(user.email, `Enrollment Confirmed - ${course.title}`, html);
-          }
-
-          return res.json({
-            status: "active",
-            payment_status: isSubscription ? "partial" : "paid",
-            message: isSubscription ? "Course unlocked — monthly plan active" : "Course unlocked successfully"
-          });
-        }
-      } catch (e) {
-        console.error("Stripe check error:", e);
-      }
+    const charge = await getFlutterwaveCharge(intent.flw_charge_id);
+    if (!charge) {
+      return res.status(502).json({ detail: "Could not check payment status. Please try again shortly." });
     }
 
-    res.json({
-      status: enrollment.status,
-      payment_status: enrollment.payment_status
-    });
+    if (charge.meta?.user_id && charge.meta.user_id !== req.user.id) {
+      return res.status(403).json({ detail: "Not authorized to view this payment" });
+    }
+
+    if (charge.status === "succeeded") {
+      const meta = charge.meta || {};
+      const result = await confirmTuitionInstallment(meta, reference);
+      return res.json({
+        status: "active",
+        payment_status: result?.fullyPaid ? "paid" : "partial",
+        message: result?.fullyPaid ? "Course unlocked successfully" : "Course unlocked — installment recorded"
+      });
+    }
+
+    res.json({ status: charge.status === "failed" ? "failed" : "pending", payment_status: charge.status });
   } catch (error) {
     console.error("Check tuition status error:", error);
     res.status(500).json({ detail: "Internal server error" });
   }
 });
 
-// Stripe webhook is registered before express.json() — see top of middleware section.
+// Flutterwave webhook is registered before express.json() — see top of middleware section.
 
 // ============ DASHBOARD ROUTES ============
 app.get("/api/dashboard/admin", authenticate, requireRoles(["admin", "super_admin", "sub_admin", "staff"]), async (req, res) => {
@@ -3956,6 +4073,69 @@ app.get("/api/my-enrollments", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Fetch enrollments error:", err);
     res.status(500).json({ detail: "Failed to fetch enrollments" });
+  }
+});
+
+// ============ TUITION REMINDERS (CRON) ============
+// There's no auto-billing for monthly plans — call this once a day from an
+// external scheduler (e.g. a Render Cron Job) pointed at this endpoint with
+// header "X-Cron-Secret: <CRON_SECRET>". It emails students whose next
+// installment looks overdue (30+ days since their last payment) and haven't
+// already been reminded in the last 25 days.
+app.post("/api/cron/tuition-reminders", async (req, res) => {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && !timingSafeStringEqual(req.headers["x-cron-secret"], cronSecret)) {
+      return res.status(401).json({ detail: "Unauthorized" });
+    }
+    if (!cronSecret) {
+      console.error("WARNING: CRON_SECRET not set — /api/cron/tuition-reminders is unauthenticated");
+    }
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const twentyFiveDaysAgo = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString();
+
+    const dueEnrollments = await db.collection("enrollments").find({
+      payment_plan: "monthly",
+      payment_status: "partial",
+      tuition_paid_at: { $lte: thirtyDaysAgo },
+      $or: [
+        { last_reminder_sent_at: { $exists: false } },
+        { last_reminder_sent_at: { $lte: twentyFiveDaysAgo } }
+      ]
+    }).toArray();
+
+    let sent = 0;
+    for (const enrollment of dueEnrollments) {
+      const userId = enrollment.student_id || enrollment.user_id;
+      const student = userId ? await db.collection("users").findOne({ id: userId }) : null;
+      const course = await db.collection("courses").findOne({ id: enrollment.course_id });
+      if (!student?.email) continue;
+
+      const nextInstallment = (enrollment.installments_paid || 0) + 1;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${getEmailHeader("Tuition Installment Due")}
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #3d7a4a; margin-top: 0;">Installment ${nextInstallment} of ${enrollment.total_installments || 12} is due</h2>
+            <p>Dear ${student.first_name || "Student"},</p>
+            <p>Your next monthly tuition installment for <strong>${course?.title || "your course"}</strong> is ready to be paid. There's no auto-billing on your plan — please pay it manually from your dashboard to keep your course access uninterrupted.</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${FRONTEND_URL}/student/dashboard" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">Pay Now</a>
+            </div>
+            <p>Best regards,<br><strong>GITB Team</strong></p>
+          </div>
+        </div>`;
+      await sendEmail(student.email, `Tuition Installment ${nextInstallment} Due — ${course?.title || "GITB"}`, html);
+      await db.collection("enrollments").updateOne({ id: enrollment.id }, { $set: { last_reminder_sent_at: new Date().toISOString() } });
+      sent++;
+    }
+
+    console.log(`Tuition reminders: ${sent} sent`);
+    res.json({ sent });
+  } catch (error) {
+    console.error("Tuition reminders cron error:", error);
+    res.status(500).json({ detail: "Internal server error" });
   }
 });
 
@@ -4510,7 +4690,7 @@ async function startServer() {
     const server = app.listen(PORT, "0.0.0.0", () => {
       console.log(`✓ Server running on port ${PORT}`);
       console.log(`✓ Database: ${db ? "connected" : "not connected"}`);
-      console.log(`✓ Stripe: ${stripe ? "initialized" : "not initialized"}`);
+      console.log(`✓ Flutterwave: ${flutterwaveEnabled ? "initialized" : "not initialized"}`);
       console.log(`✓ Resend: ${resend ? "initialized" : "disabled"}`);
     });
 

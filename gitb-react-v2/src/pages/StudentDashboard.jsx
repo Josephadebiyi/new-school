@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import PaymentMethodPicker, { isPaymentMethodComplete, buildCountryCode } from '../components/PaymentMethodPicker';
 import {
   getMyCourses, getMyEnrollments, getCourseMaterials, getCourseQuizzes,
   getQuizById, submitQuiz, getMyQuizResults, markLessonComplete,
@@ -65,6 +66,8 @@ export default function StudentDashboard() {
   const [addCourseMsg, setAddCourseMsg] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentModal, setPaymentModal] = useState(null); // { courseId, plan } while the picker is open
+  const [paymentDetails, setPaymentDetails] = useState({ country: '', payment_method: { type: 'card' } });
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', phone: '', profilePicture: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
@@ -81,7 +84,7 @@ export default function StudentDashboard() {
     loadInitial();
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle Stripe redirect back after payment
+  // Handle Flutterwave redirect back after payment
   useEffect(() => {
     const status = searchParams.get('payment');
     if (status === 'success') {
@@ -187,19 +190,35 @@ export default function StudentDashboard() {
     } catch (err) { setError(err.message || 'Failed to submit quiz.'); }
   }
 
-  async function handlePayment(courseIdOrEnrollment, explicitPlan = null) {
+  // Opens the payment-method modal instead of paying immediately — Flutterwave
+  // needs a country + payment method before we can create a charge.
+  function handlePayment(courseIdOrEnrollment, explicitPlan = null) {
+    const courseId = typeof courseIdOrEnrollment === 'string'
+      ? courseIdOrEnrollment
+      : courseIdOrEnrollment.course_id || courseIdOrEnrollment.courseId;
+    const plan = explicitPlan
+      || (typeof courseIdOrEnrollment === 'object' ? courseIdOrEnrollment.payment_plan : null)
+      || 'one_time';
+    setPaymentModal({ courseId, plan });
+    setPaymentDetails({ country: '', payment_method: { type: 'card' } });
+  }
+
+  async function executePayment() {
+    if (!paymentModal) return;
     setPaymentLoading(true); setError('');
     try {
-      const courseId = typeof courseIdOrEnrollment === 'string'
-        ? courseIdOrEnrollment
-        : courseIdOrEnrollment.course_id || courseIdOrEnrollment.courseId;
-      const plan = explicitPlan
-        || (typeof courseIdOrEnrollment === 'object' ? courseIdOrEnrollment.payment_plan : null)
-        || 'one_time';
-      const data = await createTuitionPayment(token, courseId, plan, window.location.origin);
+      const paymentMethod = { ...paymentDetails.payment_method };
+      if (paymentMethod.type === 'mobile_money') {
+        paymentMethod.country_code = buildCountryCode(paymentDetails.country);
+      }
+      const data = await createTuitionPayment(
+        token, paymentModal.courseId, paymentModal.plan, window.location.origin,
+        paymentDetails.country, paymentMethod
+      );
       const payload = data?.data || data;
       if (payload?.fully_covered) {
         setPaymentSuccess(true);
+        setPaymentModal(null);
         await loadInitial();
       } else if (payload?.checkout_url) {
         window.location.href = payload.checkout_url;
@@ -867,6 +886,40 @@ export default function StudentDashboard() {
             <motion.aside initial={{ x: -288 }} animate={{ x: 0 }} exit={{ x: -288 }} transition={{ type: 'tween', duration: 0.25 }} className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col md:hidden" style={{ backgroundColor: '#0C4E3A' }}>
               <SidebarContent collapsed={false} />
             </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Tuition Payment Modal — country + payment method picker */}
+      <AnimatePresence>
+        {paymentModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !paymentLoading && setPaymentModal(null)} className="fixed inset-0 bg-black/50 z-50" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Pay Tuition</h3>
+                <p className="text-sm text-gray-500 mb-5">Select your country and preferred payment method.</p>
+                <PaymentMethodPicker value={paymentDetails} onChange={setPaymentDetails} />
+                {error && <p className="mt-4 text-sm text-red-600 font-medium">{error}</p>}
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => setPaymentModal(null)}
+                    disabled={paymentLoading}
+                    className="flex-1 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={executePayment}
+                    disabled={paymentLoading || !isPaymentMethodComplete(paymentDetails)}
+                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-white disabled:opacity-50"
+                    style={{ backgroundColor: '#0C4E3A' }}
+                  >
+                    {paymentLoading ? 'Processing…' : 'Continue to Pay'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>

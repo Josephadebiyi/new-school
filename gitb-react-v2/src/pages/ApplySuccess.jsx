@@ -7,7 +7,7 @@ import { checkApplicationStatus } from '../services/api';
 const ApplySuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const sessionId = searchParams.get('session_id');
+  const sessionId = searchParams.get('ref');
 
   const [status, setStatus] = useState('loading'); // loading | success | pending | error
   const [message, setMessage] = useState('');
@@ -27,7 +27,7 @@ const ApplySuccess = () => {
     const poll = () => {
       checkApplicationStatus(sessionId)
         .then((data) => {
-          // 'processing' means Stripe confirmed payment but the application
+          // 'processing' means Flutterwave confirmed payment but the application
           // record hasn't been created yet (webhook still in flight) — keep polling.
           if (data.payment_status === 'paid' && data.status !== 'processing') {
             setStatus('success');
