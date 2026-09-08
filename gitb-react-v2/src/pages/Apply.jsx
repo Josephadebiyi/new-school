@@ -188,7 +188,7 @@ export default function Apply() {
                       ))}
                     </select>
                     <input
-                      className={inputClass}
+                      className={`${inputClass} flex-1 min-w-0`}
                       type="tel"
                       name="phoneNumber"
                       value={form.phoneNumber}
