@@ -134,7 +134,7 @@ let systemSettings = {
 
 const refreshSystemSettings = async () => {
   if (!db) return;
-  const settings = await db.collection("system_settings").findOne({ type: "config" });
+  const settings = await db.collection("system_settings").findOne({ type: "config" }, { projection: { _id: 0 } });
   if (settings) {
     systemSettings = { ...systemSettings, ...settings };
   } else {
@@ -3597,7 +3597,15 @@ app.get("/api/system/settings", authenticate, requireRoles(["admin", "super_admi
 
 app.put("/api/system/settings", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
   try {
-    const updates = req.body;
+    const updates = { ...req.body };
+    // The GET response includes every field currently in systemSettings, and
+    // the admin form round-trips that whole object back on save — strip
+    // fields that must never be touched by a client-supplied $set (_id is
+    // immutable in MongoDB and would fail the whole update; type is our
+    // lookup key, not a real setting).
+    delete updates._id;
+    delete updates.type;
+
     await db.collection("system_settings").updateOne(
       { type: "config" },
       { $set: updates },
@@ -3606,6 +3614,7 @@ app.put("/api/system/settings", authenticate, requireRoles(["admin", "super_admi
     await refreshSystemSettings();
     res.json({ message: "Settings updated", settings: systemSettings });
   } catch (err) {
+    console.error("Update system settings error:", err);
     res.status(500).json({ detail: "Failed to update settings" });
   }
 });
