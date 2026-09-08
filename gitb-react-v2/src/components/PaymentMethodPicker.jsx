@@ -37,14 +37,25 @@ export function openFlutterwaveCheckout(payment, { title, description, onSuccess
   if (typeof window === 'undefined' || !window.FlutterwaveCheckout) {
     throw new Error('Payment widget failed to load. Please refresh the page and try again.');
   }
+  const fullName = (payment.customer.name || '').trim();
+  const [firstName, ...rest] = fullName.split(' ');
+  const lastName = rest.join(' ') || firstName || 'Student';
+
   window.FlutterwaveCheckout({
     public_key: payment.public_key,
     tx_ref: payment.reference,
     amount: payment.amount,
     currency: payment.currency,
+    // The classic Inline widget validates flat customer_* fields — a nested
+    // "customer" object alone isn't recognized and throws
+    // "Invalid parameter (`customer_email`)". Sending both shapes covers
+    // whichever the loaded script version actually reads.
+    customer_email: payment.customer.email,
+    customer_firstname: firstName || 'Student',
+    customer_lastname: lastName,
     customer: {
       email: payment.customer.email,
-      name: payment.customer.name,
+      name: fullName || 'Student',
     },
     customizations: {
       title: title || 'GITB',
