@@ -63,7 +63,6 @@ const OPTIONAL_ENV_VARS = [
   "FRONTEND_URL",
   "CORS_ORIGINS",
   "ADMIN_EMAIL",
-  "APPLICATION_FEE_EUR",
   "DB_NAME",
   "FLW_WEBHOOK_HASH",
   "CRON_SECRET"
@@ -114,11 +113,14 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://gitb.lt";
 const CORS_ORIGINS = process.env.CORS_ORIGINS || "*";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "noreply@gitb.lt";
-const APPLICATION_FEE = parseFloat(process.env.APPLICATION_FEE_EUR || "35");
+// Used only to seed system_settings the very first time the app ever runs
+// (no document in the DB yet). After that, the admin Settings panel is the
+// sole source of truth — there is no environment variable that can override it.
+const APPLICATION_FEE_SEED_DEFAULT = 35;
 
 // System Settings Cache (simple)
 let systemSettings = {
-  application_fee: APPLICATION_FEE,
+  application_fee: APPLICATION_FEE_SEED_DEFAULT,
   admission_fee: 2500,
   admission_letter_template: "Dear {{name}},\n\nCongratulations! You have been accepted into {{course}} at GITB Academy.\n\nBest regards,\nGITB Admissions",
   bank_name: "Luminor Bank AS",
@@ -809,7 +811,7 @@ app.get("/api", (req, res) => {
 app.get("/api/config", (req, res) => {
   res.json({
     flutterwavePublicKey: FLW_PUBLIC_KEY,
-    applicationFee: systemSettings.application_fee ?? APPLICATION_FEE,
+    applicationFee: systemSettings.application_fee ?? APPLICATION_FEE_SEED_DEFAULT,
     currency: process.env.DEFAULT_CURRENCY || "EUR",
     dashboardBanner: {
       imageUrl: systemSettings.dashboard_banner_image_url || "",
@@ -2617,11 +2619,10 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
     // Generate a unique application ID up front, and use it as the payment reference
     const applicationId = uuidv4();
 
-    // Read the live, admin-editable fee rather than the env-var default, so
-    // changes made in the admin Settings panel take effect immediately.
+    // Read the live, admin-editable fee — the only source of truth.
     const currentApplicationFee = Number(systemSettings.application_fee) > 0
       ? Number(systemSettings.application_fee)
-      : APPLICATION_FEE;
+      : APPLICATION_FEE_SEED_DEFAULT;
 
     const currency = getCurrencyForCountry(country);
     let localAmount;

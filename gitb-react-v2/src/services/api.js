@@ -261,8 +261,11 @@ export async function getUsers(token) {
   return Array.isArray(data) ? data : [];
 }
 
+// NOTE: this is intentionally /api/system/settings, not /api/system-config —
+// that's a separate, older config store (site branding) unrelated to
+// application_fee / dashboard banner, which live here instead.
 export async function getSystemSettings(token) {
-  const res = await fetch(`${API_BASE}/api/system-config`, {
+  const res = await fetch(`${API_BASE}/api/system/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load system settings');
@@ -270,7 +273,7 @@ export async function getSystemSettings(token) {
 }
 
 export async function updateSystemSettings(token, payload) {
-  const res = await fetch(`${API_BASE}/api/system-config`, {
+  const res = await fetch(`${API_BASE}/api/system/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
