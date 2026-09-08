@@ -1,22 +1,42 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BookOpen, CheckCircle, CreditCard, Globe, User } from 'lucide-react';
 import { createApplication, fetchCourses } from '../services/api';
-import PaymentMethodPicker, { isPaymentMethodComplete, buildCountryCode } from '../components/PaymentMethodPicker';
+import CountryPicker, { openFlutterwaveCheckout } from '../components/PaymentMethodPicker';
 
 const steps = [
   { label: 'Personal Details', icon: User },
   { label: 'Program Selection', icon: BookOpen },
-  { label: 'Payment Method', icon: Globe },
-  { label: 'Review', icon: CreditCard },
+  { label: 'Country', icon: Globe },
+  { label: 'Review & Pay', icon: CreditCard },
 ];
 
 const inputClass = 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#0B3B2C] focus:ring-2 focus:ring-[#0B3B2C]/10 text-[#1a1a1a] text-sm transition-all';
 const labelClass = 'block text-sm font-semibold text-[#1a1a1a] mb-2';
 
+// Common dial codes for the phone field — not exhaustive, but covers GITB's
+// primary markets. Falls back to a free-text "+" prefix if not listed.
+const DIAL_CODES = [
+  { code: '+234', label: 'Nigeria (+234)' },
+  { code: '+233', label: 'Ghana (+233)' },
+  { code: '+254', label: 'Kenya (+254)' },
+  { code: '+256', label: 'Uganda (+256)' },
+  { code: '+255', label: 'Tanzania (+255)' },
+  { code: '+250', label: 'Rwanda (+250)' },
+  { code: '+27', label: 'South Africa (+27)' },
+  { code: '+20', label: 'Egypt (+20)' },
+  { code: '+44', label: 'United Kingdom (+44)' },
+  { code: '+353', label: 'Ireland (+353)' },
+  { code: '+1', label: 'US/Canada (+1)' },
+  { code: '+49', label: 'Germany (+49)' },
+  { code: '+33', label: 'France (+33)' },
+  { code: '+91', label: 'India (+91)' },
+];
+
 export default function Apply() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const initCourse = searchParams.get('course') || '';
   const referralCode = searchParams.get('ref') || '';
 
@@ -24,16 +44,18 @@ export default function Apply() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [payment, setPayment] = useState(null); // { reference, amount, currency, public_key, customer }
 
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
-    phone: '',
+    phoneCode: '+234',
+    phoneNumber: '',
     courseId: initCourse,
     motivation: '',
+    country: '',
   });
-  const [payment, setPayment] = useState({ country: '', payment_method: { type: 'card' } });
 
   useEffect(() => {
     fetchCourses().then(setCourses).catch(() => {});
@@ -43,38 +65,46 @@ export default function Apply() {
 
   const canAdvanceStep1 = form.firstName && form.lastName && form.email;
   const canAdvanceStep2 = form.courseId;
-  const canAdvanceStep3 = isPaymentMethodComplete(payment);
+  const canAdvanceStep3 = !!form.country;
   const selectedCourse = courses.find((course) => course.id === form.courseId);
 
-  const handleSubmit = async () => {
+  // Creates the payment intent server-side (computes the local-currency
+  // amount) so we can show it on the review screen before the student pays.
+  const prepareApplication = async () => {
     setLoading(true);
     setError('');
     try {
-      const paymentMethod = { ...payment.payment_method };
-      if (paymentMethod.type === 'mobile_money') {
-        paymentMethod.country_code = buildCountryCode(payment.country);
-      }
       const data = await createApplication({
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         email: form.email.toLowerCase().trim(),
-        phone: form.phone.trim(),
+        phone: form.phoneNumber ? `${form.phoneCode}${form.phoneNumber.replace(/^0+/, '')}` : '',
         course_id: form.courseId,
         motivation: form.motivation,
-        origin_url: window.location.origin,
         referral_code: referralCode,
-        country: payment.country,
-        payment_method: paymentMethod,
+        country: form.country,
       });
-      if (data?.checkout_url) {
-        window.location.href = data.checkout_url;
-      } else {
-        setError('Payment session could not be created. Please try again.');
-      }
+      setPayment(data);
+      setStep(3);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePay = () => {
+    if (!payment) return;
+    setError('');
+    try {
+      openFlutterwaveCheckout(payment, {
+        title: 'GITB Application Fee',
+        description: selectedCourse ? `Application fee — ${selectedCourse.title}` : 'Application fee',
+        onSuccessRef: (reference) => navigate(`/apply/success?ref=${reference}`),
+        onClose: () => setError('Payment was cancelled. You can try again anytime.'),
+      });
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -146,7 +176,26 @@ export default function Apply() {
                 </div>
                 <div className="mb-6">
                   <label className={labelClass}>Phone Number</label>
-                  <input className={inputClass} type="tel" name="phone" value={form.phone} onChange={update} placeholder="+44 7000 000000" />
+                  <div className="flex gap-2">
+                    <select
+                      name="phoneCode"
+                      value={form.phoneCode}
+                      onChange={update}
+                      className={`${inputClass} w-36 shrink-0`}
+                    >
+                      {DIAL_CODES.map((d) => (
+                        <option key={d.code} value={d.code}>{d.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      className={inputClass}
+                      type="tel"
+                      name="phoneNumber"
+                      value={form.phoneNumber}
+                      onChange={update}
+                      placeholder="700 000 000"
+                    />
+                  </div>
                 </div>
                 <button
                   onClick={() => setStep(1)}
@@ -218,12 +267,16 @@ export default function Apply() {
 
             {step === 2 && (
               <motion.div key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Where are you paying from?</h2>
-                <p className="text-sm text-gray-500 mb-6">This tells us which currency and payment methods to offer you for the application fee.</p>
+                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Country of residence</h2>
+                <p className="text-sm text-gray-500 mb-6">This tells us the currency and local payment methods to offer you for the application fee.</p>
 
                 <div className="mb-6">
-                  <PaymentMethodPicker value={payment} onChange={setPayment} />
+                  <CountryPicker country={form.country} onChange={(country) => setForm((prev) => ({ ...prev, country }))} />
                 </div>
+
+                {error && (
+                  <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-xl text-sm font-medium">{error}</div>
+                )}
 
                 <div className="flex gap-3">
                   <button
@@ -233,11 +286,11 @@ export default function Apply() {
                     Back
                   </button>
                   <button
-                    onClick={() => setStep(3)}
-                    disabled={!canAdvanceStep3}
+                    onClick={prepareApplication}
+                    disabled={!canAdvanceStep3 || loading}
                     className="flex-grow py-4 rounded-full font-bold text-base bg-[#0B3B2C] text-white hover:bg-[#164E3E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    Review application
+                    {loading ? 'Calculating…' : 'Continue'}
                   </button>
                 </div>
               </motion.div>
@@ -245,14 +298,14 @@ export default function Apply() {
 
             {step === 3 && (
               <motion.div key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Review and submit</h2>
+                <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Review and pay</h2>
 
                 <div className="space-y-3 mb-6">
                   <div className="bg-[#F3F4F6] rounded-2xl p-4">
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Applicant</p>
                     <p className="font-semibold text-[#1a1a1a]">{form.firstName} {form.lastName}</p>
                     <p className="text-sm text-gray-500">{form.email}</p>
-                    {form.phone && <p className="text-sm text-gray-500">{form.phone}</p>}
+                    {form.phoneNumber && <p className="text-sm text-gray-500">{form.phoneCode} {form.phoneNumber}</p>}
                   </div>
 
                   <div className="bg-[#F3F4F6] rounded-2xl p-4">
@@ -261,12 +314,12 @@ export default function Apply() {
                     {selectedCourse && <p className="text-sm text-gray-500">{selectedCourse.duration} · {selectedCourse.level}</p>}
                   </div>
 
-                  <div className="bg-[#F3F4F6] rounded-2xl p-4">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Payment Method</p>
-                    <p className="font-semibold text-[#1a1a1a]">
-                      {payment.payment_method?.type === 'mobile_money' ? 'Mobile Money' : 'Debit/Credit Card'}
-                    </p>
-                  </div>
+                  {payment && (
+                    <div className="bg-[#0B3B2C] rounded-2xl p-5 text-white">
+                      <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Amount to Pay</p>
+                      <p className="text-2xl font-bold">{payment.currency} {payment.amount.toLocaleString()}</p>
+                    </div>
+                  )}
                 </div>
 
                 {error && (
@@ -274,10 +327,6 @@ export default function Apply() {
                     {error}
                   </div>
                 )}
-
-                <p className="text-sm text-gray-500 leading-relaxed mb-6">
-                  When you submit, we will create your application and direct you to the secure payment step if required by the backend flow.
-                </p>
 
                 <div className="flex gap-3">
                   <button
@@ -287,11 +336,11 @@ export default function Apply() {
                     Back
                   </button>
                   <button
-                    onClick={handleSubmit}
-                    disabled={loading}
+                    onClick={handlePay}
+                    disabled={!payment}
                     className="flex-grow py-4 rounded-full font-bold text-base bg-[#D4F542] text-[#0B3B2C] hover:bg-white border border-[#D4F542] hover:border-[#0B3B2C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    {loading ? 'Processing…' : 'Submit application'}
+                    Pay Now
                   </button>
                 </div>
               </motion.div>

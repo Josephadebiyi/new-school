@@ -426,11 +426,11 @@ export async function getMyReferrals(token) {
   return res.json();
 }
 
-export async function createTuitionPayment(token, courseId, paymentPlan, originUrl, country, paymentMethod) {
+export async function createTuitionPayment(token, courseId, paymentPlan, country) {
   const res = await fetch(`${API_BASE}/api/tuition/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ course_id: courseId, payment_plan: paymentPlan, origin_url: originUrl, country, payment_method: paymentMethod }),
+    body: JSON.stringify({ course_id: courseId, payment_plan: paymentPlan, country }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || 'Payment failed');

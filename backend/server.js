@@ -54,9 +54,8 @@ require("dotenv").config();
 const REQUIRED_ENV_VARS = [
   "MONGO_URL",
   "JWT_SECRET",
-  "FLW_CLIENT_ID",
-  "FLW_CLIENT_SECRET",
-  "FLW_ENCRYPTION_KEY"
+  "FLW_SECRET_KEY",
+  "FLW_PUBLIC_KEY"
 ];
 
 const OPTIONAL_ENV_VARS = [
@@ -67,7 +66,6 @@ const OPTIONAL_ENV_VARS = [
   "APPLICATION_FEE_EUR",
   "DB_NAME",
   "FLW_WEBHOOK_HASH",
-  "FLW_API_BASE",
   "CRON_SECRET"
 ];
 
@@ -143,11 +141,10 @@ const refreshSystemSettings = async () => {
 };
 
 // Initialize services
-const FLW_CLIENT_ID = process.env.FLW_CLIENT_ID;
-const FLW_CLIENT_SECRET = process.env.FLW_CLIENT_SECRET;
-const FLW_ENCRYPTION_KEY = process.env.FLW_ENCRYPTION_KEY;
-const flutterwaveEnabled = !!(FLW_CLIENT_ID && FLW_CLIENT_SECRET && FLW_ENCRYPTION_KEY);
-console.log(flutterwaveEnabled ? "Flutterwave configured" : "FATAL: FLW_CLIENT_ID/FLW_CLIENT_SECRET/FLW_ENCRYPTION_KEY missing");
+const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY;
+const FLW_PUBLIC_KEY = process.env.FLW_PUBLIC_KEY;
+const flutterwaveEnabled = !!(FLW_SECRET_KEY && FLW_PUBLIC_KEY);
+console.log(flutterwaveEnabled ? "Flutterwave configured" : "FATAL: FLW_SECRET_KEY/FLW_PUBLIC_KEY missing");
 if (!flutterwaveEnabled) process.exit(1);
 
 let resend = null;
@@ -180,34 +177,14 @@ if (!process.env.FLW_WEBHOOK_HASH) {
 }
 
 // ============ FLUTTERWAVE PAYMENTS ============
-// Sandbox by default — set FLW_API_BASE to your confirmed production base URL
-// once you've verified it in your Flutterwave dashboard.
-const FLW_API_BASE = process.env.FLW_API_BASE || "https://developersandbox-api.flutterwave.com";
-const FLW_TOKEN_URL = "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
-
-// OAuth2 client-credentials token, cached until ~30s before it expires
-// (Flutterwave issues 10-minute tokens).
-let flwTokenCache = { token: null, expiresAt: 0 };
-async function getFlutterwaveAccessToken() {
-  if (flwTokenCache.token && flwTokenCache.expiresAt > Date.now() + 30000) {
-    return flwTokenCache.token;
-  }
-  const res = await fetch(FLW_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: FLW_CLIENT_ID,
-      client_secret: FLW_CLIENT_SECRET,
-      grant_type: "client_credentials"
-    })
-  });
-  const data = await res.json();
-  if (!res.ok || !data.access_token) {
-    throw new Error("Failed to obtain Flutterwave access token");
-  }
-  flwTokenCache = { token: data.access_token, expiresAt: Date.now() + (data.expires_in || 600) * 1000 };
-  return flwTokenCache.token;
-}
+// Using Flutterwave's classic v3 "Inline" checkout: the browser loads
+// checkout.flutterwave.com/v3.js and calls FlutterwaveCheckout({...}) with a
+// public key. Flutterwave's own hosted widget then shows whichever payment
+// methods (card, bank transfer, USSD, mobile money) are actually available
+// for the currency we tell it to charge in — we don't build per-method forms
+// ourselves. Our server only computes the amount/currency and later verifies
+// the completed charge; it never touches raw card data at all.
+const FLW_API_BASE = "https://api.flutterwave.com/v3";
 
 // Constant-time secret comparison — avoids leaking secret bytes via response
 // timing, for the webhook signature and cron-secret checks.
@@ -219,105 +196,37 @@ function timingSafeStringEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function generateFlutterwaveNonce() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let nonce = "";
-  for (let i = 0; i < 12; i++) nonce += chars.charAt(Math.floor(Math.random() * chars.length));
-  return nonce;
-}
-
-// AES-256-GCM, per Flutterwave's encryption spec — card fields never leave
-// our server unencrypted, but our server does briefly hold the raw values
-// (see the PCI compliance discussion — this is a known, accepted tradeoff).
-// NOTE: verify this against a real sandbox card transaction before relying on
-// it in production — Flutterwave's docs don't fully specify whether the auth
-// tag is appended to the ciphertext or handled separately; this implementation
-// assumes the common convention of ciphertext+tag concatenated then base64'd.
-function encryptCardField(plaintext, nonce) {
-  const key = Buffer.from(FLW_ENCRYPTION_KEY, "base64");
-  const iv = Buffer.from(nonce, "utf8");
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(String(plaintext), "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return Buffer.concat([encrypted, authTag]).toString("base64");
-}
-
-// Builds the payment_method object for the direct-charge request based on
-// the type the student picked on our own country/method picker. Only "card"
-// and "mobile_money" are implemented — bank_account/ussd field names weren't
-// confirmable from public docs and need testing against a real sandbox
-// account before being enabled.
-function buildFlutterwavePaymentMethod(input) {
-  if (input.type === "card") {
-    const nonce = generateFlutterwaveNonce();
-    return {
-      type: "card",
-      card: {
-        encrypted_card_number: encryptCardField(input.card_number, nonce),
-        encrypted_expiry_month: encryptCardField(input.expiry_month, nonce),
-        encrypted_expiry_year: encryptCardField(input.expiry_year, nonce),
-        encrypted_cvv: encryptCardField(input.cvv, nonce),
-        nonce
-      }
-    };
-  }
-  if (input.type === "mobile_money") {
-    // Local numbers are usually entered with a leading 0 (e.g. "0712345678"),
-    // but Flutterwave expects it without, since country_code is sent separately.
-    const digitsOnly = (input.phone_number || "").replace(/[^0-9]/g, "");
-    const phoneNumber = digitsOnly.startsWith("0") ? digitsOnly.slice(1) : digitsOnly;
-    return {
-      type: "mobile_money",
-      mobile_money: {
-        country_code: input.country_code,
-        network: (input.network || "").toUpperCase(),
-        phone_number: phoneNumber
-      }
-    };
-  }
-  throw new Error(`Unsupported payment method type: ${input.type}`);
-}
-
-async function createFlutterwaveCharge({ amount, currency, reference, redirectUrl, customerEmail, customerName, customerPhone, paymentMethod, meta }) {
-  const token = await getFlutterwaveAccessToken();
-  const [firstName, ...rest] = (customerName || "").trim().split(" ");
-  const res = await fetch(`${FLW_API_BASE}/orchestration/direct-charges`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-Trace-Id": reference,
-      "X-Idempotency-Key": reference
-    },
-    body: JSON.stringify({
-      amount,
-      currency,
-      reference,
-      customer: {
-        email: customerEmail,
-        name: { first: firstName || customerName || "Student", last: rest.join(" ") || "-" },
-        ...(customerPhone && { phone: customerPhone })
-      },
-      payment_method: buildFlutterwavePaymentMethod(paymentMethod),
-      redirect_url: redirectUrl,
-      meta
-    })
-  });
-  const data = await res.json();
-  if (!res.ok || data.status !== "success") {
-    throw new Error(data.message || "Flutterwave charge creation failed");
-  }
-  return data.data; // { id, status, next_action, ... }
-}
-
-async function getFlutterwaveCharge(chargeId) {
-  const token = await getFlutterwaveAccessToken();
-  const res = await fetch(`${FLW_API_BASE}/charges/${chargeId}`, {
-    headers: { Authorization: `Bearer ${token}` }
+// Re-fetches a charge's true status/amount directly from Flutterwave — used
+// by the webhook (never trust the webhook body alone) and by status polling.
+async function verifyFlutterwaveTransaction(transactionId) {
+  const res = await fetch(`${FLW_API_BASE}/transactions/${transactionId}/verify`, {
+    headers: { Authorization: `Bearer ${FLW_SECRET_KEY}` }
   });
   const data = await res.json();
   if (!res.ok || data.status !== "success") return null;
   return data.data;
+}
+
+// Same as above, but looked up by OUR reference — used when we don't yet
+// have Flutterwave's own numeric transaction id (e.g. polling status right
+// after redirect, before the webhook has told us the id).
+async function verifyFlutterwaveByReference(txRef) {
+  const res = await fetch(`${FLW_API_BASE}/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`, {
+    headers: { Authorization: `Bearer ${FLW_SECRET_KEY}` }
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== "success") return null;
+  return data.data;
+}
+
+// Confirms a charge is genuinely successful AND for the amount we actually
+// expected — the widget runs entirely in the browser, so a tampered amount
+// is the one thing we must never trust without this check.
+function chargeMatchesIntent(verified, intent) {
+  if (!verified || !intent) return false;
+  if (verified.status !== "successful") return false;
+  if (verified.currency !== intent.expected_currency) return false;
+  return Math.abs(Number(verified.amount) - Number(intent.expected_amount)) < 0.01;
 }
 
 // Country -> ISO currency code. Anything not listed here falls back to USD,
@@ -373,24 +282,6 @@ const COUNTRY_NAMES = {
   IN: "India", PK: "Pakistan", BD: "Bangladesh", LK: "Sri Lanka", NP: "Nepal", CN: "China", JP: "Japan", KR: "South Korea",
   SG: "Singapore", MY: "Malaysia", ID: "Indonesia", PH: "Philippines", TH: "Thailand", VN: "Vietnam", AU: "Australia", NZ: "New Zealand", HK: "Hong Kong",
 };
-
-// Which payment methods to offer on our OWN country/method picker, per
-// currency. Only "card" and "mobile_money" are wired up to Flutterwave today
-// (see buildFlutterwavePaymentMethod) — bank_transfer/ussd need their exact
-// field names confirmed against a sandbox account before being added here.
-const MOBILE_MONEY_CURRENCIES = ["KES", "UGX", "TZS", "GHS", "ZMW", "RWF", "XOF", "XAF", "MWK"];
-const MOBILE_MONEY_NETWORKS = {
-  KES: ["MPESA", "AIRTEL"], UGX: ["MTN", "AIRTEL"], TZS: ["MPESA", "TIGO", "AIRTEL"],
-  GHS: ["MTN", "AIRTEL", "VODAFONE"], ZMW: ["MTN", "AIRTEL"], RWF: ["MTN", "AIRTEL"],
-  XOF: ["MTN", "ORANGE", "MOOV"], XAF: ["MTN", "ORANGE"], MWK: ["AIRTEL", "TNM"]
-};
-function getAvailablePaymentMethods(currency) {
-  const methods = [{ type: "card", label: "Debit/Credit Card" }];
-  if (MOBILE_MONEY_CURRENCIES.includes(currency)) {
-    methods.push({ type: "mobile_money", label: "Mobile Money", networks: MOBILE_MONEY_NETWORKS[currency] || [] });
-  }
-  return methods;
-}
 
 // Simple in-memory FX rate cache (1 hour) — avoids hammering the rate API on
 // every single checkout request. Rates are approximate; Flutterwave applies
@@ -472,21 +363,14 @@ app.use(cors({
   credentials: true
 }));
 
-// Must be registered before express.json() so it receives the raw body buffer —
-// HMAC signature verification requires the exact raw bytes, not re-serialized JSON.
-app.post("/api/webhooks/flutterwave", express.raw({ type: "application/json" }), async (req, res) => {
+app.post("/api/webhooks/flutterwave", express.json(), async (req, res) => {
   try {
     const webhookHash = process.env.FLW_WEBHOOK_HASH;
-    const signature = req.headers["flutterwave-signature"];
+    const signature = req.headers["verif-hash"];
 
     if (webhookHash) {
-      if (!signature) {
-        console.error("Webhook rejected: missing flutterwave-signature header");
-        return res.status(401).send("Unauthorized");
-      }
-      const computed = crypto.createHmac("sha256", webhookHash).update(req.body).digest("base64");
-      if (!timingSafeStringEqual(computed, signature)) {
-        console.error("Webhook rejected: signature mismatch");
+      if (!signature || !timingSafeStringEqual(signature, webhookHash)) {
+        console.error("Webhook rejected: invalid or missing verif-hash");
         return res.status(401).send("Unauthorized");
       }
     } else if (process.env.NODE_ENV === "production") {
@@ -494,78 +378,17 @@ app.post("/api/webhooks/flutterwave", express.raw({ type: "application/json" }),
       return res.status(400).send("Webhook Error: webhook hash not configured");
     }
 
-    const event = JSON.parse(req.body.toString());
+    const event = req.body || {};
 
-    if (event.type === "charge.completed" && event.data?.id) {
+    if (event.event === "charge.completed" && event.data?.id) {
       // Never trust the webhook payload's amount/status directly — Flutterwave
-      // themselves recommend re-fetching the charge server-side to confirm.
-      const verified = await getFlutterwaveCharge(event.data.id);
-
+      // themselves recommend re-fetching the transaction server-side to confirm.
+      const verified = await verifyFlutterwaveTransaction(event.data.id);
       if (!verified) {
-        console.error(`Webhook: could not verify charge ${event.data.id}`);
+        console.error(`Webhook: could not verify transaction ${event.data.id}`);
         return res.json({ received: true });
       }
-
-      const meta = verified.meta || {};
-      const isSuccessful = verified.status === "succeeded";
-
-      if (meta.type === "tuition" && meta.enrollment_id) {
-        if (!isSuccessful) {
-          await sendTuitionFailedEmail(meta.enrollment_id);
-          return res.json({ received: true });
-        }
-
-        const result = await confirmTuitionInstallment(meta, verified.reference);
-        if (result) {
-          console.log(`Tuition installment ${result.installmentsPaid}/${result.totalInstallments} paid for enrollment ${meta.enrollment_id}`);
-        }
-      } else if (meta.type === "application_fee" && meta.application_id) {
-        if (!isSuccessful) {
-          await sendApplicationFeeFailedEmail(meta);
-          return res.json({ received: true });
-        }
-
-        // Flutterwave-first flow: application record doesn't exist yet — create it now.
-        const exists = await db.collection("applications").findOne({ id: meta.application_id });
-        if (!exists) {
-          await db.collection("applications").insertOne({
-            id: meta.application_id,
-            first_name: meta.first_name || "",
-            last_name: meta.last_name || "",
-            email: meta.email || "",
-            phone: meta.phone || null,
-            course_id: meta.course_id || null,
-            course_title: meta.course_title || null,
-            country: meta.country || null,
-            city: meta.city || null,
-            address: meta.address || null,
-            date_of_birth: meta.date_of_birth || null,
-            identification_url: meta.identification_url || null,
-            high_school_certificate_url: meta.high_school_certificate_url || null,
-            motivation: meta.motivation || null,
-            referred_by_code: meta.referred_by_code || null,
-            status: "pending",
-            payment_status: "paid",
-            flw_reference: verified.reference,
-            payment_amount: parseFloat(meta.eur_amount) || 0, // canonical EUR reference amount
-            payment_amount_local: verified.amount,
-            payment_currency: verified.currency,
-            created_at: new Date().toISOString(),
-            paid_at: new Date().toISOString(),
-          });
-          console.log(`Application created for ${meta.email} → course ${meta.course_id} (id: ${meta.application_id})`);
-
-          if (meta.email && meta.first_name) {
-            const courseTitle = meta.course_title ||
-              (await db.collection("courses").findOne({ id: meta.course_id }))?.title ||
-              "your chosen programme";
-            await sendApplicationReceivedEmail(meta.email, meta.first_name, courseTitle);
-            console.log(`Confirmation email sent to ${meta.email}`);
-          }
-        } else {
-          console.log(`Duplicate webhook for application ${meta.application_id} — skipping`);
-        }
-      }
+      await processFlutterwaveTransaction(verified);
     }
 
     res.json({ received: true });
@@ -574,6 +397,82 @@ app.post("/api/webhooks/flutterwave", express.raw({ type: "application/json" }),
     res.status(500).json({ detail: "Webhook processing failed" });
   }
 });
+
+// Shared by the webhook and the status-poll fallbacks. Looks up OUR OWN
+// stored payment_intent by reference (never trusts the widget/client for
+// amount or applicant details), confirms the transaction really succeeded
+// for the exact amount we expected, then dispatches to the right confirm
+// handler. Safe to call more than once for the same transaction.
+async function processFlutterwaveTransaction(verified) {
+  const intent = await db.collection("payment_intents").findOne({ reference: verified.tx_ref });
+  if (!intent) {
+    console.error(`No payment_intent found for tx_ref ${verified.tx_ref}`);
+    return null;
+  }
+
+  if (verified.status !== "successful") {
+    if (intent.type === "tuition") await sendTuitionFailedEmail(intent.meta.enrollment_id);
+    else if (intent.type === "application_fee") await sendApplicationFeeFailedEmail(intent.meta);
+    return null;
+  }
+
+  if (!chargeMatchesIntent(verified, intent)) {
+    console.error(`Amount mismatch for tx_ref ${verified.tx_ref}: expected ${intent.expected_amount} ${intent.expected_currency}, got ${verified.amount} ${verified.currency}`);
+    return null;
+  }
+
+  if (intent.type === "tuition") {
+    return await confirmTuitionInstallment(intent.meta, verified.tx_ref);
+  }
+  if (intent.type === "application_fee") {
+    return await confirmApplicationFee(intent.meta, verified);
+  }
+  return null;
+}
+
+// Flutterwave-first flow: the application record doesn't exist until this
+// runs. Idempotent — safe to call again for the same application_id.
+async function confirmApplicationFee(meta, verified) {
+  const exists = await db.collection("applications").findOne({ id: meta.application_id });
+  if (exists) return exists;
+
+  const application = {
+    id: meta.application_id,
+    first_name: meta.first_name || "",
+    last_name: meta.last_name || "",
+    email: meta.email || "",
+    phone: meta.phone || null,
+    course_id: meta.course_id || null,
+    course_title: meta.course_title || null,
+    country: meta.country || null,
+    city: meta.city || null,
+    address: meta.address || null,
+    date_of_birth: meta.date_of_birth || null,
+    identification_url: meta.identification_url || null,
+    high_school_certificate_url: meta.high_school_certificate_url || null,
+    motivation: meta.motivation || null,
+    referred_by_code: meta.referred_by_code || null,
+    status: "pending",
+    payment_status: "paid",
+    flw_reference: verified.tx_ref,
+    payment_amount: Number(meta.eur_amount) || 0, // canonical EUR reference amount
+    payment_amount_local: verified.amount,
+    payment_currency: verified.currency,
+    created_at: new Date().toISOString(),
+    paid_at: new Date().toISOString(),
+  };
+  await db.collection("applications").insertOne(application);
+  console.log(`Application created for ${meta.email} → course ${meta.course_id} (id: ${meta.application_id})`);
+
+  if (meta.email && meta.first_name) {
+    const courseTitle = meta.course_title ||
+      (await db.collection("courses").findOne({ id: meta.course_id }))?.title ||
+      "your chosen programme";
+    await sendApplicationReceivedEmail(meta.email, meta.first_name, courseTitle);
+    console.log(`Confirmation email sent to ${meta.email}`);
+  }
+  return application;
+}
 
 async function sendApplicationFeeFailedEmail(meta) {
   if (!meta.email) return;
@@ -909,6 +808,7 @@ app.get("/api", (req, res) => {
 // Public config endpoint (safe to expose)
 app.get("/api/config", (req, res) => {
   res.json({
+    flutterwavePublicKey: FLW_PUBLIC_KEY,
     applicationFee: systemSettings.application_fee ?? APPLICATION_FEE,
     currency: process.env.DEFAULT_CURRENCY || "EUR",
     dashboardBanner: {
@@ -2658,12 +2558,6 @@ app.get("/api/countries", (req, res) => {
   res.json(countries);
 });
 
-// Public: which payment methods we can offer for a given country
-app.get("/api/payment-methods", (req, res) => {
-  const currency = getCurrencyForCountry(req.query.country);
-  res.json({ currency, methods: getAvailablePaymentMethods(currency) });
-});
-
 app.post("/api/applications/create", applicationLimiter, async (req, res) => {
   try {
     if (!db) return res.status(503).json({ detail: "Database not available" });
@@ -2673,14 +2567,14 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       first_name, last_name, email, phone, course_id,
       country, city, address, date_of_birth,
       identification_url, high_school_certificate_url,
-      motivation, origin_url, referral_code, payment_method
+      motivation, referral_code
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
       return res.status(422).json({ detail: "Missing required fields: first_name, last_name, email, course_id" });
     }
-    if (!country || !payment_method?.type) {
-      return res.status(422).json({ detail: "Country and payment method are required" });
+    if (!country) {
+      return res.status(422).json({ detail: "Country of residence is required" });
     }
 
     // Validate referral code, if provided. A referrer can't refer themselves,
@@ -2719,7 +2613,6 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
 
     // Generate a unique application ID up front, and use it as the payment reference
     const applicationId = uuidv4();
-    const frontendBase = origin_url || FRONTEND_URL || 'https://gitb.lt';
 
     // Read the live, admin-editable fee rather than the env-var default, so
     // changes made in the admin Settings panel take effect immediately.
@@ -2736,80 +2629,47 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       return res.status(502).json({ detail: "Could not determine payment amount for your country. Please try again shortly." });
     }
 
-    let charge;
-    try {
-      charge = await createFlutterwaveCharge({
-        amount: localAmount,
-        currency,
-        reference: applicationId,
-        redirectUrl: `${frontendBase}/apply/success?ref=${applicationId}`,
-        customerEmail: email,
-        customerName: `${first_name} ${last_name}`,
-        // Not sending customerPhone: Flutterwave requires it as a structured
-        // {country_code, number} object, and free-text phone input can't be
-        // reliably split into that shape — a malformed one risks the whole
-        // charge request being rejected. Email is the only required customer field.
-        paymentMethod: payment_method,
-        meta: {
-          type: "application_fee",
-          application_id: applicationId,
-          course_id: course.id,
-          course_title: course.title,
-          first_name,
-          last_name,
-          email: email.toLowerCase().trim(),
-          phone: phone || "",
-          country: country || "",
-          city: city || "",
-          address: address || "",
-          date_of_birth: date_of_birth || "",
-          identification_url: identification_url || "",
-          high_school_certificate_url: high_school_certificate_url || "",
-          motivation: (motivation || "").slice(0, 490),
-          referred_by_code: referredByCode,
-          eur_amount: String(currentApplicationFee)
-        }
-      });
-    } catch (flwErr) {
-      console.error("Flutterwave charge creation failed:", flwErr.message);
-      return res.status(502).json({
-        detail: "Payment could not be created. Please try again or contact admissions@gitb.lt",
-      });
-    }
-
+    // Nothing is charged here — the browser launches Flutterwave's own
+    // checkout widget with these values. We store the canonical amount and
+    // all the applicant's details now, server-side, so the webhook never has
+    // to trust anything the client (or the widget) reports back to us.
     await db.collection("payment_intents").insertOne({
       reference: applicationId,
-      flw_charge_id: charge.id,
       type: "application_fee",
+      expected_amount: localAmount,
+      expected_currency: currency,
+      meta: {
+        type: "application_fee",
+        application_id: applicationId,
+        course_id: course.id,
+        course_title: course.title,
+        first_name,
+        last_name,
+        email: email.toLowerCase().trim(),
+        phone: phone || "",
+        country: country || "",
+        city: city || "",
+        address: address || "",
+        date_of_birth: date_of_birth || "",
+        identification_url: identification_url || "",
+        high_school_certificate_url: high_school_certificate_url || "",
+        motivation: (motivation || "").slice(0, 1000),
+        referred_by_code: referredByCode,
+        eur_amount: currentApplicationFee
+      },
       created_at: new Date().toISOString()
     });
 
-    console.log(`Flutterwave charge created for ${email} → ${course.title} (ref: ${applicationId}, status: ${charge.status})`);
+    console.log(`Payment intent created for ${email} → ${course.title} (ref: ${applicationId}, ${localAmount} ${currency})`);
 
-    if (charge.next_action?.type === "redirect_url" && charge.next_action.redirect_url?.url) {
-      return res.json({
-        data: {
-          checkout_url: charge.next_action.redirect_url.url,
-          application_id: applicationId,
-        },
-      });
-    }
-
-    if (charge.status === "succeeded" || charge.next_action?.type === "payment_instruction") {
-      // Either already confirmed, or the customer just needs to approve a push
-      // notification on their phone (mobile money) — no redirect needed either way.
-      return res.json({
-        data: {
-          checkout_url: `${frontendBase}/apply/success?ref=${applicationId}`,
-          application_id: applicationId,
-        },
-      });
-    }
-
-    // requires_otp / requires_pin / requires_additional_fields aren't wired up yet.
-    console.error(`Unsupported next_action for application ${applicationId}:`, charge.next_action);
-    return res.status(502).json({
-      detail: "This payment method needs an additional verification step we don't support yet. Please try a different method or contact admissions@gitb.lt",
+    res.json({
+      data: {
+        reference: applicationId,
+        amount: localAmount,
+        currency,
+        public_key: FLW_PUBLIC_KEY,
+        customer: { email: email.toLowerCase().trim(), name: `${first_name} ${last_name}` },
+      },
     });
   } catch (error) {
     console.error("Create application error:", error);
@@ -2837,21 +2697,18 @@ app.get("/api/applications/status/:sessionId", async (req, res) => {
       if (!intent) {
         return res.status(404).json({ detail: "Application not found" });
       }
-      try {
-        const charge = await getFlutterwaveCharge(intent.flw_charge_id);
-        if (charge?.status === "succeeded") {
-          // Payment is confirmed by Flutterwave, but the application record
-          // hasn't been created yet (webhook hasn't run). Don't claim success prematurely.
-          return res.json({
-            status: "processing",
-            payment_status: "paid",
-            message: "Your payment was received and is being processed. This page will update automatically."
-          });
-        }
-        return res.json({ status: "pending_payment", payment_status: charge?.status || "pending" });
-      } catch (e) {
-        return res.status(404).json({ detail: "Application not found" });
+      const verified = await verifyFlutterwaveByReference(reference);
+      if (verified?.status === "successful" && chargeMatchesIntent(verified, intent)) {
+        // Confirmed by Flutterwave — create the application now in case the
+        // webhook hasn't landed yet (this is idempotent with the webhook).
+        await confirmApplicationFee(intent.meta, verified);
+        return res.json({
+          status: "processing",
+          payment_status: "paid",
+          message: "Your payment was received and is being processed. This page will update automatically."
+        });
       }
+      return res.json({ status: "pending_payment", payment_status: verified?.status || "pending" });
     }
 
     res.json({
@@ -3276,13 +3133,13 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = req.user;
-    const { course_id, origin_url, payment_plan, country, payment_method } = req.body;
+    const { course_id, payment_plan, country } = req.body;
 
     if (!course_id) {
       return res.status(422).json({ detail: "Course ID is required" });
     }
-    if (!country || !payment_method?.type) {
-      return res.status(422).json({ detail: "Country and payment method are required" });
+    if (!country) {
+      return res.status(422).json({ detail: "Country of residence is required" });
     }
 
     // Check enrollment exists and is pending payment
@@ -3418,66 +3275,47 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(502).json({ detail: "Could not determine payment amount for your country. Please try again shortly." });
     }
 
+    // Nothing is charged here — the browser launches Flutterwave's own
+    // checkout widget with these values, and the webhook (or the status-poll
+    // fallback) confirms the real outcome against what we stored below.
     const reference = uuidv4();
-    const frontendBase = origin_url || FRONTEND_URL;
-    let charge;
-    try {
-      charge = await createFlutterwaveCharge({
-        amount: localAmount,
-        currency,
-        reference,
-        redirectUrl: `${frontendBase}/student/dashboard?payment=success&course=${course_id}&ref=${reference}`,
-        customerEmail: user.email,
-        customerName: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email,
-        paymentMethod: payment_method,
-        meta: {
-          type: "tuition",
-          enrollment_id: enrollment.id,
-          course_id: course_id,
-          user_id: userId,
-          user_email: user.email,
-          discount_applied_cents: String(discountCents),
-          is_monthly: String(isMonthly),
-          eur_amount: String(chargeAmount)
-        }
-      });
-    } catch (flwErr) {
-      console.error("Create tuition payment error:", flwErr.message);
-      return res.status(502).json({ detail: "Payment could not be processed. Please try again or contact admissions@gitb.lt" });
-    }
-
     await db.collection("payment_intents").insertOne({
       reference,
-      flw_charge_id: charge.id,
       type: "tuition",
+      expected_amount: localAmount,
+      expected_currency: currency,
+      meta: {
+        type: "tuition",
+        enrollment_id: enrollment.id,
+        course_id: course_id,
+        user_id: userId,
+        user_email: user.email,
+        discount_applied_cents: String(discountCents),
+        is_monthly: String(isMonthly),
+        eur_amount: String(chargeAmount)
+      },
       created_at: new Date().toISOString()
     });
 
     await db.collection("enrollments").updateOne(
       { id: enrollment.id },
-      { $set: { flw_last_reference_pending: reference, payment_plan: isMonthly ? 'monthly' : 'one_time', total_installments: totalInstallments } }
+      { $set: { payment_plan: isMonthly ? 'monthly' : 'one_time', total_installments: totalInstallments } }
     );
 
-    const responsePayload = {
-      enrollment_id: enrollment.id,
-      course_title: course.title,
-      amount: finalChargeCents / 100,
-      referral_discount_applied: discountCents / 100,
-      payment_plan: isMonthly ? 'monthly' : 'one_time',
-      installment: installmentNumber,
-      total_installments: totalInstallments
-    };
-
-    if (charge.next_action?.type === "redirect_url" && charge.next_action.redirect_url?.url) {
-      return res.json({ data: { ...responsePayload, checkout_url: charge.next_action.redirect_url.url } });
-    }
-    if (charge.status === "succeeded" || charge.next_action?.type === "payment_instruction") {
-      return res.json({ data: { ...responsePayload, checkout_url: `${frontendBase}/student/dashboard?payment=success&course=${course_id}&ref=${reference}` } });
-    }
-
-    console.error(`Unsupported next_action for tuition payment ${reference}:`, charge.next_action);
-    return res.status(502).json({
-      detail: "This payment method needs an additional verification step we don't support yet. Please try a different method or contact admissions@gitb.lt",
+    res.json({
+      data: {
+        reference,
+        amount: localAmount,
+        currency,
+        public_key: FLW_PUBLIC_KEY,
+        customer: { email: user.email, name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email },
+        enrollment_id: enrollment.id,
+        course_title: course.title,
+        referral_discount_applied: discountCents / 100,
+        payment_plan: isMonthly ? 'monthly' : 'one_time',
+        installment: installmentNumber,
+        total_installments: totalInstallments
+      }
     });
   } catch (error) {
     console.error("Create tuition payment error:", error);
@@ -3496,18 +3334,17 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
       return res.status(404).json({ detail: "Payment reference not found" });
     }
 
-    const charge = await getFlutterwaveCharge(intent.flw_charge_id);
-    if (!charge) {
-      return res.status(502).json({ detail: "Could not check payment status. Please try again shortly." });
-    }
-
-    if (charge.meta?.user_id && charge.meta.user_id !== req.user.id) {
+    if (intent.meta?.user_id && intent.meta.user_id !== req.user.id) {
       return res.status(403).json({ detail: "Not authorized to view this payment" });
     }
 
-    if (charge.status === "succeeded") {
-      const meta = charge.meta || {};
-      const result = await confirmTuitionInstallment(meta, reference);
+    const verified = await verifyFlutterwaveByReference(reference);
+    if (!verified) {
+      return res.status(502).json({ detail: "Could not check payment status. Please try again shortly." });
+    }
+
+    if (verified.status === "successful" && chargeMatchesIntent(verified, intent)) {
+      const result = await confirmTuitionInstallment(intent.meta, reference);
       return res.json({
         status: "active",
         payment_status: result?.fullyPaid ? "paid" : "partial",
@@ -3515,7 +3352,7 @@ app.get("/api/tuition/status/:sessionId", authenticate, async (req, res) => {
       });
     }
 
-    res.json({ status: charge.status === "failed" ? "failed" : "pending", payment_status: charge.status });
+    res.json({ status: verified.status === "failed" ? "failed" : "pending", payment_status: verified.status });
   } catch (error) {
     console.error("Check tuition status error:", error);
     res.status(500).json({ detail: "Internal server error" });

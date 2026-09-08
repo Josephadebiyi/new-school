@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import PaymentMethodPicker, { isPaymentMethodComplete, buildCountryCode } from '../components/PaymentMethodPicker';
+import CountryPicker, { openFlutterwaveCheckout } from '../components/PaymentMethodPicker';
 import {
   getMyCourses, getMyEnrollments, getCourseMaterials, getCourseQuizzes,
   getQuizById, submitQuiz, getMyQuizResults, markLessonComplete,
@@ -67,7 +67,7 @@ export default function StudentDashboard() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentModal, setPaymentModal] = useState(null); // { courseId, plan } while the picker is open
-  const [paymentDetails, setPaymentDetails] = useState({ country: '', payment_method: { type: 'card' } });
+  const [paymentCountry, setPaymentCountry] = useState('');
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', phone: '', profilePicture: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
@@ -190,8 +190,8 @@ export default function StudentDashboard() {
     } catch (err) { setError(err.message || 'Failed to submit quiz.'); }
   }
 
-  // Opens the payment-method modal instead of paying immediately — Flutterwave
-  // needs a country + payment method before we can create a charge.
+  // Opens the country-picker modal instead of paying immediately — we need
+  // to know the country to compute the local-currency amount first.
   function handlePayment(courseIdOrEnrollment, explicitPlan = null) {
     const courseId = typeof courseIdOrEnrollment === 'string'
       ? courseIdOrEnrollment
@@ -199,34 +199,45 @@ export default function StudentDashboard() {
     const plan = explicitPlan
       || (typeof courseIdOrEnrollment === 'object' ? courseIdOrEnrollment.payment_plan : null)
       || 'one_time';
-    setPaymentModal({ courseId, plan });
-    setPaymentDetails({ country: '', payment_method: { type: 'card' } });
+    setPaymentModal({ courseId, plan, preview: null });
+    setPaymentCountry('');
   }
 
-  async function executePayment() {
-    if (!paymentModal) return;
+  // Computes the local-currency amount server-side so it can be shown before
+  // the student commits to paying.
+  async function preparePayment() {
+    if (!paymentModal || !paymentCountry) return;
     setPaymentLoading(true); setError('');
     try {
-      const paymentMethod = { ...paymentDetails.payment_method };
-      if (paymentMethod.type === 'mobile_money') {
-        paymentMethod.country_code = buildCountryCode(paymentDetails.country);
-      }
-      const data = await createTuitionPayment(
-        token, paymentModal.courseId, paymentModal.plan, window.location.origin,
-        paymentDetails.country, paymentMethod
-      );
+      const data = await createTuitionPayment(token, paymentModal.courseId, paymentModal.plan, paymentCountry);
       const payload = data?.data || data;
       if (payload?.fully_covered) {
         setPaymentSuccess(true);
         setPaymentModal(null);
         await loadInitial();
-      } else if (payload?.checkout_url) {
-        window.location.href = payload.checkout_url;
-      } else {
-        setError('No checkout URL returned. Please contact support.');
+        return;
       }
+      setPaymentModal((prev) => ({ ...prev, preview: payload }));
     } catch (err) { setError(err.message || 'Payment failed. Please try again.'); }
     finally { setPaymentLoading(false); }
+  }
+
+  function executePayment() {
+    const payment = paymentModal?.preview;
+    if (!payment) return;
+    setError('');
+    try {
+      openFlutterwaveCheckout(payment, {
+        title: 'GITB Tuition Payment',
+        description: `Tuition — ${payment.course_title || ''}`,
+        onSuccessRef: async () => {
+          setPaymentModal(null);
+          setPaymentSuccess(true);
+          await loadInitial();
+        },
+        onClose: () => setError('Payment was cancelled. You can try again anytime.'),
+      });
+    } catch (err) { setError(err.message); }
   }
 
   async function handleAddCourse(courseId) {
@@ -890,7 +901,7 @@ export default function StudentDashboard() {
         )}
       </AnimatePresence>
 
-      {/* Tuition Payment Modal — country + payment method picker */}
+      {/* Tuition Payment Modal — country picker, then amount + Pay Now */}
       <AnimatePresence>
         {paymentModal && (
           <>
@@ -898,26 +909,59 @@ export default function StudentDashboard() {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Pay Tuition</h3>
-                <p className="text-sm text-gray-500 mb-5">Select your country and preferred payment method.</p>
-                <PaymentMethodPicker value={paymentDetails} onChange={setPaymentDetails} />
-                {error && <p className="mt-4 text-sm text-red-600 font-medium">{error}</p>}
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setPaymentModal(null)}
-                    disabled={paymentLoading}
-                    className="flex-1 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={executePayment}
-                    disabled={paymentLoading || !isPaymentMethodComplete(paymentDetails)}
-                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-white disabled:opacity-50"
-                    style={{ backgroundColor: '#0C4E3A' }}
-                  >
-                    {paymentLoading ? 'Processing…' : 'Continue to Pay'}
-                  </button>
-                </div>
+
+                {!paymentModal.preview ? (
+                  <>
+                    <p className="text-sm text-gray-500 mb-5">Select your country of residence to see the amount you'll pay.</p>
+                    <CountryPicker country={paymentCountry} onChange={setPaymentCountry} />
+                    {error && <p className="mt-4 text-sm text-red-600 font-medium">{error}</p>}
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={() => setPaymentModal(null)}
+                        disabled={paymentLoading}
+                        className="flex-1 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={preparePayment}
+                        disabled={paymentLoading || !paymentCountry}
+                        className="flex-1 py-3 rounded-xl font-semibold text-sm text-white disabled:opacity-50"
+                        style={{ backgroundColor: '#0C4E3A' }}
+                      >
+                        {paymentLoading ? 'Calculating…' : 'Continue'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {paymentModal.preview.total_installments > 1
+                        ? `Installment ${paymentModal.preview.installment} of ${paymentModal.preview.total_installments}`
+                        : 'Full tuition payment'}
+                    </p>
+                    <div className="rounded-2xl p-5 text-white mb-4" style={{ backgroundColor: '#0C4E3A' }}>
+                      <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Amount to Pay</p>
+                      <p className="text-2xl font-bold">{paymentModal.preview.currency} {paymentModal.preview.amount.toLocaleString()}</p>
+                    </div>
+                    {error && <p className="mb-4 text-sm text-red-600 font-medium">{error}</p>}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setPaymentModal((prev) => ({ ...prev, preview: null }))}
+                        className="flex-1 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={executePayment}
+                        className="flex-1 py-3 rounded-xl font-semibold text-sm text-white"
+                        style={{ backgroundColor: '#0C4E3A' }}
+                      >
+                        Pay Now
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
           </>
