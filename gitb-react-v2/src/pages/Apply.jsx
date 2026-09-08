@@ -177,19 +177,19 @@ export default function Apply() {
                 </div>
                 <div className="mb-6">
                   <label className={labelClass}>Phone Number</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <select
                       name="phoneCode"
                       value={form.phoneCode}
                       onChange={update}
-                      className={`${inputClass} w-36 shrink-0`}
+                      className={`${inputClass} w-full sm:w-28 sm:shrink-0`}
                     >
                       {DIAL_CODES.map((d) => (
                         <option key={d.code} value={d.code}>{d.label}</option>
                       ))}
                     </select>
                     <input
-                      className={`${inputClass} flex-1 min-w-0`}
+                      className={`${inputClass} w-full sm:flex-1 sm:min-w-0`}
                       type="tel"
                       name="phoneNumber"
                       value={form.phoneNumber}
