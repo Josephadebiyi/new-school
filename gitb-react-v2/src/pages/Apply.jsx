@@ -16,22 +16,23 @@ const inputClass = 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:out
 const labelClass = 'block text-sm font-semibold text-[#1a1a1a] mb-2';
 
 // Common dial codes for the phone field — not exhaustive, but covers GITB's
-// primary markets. Falls back to a free-text "+" prefix if not listed.
+// primary markets. Short labels (country code + dial code) so the select
+// never overflows its box regardless of the selected value's length.
 const DIAL_CODES = [
-  { code: '+234', label: 'Nigeria (+234)' },
-  { code: '+233', label: 'Ghana (+233)' },
-  { code: '+254', label: 'Kenya (+254)' },
-  { code: '+256', label: 'Uganda (+256)' },
-  { code: '+255', label: 'Tanzania (+255)' },
-  { code: '+250', label: 'Rwanda (+250)' },
-  { code: '+27', label: 'South Africa (+27)' },
-  { code: '+20', label: 'Egypt (+20)' },
-  { code: '+44', label: 'United Kingdom (+44)' },
-  { code: '+353', label: 'Ireland (+353)' },
-  { code: '+1', label: 'US/Canada (+1)' },
-  { code: '+49', label: 'Germany (+49)' },
-  { code: '+33', label: 'France (+33)' },
-  { code: '+91', label: 'India (+91)' },
+  { code: '+234', label: 'NG +234' },
+  { code: '+233', label: 'GH +233' },
+  { code: '+254', label: 'KE +254' },
+  { code: '+256', label: 'UG +256' },
+  { code: '+255', label: 'TZ +255' },
+  { code: '+250', label: 'RW +250' },
+  { code: '+27', label: 'ZA +27' },
+  { code: '+20', label: 'EG +20' },
+  { code: '+44', label: 'GB +44' },
+  { code: '+353', label: 'IE +353' },
+  { code: '+1', label: 'US +1' },
+  { code: '+49', label: 'DE +49' },
+  { code: '+33', label: 'FR +33' },
+  { code: '+91', label: 'IN +91' },
 ];
 
 export default function Apply() {
@@ -63,7 +64,7 @@ export default function Apply() {
 
   const update = (event) => setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
 
-  const canAdvanceStep1 = form.firstName && form.lastName && form.email;
+  const canAdvanceStep1 = form.firstName && form.lastName && form.email && form.phoneNumber.replace(/[^0-9]/g, '').length >= 6;
   const canAdvanceStep2 = form.courseId;
   const canAdvanceStep3 = !!form.country;
   const selectedCourse = courses.find((course) => course.id === form.courseId);

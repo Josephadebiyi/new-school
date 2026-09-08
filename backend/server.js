@@ -2573,6 +2573,9 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
     if (!first_name || !last_name || !email || !course_id) {
       return res.status(422).json({ detail: "Missing required fields: first_name, last_name, email, course_id" });
     }
+    if (!phone || phone.replace(/[^0-9]/g, "").length < 6) {
+      return res.status(422).json({ detail: "A valid phone number is required" });
+    }
     if (!country) {
       return res.status(422).json({ detail: "Country of residence is required" });
     }
