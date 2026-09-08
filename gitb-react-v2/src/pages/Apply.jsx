@@ -56,6 +56,7 @@ export default function Apply() {
     courseId: initCourse,
     motivation: '',
     country: '',
+    couponCode: '',
   });
 
   useEffect(() => {
@@ -84,6 +85,7 @@ export default function Apply() {
         motivation: form.motivation,
         referral_code: referralCode,
         country: form.country,
+        coupon_code: form.couponCode.trim(),
       });
       setPayment(data);
       setStep(3);
@@ -275,6 +277,19 @@ export default function Apply() {
 
                 <div className="mb-6">
                   <CountryPicker country={form.country} onChange={(country) => setForm((prev) => ({ ...prev, country }))} />
+                </div>
+
+                <div className="mb-6">
+                  <label className={labelClass}>Tuition Coupon Code (optional)</label>
+                  <input
+                    type="text"
+                    name="couponCode"
+                    value={form.couponCode}
+                    onChange={(e) => setForm((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. GITB2026"
+                    className={inputClass}
+                  />
+                  <p className="text-xs text-gray-500 mt-2">This only discounts tuition, not the registration & application fee. It's saved with your application and applied automatically once you're approved and pay tuition.</p>
                 </div>
 
                 {error && (

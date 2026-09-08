@@ -454,6 +454,7 @@ async function confirmApplicationFee(meta, verified) {
     high_school_certificate_url: meta.high_school_certificate_url || null,
     motivation: meta.motivation || null,
     referred_by_code: meta.referred_by_code || null,
+    attached_coupon_code: meta.attached_coupon_code || null,
     status: "pending",
     payment_status: "paid",
     flw_reference: verified.tx_ref,
@@ -2606,7 +2607,7 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       first_name, last_name, email, phone, course_id,
       country, city, address, date_of_birth,
       identification_url, high_school_certificate_url,
-      motivation, referral_code
+      motivation, referral_code, coupon_code
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
@@ -2627,6 +2628,20 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       const referrer = await db.collection("users").findOne({ referral_code: referral_code.toUpperCase().trim() });
       if (referrer && referrer.email.toLowerCase() !== email.toLowerCase().trim()) {
         referredByCode = referrer.referral_code;
+      }
+    }
+
+    // Validate a tuition coupon, if provided. It's only ever attached here —
+    // it never discounts the application fee itself, and isn't actually
+    // redeemed/counted against its usage limit until admin approves the
+    // application and the student later pays tuition (see the approve route
+    // and /api/tuition/pay). An invalid/expired code is silently ignored
+    // rather than blocking the application, same as the referral code above.
+    let attachedCouponCode = "";
+    if (coupon_code) {
+      const couponResult = await validateCoupon(coupon_code);
+      if (couponResult.valid) {
+        attachedCouponCode = couponResult.coupon.code;
       }
     }
 
@@ -2696,6 +2711,7 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
         high_school_certificate_url: high_school_certificate_url || "",
         motivation: (motivation || "").slice(0, 1000),
         referred_by_code: referredByCode,
+        attached_coupon_code: attachedCouponCode,
         eur_amount: currentApplicationFee
       },
       created_at: new Date().toISOString()
@@ -2903,6 +2919,17 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
         : (Number(course.price) || 0)
     ) : 0;
 
+    // A coupon entered at application time only actually attaches to the
+    // student's account now, once they're approved — it's re-validated here
+    // (it may have expired or been used up between application and approval)
+    // and, if still good, carried onto the enrollment so /api/tuition/pay
+    // can apply it automatically without the student re-entering it.
+    let attachedCouponCode = null;
+    if (application.attached_coupon_code) {
+      const couponResult = await validateCoupon(application.attached_coupon_code);
+      if (couponResult.valid) attachedCouponCode = couponResult.coupon.code;
+    }
+
     // Create enrollment with pending_payment status (tuition not paid yet)
     const enrollment = {
       id: uuidv4(),
@@ -2911,6 +2938,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       course_id: application.course_id,
       course_title: application.course_title,
       application_id: applicationId,
+      attached_coupon_code: attachedCouponCode,
       enrolled_at: new Date().toISOString(),
       status: "pending_payment", // Requires tuition payment
       payment_status: "unpaid",
@@ -3183,15 +3211,6 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(422).json({ detail: "Country of residence is required" });
     }
 
-    let coupon = null;
-    if (coupon_code) {
-      const couponResult = await validateCoupon(coupon_code);
-      if (!couponResult.valid) {
-        return res.status(400).json({ detail: couponResult.reason });
-      }
-      coupon = couponResult.coupon;
-    }
-
     // Check enrollment exists and is pending payment
     let enrollment = await db.collection("enrollments").findOne({
       $or: [{ user_id: userId }, { student_id: userId }],
@@ -3213,11 +3232,27 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         student_id: userId,
         course_id: course_id,
         application_id: application ? application.id : null,
+        attached_coupon_code: application?.attached_coupon_code || null,
         status: "pending_payment",
         payment_status: "unpaid",
         created_at: new Date().toISOString()
       };
       await db.collection("enrollments").insertOne(enrollment);
+    }
+
+    // A code typed into the payment modal wins if given; otherwise fall back
+    // to whatever coupon got attached to this enrollment at application time.
+    let coupon = null;
+    const effectiveCouponCode = coupon_code || enrollment.attached_coupon_code;
+    if (effectiveCouponCode) {
+      const couponResult = await validateCoupon(effectiveCouponCode);
+      if (!couponResult.valid) {
+        // Only a manually-typed code should block payment on failure — a
+        // stale/expired auto-attached one should just silently not apply.
+        if (coupon_code) return res.status(400).json({ detail: couponResult.reason });
+      } else {
+        coupon = couponResult.coupon;
+      }
     }
 
     if (enrollment.payment_status === "paid") {
