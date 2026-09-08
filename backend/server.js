@@ -121,6 +121,7 @@ const APPLICATION_FEE_SEED_DEFAULT = 35;
 // System Settings Cache (simple)
 let systemSettings = {
   application_fee: APPLICATION_FEE_SEED_DEFAULT,
+  referral_reward_percent: 10,
   admission_fee: 2500,
   admission_letter_template: "Dear {{name}},\n\nCongratulations! You have been accepted into {{course}} at GITB Academy.\n\nBest regards,\nGITB Admissions",
   bank_name: "Luminor Bank AS",
@@ -821,6 +822,7 @@ app.get("/api/config", (req, res) => {
   res.json({
     flutterwavePublicKey: FLW_PUBLIC_KEY,
     applicationFee: systemSettings.application_fee ?? APPLICATION_FEE_SEED_DEFAULT,
+    referralRewardPercent: Number(systemSettings.referral_reward_percent) || 10,
     currency: process.env.DEFAULT_CURRENCY || "EUR",
     dashboardBanner: {
       imageUrl: systemSettings.dashboard_banner_image_url || "",
@@ -969,7 +971,8 @@ async function assignReferralCode(userId) {
 
 // Called whenever a student's tuition payment succeeds for the first time.
 // If they were referred and the referral hasn't been rewarded yet, credits
-// the referrer with 10% of the REFERRER's own tuition price.
+// the referrer with systemSettings.referral_reward_percent of the
+// REFERRER's own tuition price (admin-configurable, defaults to 10%).
 async function tryRewardReferral(referredUserId) {
   try {
     const referral = await db.collection("referrals").findOne({ referred_user_id: referredUserId, status: "pending" });
@@ -995,7 +998,10 @@ async function tryRewardReferral(referredUserId) {
       return;
     }
 
-    const rewardCents = Math.round(coursePrice * 0.10 * 100);
+    const rewardPercent = Number(systemSettings.referral_reward_percent) > 0
+      ? Number(systemSettings.referral_reward_percent)
+      : 10;
+    const rewardCents = Math.round(coursePrice * (rewardPercent / 100) * 100);
 
     await db.collection("referrals").updateOne(
       { id: referral.id },
@@ -1018,7 +1024,7 @@ async function tryRewardReferral(referredUserId) {
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: #3d7a4a; margin-top: 0;">You earned €${(rewardCents / 100).toFixed(2)} in tuition credit!</h2>
             <p>Dear ${referrer.first_name || "there"},</p>
-            <p>Great news — someone you referred to GITB has completed their tuition payment. You've earned a 10% tuition credit (€${(rewardCents / 100).toFixed(2)}) toward your own course.</p>
+            <p>Great news — someone you referred to GITB has completed their tuition payment. You've earned a ${rewardPercent}% tuition credit (€${(rewardCents / 100).toFixed(2)}) toward your own course.</p>
             <p>This credit is automatically applied the next time you make a tuition payment. Log in to your dashboard to see your referral balance.</p>
             <div style="text-align: center; margin: 25px 0;">
               <a href="${FRONTEND_URL}/student/dashboard" style="display: inline-block; padding: 12px 30px; background: #3d7a4a; color: white; text-decoration: none; border-radius: 5px;">
@@ -1426,7 +1432,7 @@ const sendWelcomeEmail = async (email, firstName, lastName, courseTitle, tempPas
       <div style="background:#f0f9f2;border:1px dashed #0B3B2C;border-radius:12px;padding:22px 24px;margin:0 0 28px;">
         <p style="margin:0 0 8px;color:#0B3B2C;font-size:14px;font-weight:bold;">💚 Earn tuition credit by referring friends</p>
         <p style="margin:0 0 14px;color:#444;font-size:13px;line-height:1.7;">
-          Share your referral link below. For every friend who enrolls and pays their tuition, you'll earn a 10% credit toward your own tuition fees — credits stack, and are applied automatically to your next payment.
+          Share your referral link below. For every friend who enrolls and pays their tuition, you'll earn a ${Number(systemSettings.referral_reward_percent) || 10}% credit toward your own tuition fees — credits stack, and are applied automatically to your next payment.
         </p>
         <div style="background:#ffffff;border-radius:8px;padding:12px 16px;text-align:center;">
           <a href="${FRONTEND_URL}/apply?ref=${referralCode}" style="color:#0B3B2C;font-size:13px;font-weight:bold;word-break:break-all;text-decoration:underline;">${FRONTEND_URL}/apply?ref=${referralCode}</a>
@@ -4196,6 +4202,7 @@ app.get("/api/referrals/my", authenticate, async (req, res) => {
       referral_code: user.referral_code,
       referral_link: `${FRONTEND_URL}/apply?ref=${user.referral_code}`,
       balance_eur: (user.referral_balance_cents || 0) / 100,
+      reward_percent: Number(systemSettings.referral_reward_percent) || 10,
       referrals: referrals.map(r => ({
         referred_name: r.referred_name,
         course_title: r.course_title,
@@ -4208,6 +4215,87 @@ app.get("/api/referrals/my", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Fetch referrals error:", err);
     res.status(500).json({ detail: "Failed to fetch referral information" });
+  }
+});
+
+// Admin view: every applicant who used a referral code, grouped by the code
+// (and its owner). Sourced from `applications` (captures every applicant who
+// typed a code, even if never approved) and enriched with reward status from
+// `referrals` (only created once an application is approved — see the
+// approve route) where available.
+app.get("/api/admin/referrals", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const apps = await db.collection("applications")
+      .find({ referred_by_code: { $ne: null } }, {
+        projection: { _id: 0, id: 1, first_name: 1, last_name: 1, email: 1, status: 1, course_title: 1, created_at: 1, referred_by_code: 1 }
+      })
+      .sort({ created_at: -1 })
+      .toArray();
+
+    if (!apps.length) return res.json({ groups: [] });
+
+    const codes = [...new Set(apps.map((a) => a.referred_by_code))];
+    const referrers = await db.collection("users")
+      .find({ referral_code: { $in: codes } }, {
+        projection: { _id: 0, id: 1, referral_code: 1, first_name: 1, last_name: 1, email: 1, referral_balance_cents: 1 }
+      })
+      .toArray();
+    const referrerByCode = Object.fromEntries(referrers.map((r) => [r.referral_code, r]));
+
+    // Reward status is keyed by the referred student's user id, which only
+    // exists once their account is created (on approval) — match by email.
+    const emails = apps.map((a) => a.email);
+    const referredUsers = await db.collection("users")
+      .find({ email: { $in: emails } }, { projection: { _id: 0, id: 1, email: 1 } })
+      .toArray();
+    const userIdByEmail = Object.fromEntries(referredUsers.map((u) => [u.email, u.id]));
+
+    const referrerIds = referrers.map((r) => r.id);
+    const referralDocs = await db.collection("referrals")
+      .find({ referrer_id: { $in: referrerIds } }, { projection: { _id: 0 } })
+      .toArray();
+    const referralByReferredUserId = Object.fromEntries(referralDocs.map((r) => [r.referred_user_id, r]));
+
+    const groupsByCode = {};
+    for (const app of apps) {
+      const code = app.referred_by_code;
+      if (!groupsByCode[code]) {
+        const referrer = referrerByCode[code] || null;
+        groupsByCode[code] = {
+          referral_code: code,
+          referrer: referrer ? {
+            id: referrer.id,
+            name: `${referrer.first_name || ''} ${referrer.last_name || ''}`.trim(),
+            email: referrer.email,
+            balance_eur: (referrer.referral_balance_cents || 0) / 100,
+          } : null,
+          students: [],
+        };
+      }
+      const referredUserId = userIdByEmail[app.email];
+      const referralDoc = referredUserId ? referralByReferredUserId[referredUserId] : null;
+      groupsByCode[code].students.push({
+        application_id: app.id,
+        name: `${app.first_name || ''} ${app.last_name || ''}`.trim(),
+        email: app.email,
+        course_title: app.course_title,
+        application_status: app.status,
+        applied_at: app.created_at,
+        reward_status: referralDoc ? referralDoc.status : "not_yet_enrolled",
+        reward_eur: referralDoc ? (referralDoc.reward_amount_cents || 0) / 100 : 0,
+      });
+    }
+
+    const groups = Object.values(groupsByCode).map((g) => ({
+      ...g,
+      total_referred: g.students.length,
+      total_rewarded_eur: g.students.reduce((sum, s) => sum + (s.reward_status === "rewarded" ? s.reward_eur : 0), 0),
+    })).sort((a, b) => b.total_referred - a.total_referred);
+
+    res.json({ groups });
+  } catch (err) {
+    console.error("Fetch admin referrals error:", err);
+    res.status(500).json({ detail: "Failed to fetch referral data" });
   }
 });
 

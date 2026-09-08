@@ -431,6 +431,14 @@ export async function getCoupons(token) {
   return res.json();
 }
 
+export async function getAdminReferrals(token) {
+  const res = await fetch(`${API_BASE}/api/admin/referrals`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch referral data');
+  return res.json();
+}
+
 export async function createCoupon(token, payload) {
   const res = await fetch(`${API_BASE}/api/coupons`, {
     method: 'POST',

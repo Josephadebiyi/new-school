@@ -371,7 +371,7 @@ export default function StudentDashboard() {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">Refer a Friend, Earn Tuition Credit</h3>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <p className="text-sm text-gray-500 mb-3">
-                Share your link. When a friend enrolls and pays their tuition, you earn a 10% credit toward your own — credits stack and apply automatically to your next payment.
+                Share your link. When a friend enrolls and pays their tuition, you earn a {referrals.reward_percent ?? 10}% credit toward your own — credits stack and apply automatically to your next payment.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 mb-4">
                 <input readOnly value={referrals.referral_link} className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 bg-gray-50" />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, BookOpen, FileText, CheckCircle, XCircle, Clock, LogOut, Shield,
@@ -6,7 +6,7 @@ import {
   Edit, Save, Image as ImageIcon, RefreshCw, Settings as SettingsIcon, User,
   ChevronLeft, ChevronRight, Menu, X, Upload, DollarSign, Tag, AlertCircle,
   ClipboardList, Eye, EyeOff, Download as DownloadIcon, BarChart2, Globe,
-  Activity, UserMinus, Percent,
+  Activity, UserMinus, Percent, Share2, ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -16,6 +16,7 @@ import {
   uploadFile, createUser, adminEnrollStudent,
   assignCourseToTeacher, removeTeacherCourse, sendTestEmails,
   getActivityLog, deleteUser, getCoupons, createCoupon, updateCoupon, deleteCoupon,
+  getAdminReferrals,
 } from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -26,6 +27,7 @@ const SIDEBAR_ITEMS = [
   { id: 'courses',    label: 'Courses',     icon: BookOpen },
   { id: 'pricing',    label: 'Pricing',     icon: Tag },
   { id: 'coupons',    label: 'Coupons',     icon: Percent },
+  { id: 'referrals',  label: 'Referrals',   icon: Share2 },
   { id: 'students',   label: 'Students',    icon: Users },
   { id: 'staff',      label: 'Staff',       icon: UserCheck },
   { id: 'finance',    label: 'Finance',     icon: CreditCard },
@@ -95,6 +97,8 @@ export default function AdminDashboard() {
   const [couponForm, setCouponForm] = useState({ code: '', discount_type: 'percentage', discount_value: '', max_uses: '', expires_at: '' });
   const [couponMsg, setCouponMsg] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
+  const [referralGroups, setReferralGroups] = useState([]);
+  const [expandedReferralCode, setExpandedReferralCode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,9 +185,9 @@ export default function AdminDashboard() {
     if (!token) return;
     setLoading(true);
     try {
-      const [dashRes, appRes, courseRes, userRes, settingsRes, couponRes] = await Promise.allSettled([
+      const [dashRes, appRes, courseRes, userRes, settingsRes, couponRes, referralRes] = await Promise.allSettled([
         getAdminDashboard(token), getApplications(token), getAdminCourses(token),
-        getUsers(token), getSystemSettings(token), getCoupons(token),
+        getUsers(token), getSystemSettings(token), getCoupons(token), getAdminReferrals(token),
       ]);
       if (dashRes.status === 'fulfilled') setStats(dashRes.value);
       if (appRes.status === 'fulfilled') setApplications(Array.isArray(appRes.value) ? appRes.value : []);
@@ -191,6 +195,7 @@ export default function AdminDashboard() {
       if (userRes.status === 'fulfilled') setAllUsers(Array.isArray(userRes.value) ? userRes.value : []);
       if (settingsRes.status === 'fulfilled') setSystemSettings(settingsRes.value || {});
       if (couponRes.status === 'fulfilled') setCoupons(Array.isArray(couponRes.value) ? couponRes.value : []);
+      if (referralRes.status === 'fulfilled') setReferralGroups(Array.isArray(referralRes.value?.groups) ? referralRes.value.groups : []);
       if (dashRes.status === 'rejected' && dashRes.reason?.message?.includes('token')) {
         logout(); navigate('/login');
       }
@@ -907,7 +912,11 @@ export default function AdminDashboard() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Application Fee (€)</label>
               <input type="number" min="0" value={systemSettings.application_fee ?? 50} onChange={(e) => setSystemSettings((p) => ({ ...p, application_fee: Number(e.target.value) }))} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 w-32" />
             </div>
-            <button type="submit" className="px-4 py-2 rounded-xl text-white text-sm font-medium" style={{ backgroundColor: '#0B3B2C' }}>Save Fee</button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Referral Reward (%)</label>
+              <input type="number" min="0" max="100" value={systemSettings.referral_reward_percent ?? 10} onChange={(e) => setSystemSettings((p) => ({ ...p, referral_reward_percent: Number(e.target.value) }))} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 w-32" />
+            </div>
+            <button type="submit" className="px-4 py-2 rounded-xl text-white text-sm font-medium" style={{ backgroundColor: '#0B3B2C' }}>Save</button>
           </form>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1352,6 +1361,87 @@ export default function AdminDashboard() {
     );
   }
 
+  function ReferralsTab() {
+    const rewardStatusBadge = (status) => {
+      if (status === 'rewarded') return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Rewarded</span>;
+      if (status === 'pending') return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending payment</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Not yet enrolled</span>;
+    };
+    return (
+      <div className="max-w-4xl space-y-5">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Referrals by Code</h2>
+          <p className="text-sm text-gray-500 mt-1">Every applicant grouped by the referral code they used, and who referred them.</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">Referrer</th>
+                <th className="px-4 py-3">Students Referred</th>
+                <th className="px-4 py-3">Total Rewarded</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {referralGroups.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No referral activity yet.</td></tr>
+              )}
+              {referralGroups.map((g) => {
+                const expanded = expandedReferralCode === g.referral_code;
+                return (
+                  <Fragment key={g.referral_code}>
+                    <tr className="cursor-pointer hover:bg-gray-50" onClick={() => setExpandedReferralCode(expanded ? null : g.referral_code)}>
+                      <td className="px-4 py-3 font-mono font-semibold text-gray-900">{g.referral_code}</td>
+                      <td className="px-4 py-3 text-gray-700">
+                        {g.referrer ? <>{g.referrer.name} <span className="text-gray-400">({g.referrer.email})</span></> : <span className="text-gray-400">Unknown</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{g.total_referred}</td>
+                      <td className="px-4 py-3 text-gray-700">€{g.total_rewarded_eur.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <ChevronDown className={`w-4 h-4 inline-block text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr>
+                        <td colSpan={5} className="px-4 pb-4 bg-gray-50">
+                          <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
+                            <thead className="bg-gray-100 text-left text-gray-500">
+                              <tr>
+                                <th className="px-3 py-2">Student</th>
+                                <th className="px-3 py-2">Course</th>
+                                <th className="px-3 py-2">Application Status</th>
+                                <th className="px-3 py-2">Applied</th>
+                                <th className="px-3 py-2">Reward</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 bg-white">
+                              {g.students.map((s) => (
+                                <tr key={s.application_id}>
+                                  <td className="px-3 py-2">{s.name} <span className="text-gray-400">({s.email})</span></td>
+                                  <td className="px-3 py-2">{s.course_title || '—'}</td>
+                                  <td className="px-3 py-2 capitalize">{s.application_status}</td>
+                                  <td className="px-3 py-2">{s.applied_at ? new Date(s.applied_at).toLocaleDateString() : '—'}</td>
+                                  <td className="px-3 py-2">{rewardStatusBadge(s.reward_status)}{s.reward_status === 'rewarded' ? ` €${s.reward_eur.toFixed(2)}` : ''}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
@@ -1413,6 +1503,7 @@ export default function AdminDashboard() {
               {activeTab === 'activity'   && <ActivityTab />}
               {activeTab === 'settings'   && <SettingsTab />}
               {activeTab === 'coupons'    && <CouponsTab />}
+              {activeTab === 'referrals'  && <ReferralsTab />}
             </>
           )}
         </main>
