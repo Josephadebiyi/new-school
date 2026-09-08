@@ -99,8 +99,10 @@ export default function Apply() {
     setError('');
     try {
       openFlutterwaveCheckout(payment, {
-        title: 'GITB Application Fee',
-        description: selectedCourse ? `Application fee — ${selectedCourse.title}` : 'Application fee',
+        title: 'GITB Registration & Application Fee',
+        description: selectedCourse
+          ? `One-time registration & application fee — ${selectedCourse.title} (this is not tuition)`
+          : 'One-time registration & application fee (this is not tuition)',
         onSuccessRef: (reference) => navigate(`/apply/success?ref=${reference}`),
         onClose: () => setError('Payment was cancelled. You can try again anytime.'),
       });
@@ -269,7 +271,7 @@ export default function Apply() {
             {step === 2 && (
               <motion.div key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Country of residence</h2>
-                <p className="text-sm text-gray-500 mb-6">This tells us the currency and local payment methods to offer you for the application fee.</p>
+                <p className="text-sm text-gray-500 mb-6">This tells us the currency and local payment methods to offer you for the registration & application fee (a one-time fee, separate from tuition).</p>
 
                 <div className="mb-6">
                   <CountryPicker country={form.country} onChange={(country) => setForm((prev) => ({ ...prev, country }))} />
@@ -317,8 +319,9 @@ export default function Apply() {
 
                   {payment && (
                     <div className="bg-[#0B3B2C] rounded-2xl p-5 text-white">
-                      <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Amount to Pay</p>
+                      <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Registration & Application Fee</p>
                       <p className="text-2xl font-bold">{payment.currency} {payment.amount.toLocaleString()}</p>
+                      <p className="text-xs text-white/60 mt-1">One-time fee — this is not your tuition</p>
                     </div>
                   )}
                 </div>

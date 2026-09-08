@@ -421,6 +421,47 @@ export async function getMyEnrollments(token) {
   return res.json();
 }
 
+// ─── Coupons (admin, tuition-only discounts) ─────────────────────────────────
+
+export async function getCoupons(token) {
+  const res = await fetch(`${API_BASE}/api/coupons`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch coupons');
+  return res.json();
+}
+
+export async function createCoupon(token, payload) {
+  const res = await fetch(`${API_BASE}/api/coupons`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to create coupon');
+  return data;
+}
+
+export async function updateCoupon(token, id, payload) {
+  const res = await fetch(`${API_BASE}/api/coupons/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to update coupon');
+  return data;
+}
+
+export async function deleteCoupon(token, id) {
+  const res = await fetch(`${API_BASE}/api/coupons/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to delete coupon');
+  return res.json();
+}
+
 export async function getMyReferrals(token) {
   const res = await fetch(`${API_BASE}/api/referrals/my`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -429,11 +470,11 @@ export async function getMyReferrals(token) {
   return res.json();
 }
 
-export async function createTuitionPayment(token, courseId, paymentPlan, country) {
+export async function createTuitionPayment(token, courseId, paymentPlan, country, couponCode) {
   const res = await fetch(`${API_BASE}/api/tuition/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ course_id: courseId, payment_plan: paymentPlan, country }),
+    body: JSON.stringify({ course_id: courseId, payment_plan: paymentPlan, country, coupon_code: couponCode || undefined }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || 'Payment failed');

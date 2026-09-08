@@ -542,6 +542,7 @@ async function confirmTuitionInstallment(meta, reference) {
   }
 
   const discountAppliedCents = parseInt(meta.discount_applied_cents || "0", 10) || 0;
+  const couponDiscountAppliedCents = parseInt(meta.coupon_discount_applied_cents || "0", 10) || 0;
   const totalInstallments = enrollment.total_installments || (meta.is_monthly === "true" ? 12 : 1);
   const installmentsPaid = Math.min((enrollment.installments_paid || 0) + 1, totalInstallments);
   const fullyPaid = installmentsPaid >= totalInstallments;
@@ -558,10 +559,17 @@ async function confirmTuitionInstallment(meta, reference) {
         installments_paid: installmentsPaid,
         flw_last_reference: reference,
         referral_discount_applied_cents: discountAppliedCents,
+        coupon_discount_applied_cents: couponDiscountAppliedCents,
         tuition_paid_at: new Date().toISOString()
       }
     }
   );
+
+  // Only counts against the coupon's usage limit once the payment actually
+  // succeeds — never for an abandoned checkout attempt.
+  if (meta.coupon_id) {
+    await db.collection("coupons").updateOne({ id: meta.coupon_id }, { $inc: { used_count: 1 } });
+  }
 
   if (userId) {
     await db.collection("users").updateOne(
@@ -1028,6 +1036,35 @@ async function tryRewardReferral(referredUserId) {
   }
 }
 
+// ============ TUITION COUPONS ============
+// Admin-managed discount codes. Apply only to tuition installments, never to
+// the application/registration fee — deliberately not accepted anywhere in
+// the application-fee flow.
+async function validateCoupon(code) {
+  if (!code) return { valid: false, reason: "No coupon code provided" };
+  const coupon = await db.collection("coupons").findOne({ code: code.toUpperCase().trim() });
+  if (!coupon) return { valid: false, reason: "Invalid coupon code" };
+  if (!coupon.is_active) return { valid: false, reason: "This coupon is no longer active" };
+  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+    return { valid: false, reason: "This coupon has expired" };
+  }
+  if (coupon.max_uses != null && coupon.used_count >= coupon.max_uses) {
+    return { valid: false, reason: "This coupon has reached its usage limit" };
+  }
+  return { valid: true, coupon };
+}
+
+function computeCouponDiscountCents(coupon, amountCents) {
+  if (coupon.discount_type === "full") return amountCents;
+  if (coupon.discount_type === "percentage") {
+    return Math.min(Math.round(amountCents * (Number(coupon.discount_value) / 100)), amountCents);
+  }
+  if (coupon.discount_type === "fixed") {
+    return Math.min(Math.round(Number(coupon.discount_value) * 100), amountCents);
+  }
+  return 0;
+}
+
 const getClientIP = (req) => {
   return req.ip ||
     req.headers["x-forwarded-for"]?.split(",")[0] ||
@@ -1456,7 +1493,7 @@ const sendApplicationReceivedEmail = async (email, firstName, courseTitle) => {
       <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
         <h2 style="color: #3d7a4a; margin-top: 0;">We've Received Your Application!</h2>
         <p>Dear ${firstName},</p>
-        <p>Thank you for applying to <strong>${courseTitle}</strong> at the Global Institute of Tech and Business. Your application fee has been received and your application is now under review by our admissions team.</p>
+        <p>Thank you for applying to <strong>${courseTitle}</strong> at the Global Institute of Tech and Business. Your one-time registration &amp; application fee (not your tuition) has been received, and your application is now under review by our admissions team.</p>
         <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #3d7a4a;">
           <h3 style="margin: 0 0 8px 0; color: #2d5a3a;">What Happens Next?</h3>
           <ol style="margin: 0; padding-left: 20px; color: #444; line-height: 1.8;">
@@ -3137,13 +3174,22 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = req.user;
-    const { course_id, payment_plan, country } = req.body;
+    const { course_id, payment_plan, country, coupon_code } = req.body;
 
     if (!course_id) {
       return res.status(422).json({ detail: "Course ID is required" });
     }
     if (!country) {
       return res.status(422).json({ detail: "Country of residence is required" });
+    }
+
+    let coupon = null;
+    if (coupon_code) {
+      const couponResult = await validateCoupon(coupon_code);
+      if (!couponResult.valid) {
+        return res.status(400).json({ detail: couponResult.reason });
+      }
+      coupon = couponResult.coupon;
     }
 
     // Check enrollment exists and is pending payment
@@ -3224,18 +3270,20 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(503).json({ detail: "Payment service not available" });
     }
 
-    // Apply any referral balance the student has earned as a discount on
-    // this installment. Every tuition payment (whether the only one, or the
-    // Nth of 12) is a single discrete charge, so the discount just applies
-    // directly — no more subscription-vs-first-cycle complexity.
+    // Apply a coupon first (if any), then any referral balance the student
+    // has earned, to whatever remains. Every tuition payment (whether the
+    // only one, or the Nth of 12) is a single discrete charge, so discounts
+    // just apply directly — no subscription-vs-first-cycle complexity.
     const chargeAmountCents = Math.round(chargeAmount * 100);
+    const couponDiscountCents = coupon ? computeCouponDiscountCents(coupon, chargeAmountCents) : 0;
+    const afterCouponCents = chargeAmountCents - couponDiscountCents;
     const referralBalanceCents = Math.max(0, user.referral_balance_cents || 0);
-    const discountCents = Math.min(referralBalanceCents, chargeAmountCents);
-    const finalChargeCents = chargeAmountCents - discountCents;
+    const discountCents = Math.min(referralBalanceCents, afterCouponCents);
+    const finalChargeCents = afterCouponCents - discountCents;
     const installmentNumber = installmentsPaidSoFar + 1;
 
     if (finalChargeCents <= 0) {
-      // Fully covered by referral balance — no charge needed for this installment.
+      // Fully covered by the coupon and/or referral balance — no charge needed.
       const fullyPaid = installmentNumber >= totalInstallments;
       await db.collection("enrollments").updateOne(
         { id: enrollment.id },
@@ -3247,6 +3295,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
             total_installments: totalInstallments,
             installments_paid: installmentNumber,
             referral_discount_applied_cents: discountCents,
+            coupon_discount_applied_cents: couponDiscountCents,
             tuition_paid_at: new Date().toISOString()
           }
         }
@@ -3255,6 +3304,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         { id: userId },
         { $set: { payment_status: fullyPaid ? "paid" : "partial" }, $inc: { referral_balance_cents: -discountCents } }
       );
+      if (coupon) await db.collection("coupons").updateOne({ id: coupon.id }, { $inc: { used_count: 1 } });
       await tryRewardReferral(userId);
       return res.json({
         data: {
@@ -3264,8 +3314,8 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
           installment: installmentNumber,
           total_installments: totalInstallments,
           message: isMonthly
-            ? `Installment ${installmentNumber} of ${totalInstallments} is fully covered by your referral balance!`
-            : "Your tuition is fully covered by your referral balance!"
+            ? `Installment ${installmentNumber} of ${totalInstallments} is fully covered!`
+            : "Your tuition is fully covered!"
         }
       });
     }
@@ -3295,6 +3345,8 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         user_id: userId,
         user_email: user.email,
         discount_applied_cents: String(discountCents),
+        coupon_id: coupon ? coupon.id : "",
+        coupon_discount_applied_cents: String(couponDiscountCents),
         is_monthly: String(isMonthly),
         eur_amount: String(chargeAmount)
       },
@@ -3316,6 +3368,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         enrollment_id: enrollment.id,
         course_title: course.title,
         referral_discount_applied: discountCents / 100,
+        coupon_discount_applied: couponDiscountCents / 100,
         payment_plan: isMonthly ? 'monthly' : 'one_time',
         installment: installmentNumber,
         total_installments: totalInstallments
@@ -3986,6 +4039,105 @@ app.post("/api/cron/tuition-reminders", async (req, res) => {
   } catch (error) {
     console.error("Tuition reminders cron error:", error);
     res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// ============ COUPON ROUTES (admin-managed, tuition only) ============
+
+app.get("/api/coupons", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const coupons = await db.collection("coupons").find({}, { projection: { _id: 0 } }).sort({ created_at: -1 }).toArray();
+    res.json(coupons);
+  } catch (err) {
+    console.error("List coupons error:", err);
+    res.status(500).json({ detail: "Failed to fetch coupons" });
+  }
+});
+
+app.post("/api/coupons", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const { code, discount_type, discount_value, max_uses, expires_at } = req.body;
+
+    if (!code || !discount_type) {
+      return res.status(422).json({ detail: "Code and discount type are required" });
+    }
+    if (!["full", "percentage", "fixed"].includes(discount_type)) {
+      return res.status(422).json({ detail: "Discount type must be full, percentage, or fixed" });
+    }
+    if (discount_type === "percentage" && (discount_value <= 0 || discount_value > 100)) {
+      return res.status(422).json({ detail: "Percentage discount must be between 1 and 100" });
+    }
+    if (discount_type === "fixed" && !(discount_value > 0)) {
+      return res.status(422).json({ detail: "Fixed discount amount must be greater than 0" });
+    }
+
+    const normalizedCode = code.toUpperCase().trim();
+    const exists = await db.collection("coupons").findOne({ code: normalizedCode });
+    if (exists) {
+      return res.status(400).json({ detail: "A coupon with this code already exists" });
+    }
+
+    const coupon = {
+      id: uuidv4(),
+      code: normalizedCode,
+      discount_type,
+      discount_value: discount_type === "full" ? 0 : Number(discount_value),
+      max_uses: max_uses != null && max_uses !== "" ? Number(max_uses) : null,
+      used_count: 0,
+      expires_at: expires_at || null,
+      is_active: true,
+      created_by: req.user.id,
+      created_at: new Date().toISOString()
+    };
+    await db.collection("coupons").insertOne(coupon);
+    res.json(coupon);
+  } catch (err) {
+    console.error("Create coupon error:", err);
+    res.status(500).json({ detail: "Failed to create coupon" });
+  }
+});
+
+app.put("/api/coupons/:id", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    const updates = { ...req.body };
+    delete updates._id;
+    delete updates.id;
+    delete updates.code; // codes are immutable once created — delete and recreate instead
+    delete updates.used_count; // never client-settable
+
+    await db.collection("coupons").updateOne({ id: req.params.id }, { $set: updates });
+    const coupon = await db.collection("coupons").findOne({ id: req.params.id }, { projection: { _id: 0 } });
+    if (!coupon) return res.status(404).json({ detail: "Coupon not found" });
+    res.json(coupon);
+  } catch (err) {
+    console.error("Update coupon error:", err);
+    res.status(500).json({ detail: "Failed to update coupon" });
+  }
+});
+
+app.delete("/api/coupons/:id", authenticate, requireRoles(["admin", "super_admin"]), async (req, res) => {
+  try {
+    await db.collection("coupons").deleteOne({ id: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete coupon error:", err);
+    res.status(500).json({ detail: "Failed to delete coupon" });
+  }
+});
+
+// Student-facing: check a coupon before committing to payment (tuition only)
+app.get("/api/coupons/check", authenticate, async (req, res) => {
+  try {
+    const result = await validateCoupon(req.query.code);
+    if (!result.valid) return res.status(400).json({ detail: result.reason });
+    res.json({
+      valid: true,
+      discount_type: result.coupon.discount_type,
+      discount_value: result.coupon.discount_value
+    });
+  } catch (err) {
+    console.error("Check coupon error:", err);
+    res.status(500).json({ detail: "Failed to check coupon" });
   }
 });
 

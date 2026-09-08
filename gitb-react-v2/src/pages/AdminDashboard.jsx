@@ -6,7 +6,7 @@ import {
   Edit, Save, Image as ImageIcon, RefreshCw, Settings as SettingsIcon, User,
   ChevronLeft, ChevronRight, Menu, X, Upload, DollarSign, Tag, AlertCircle,
   ClipboardList, Eye, EyeOff, Download as DownloadIcon, BarChart2, Globe,
-  Activity, UserMinus,
+  Activity, UserMinus, Percent,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,7 +15,7 @@ import {
   updateSystemSettings, updateProfile, getCourseMaterials, addCourseMaterial,
   uploadFile, createUser, adminEnrollStudent,
   assignCourseToTeacher, removeTeacherCourse, sendTestEmails,
-  getActivityLog, deleteUser,
+  getActivityLog, deleteUser, getCoupons, createCoupon, updateCoupon, deleteCoupon,
 } from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -25,6 +25,7 @@ const SIDEBAR_ITEMS = [
   { id: 'admissions', label: 'Admissions',  icon: FileText },
   { id: 'courses',    label: 'Courses',     icon: BookOpen },
   { id: 'pricing',    label: 'Pricing',     icon: Tag },
+  { id: 'coupons',    label: 'Coupons',     icon: Percent },
   { id: 'students',   label: 'Students',    icon: Users },
   { id: 'staff',      label: 'Staff',       icon: UserCheck },
   { id: 'finance',    label: 'Finance',     icon: CreditCard },
@@ -90,6 +91,10 @@ export default function AdminDashboard() {
   const [courses, setCourses] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [systemSettings, setSystemSettings] = useState({ application_fee: 50 });
+  const [coupons, setCoupons] = useState([]);
+  const [couponForm, setCouponForm] = useState({ code: '', discount_type: 'percentage', discount_value: '', max_uses: '', expires_at: '' });
+  const [couponMsg, setCouponMsg] = useState('');
+  const [couponSaving, setCouponSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,15 +181,16 @@ export default function AdminDashboard() {
     if (!token) return;
     setLoading(true);
     try {
-      const [dashRes, appRes, courseRes, userRes, settingsRes] = await Promise.allSettled([
+      const [dashRes, appRes, courseRes, userRes, settingsRes, couponRes] = await Promise.allSettled([
         getAdminDashboard(token), getApplications(token), getAdminCourses(token),
-        getUsers(token), getSystemSettings(token),
+        getUsers(token), getSystemSettings(token), getCoupons(token),
       ]);
       if (dashRes.status === 'fulfilled') setStats(dashRes.value);
       if (appRes.status === 'fulfilled') setApplications(Array.isArray(appRes.value) ? appRes.value : []);
       if (courseRes.status === 'fulfilled') setCourses(Array.isArray(courseRes.value) ? courseRes.value : []);
       if (userRes.status === 'fulfilled') setAllUsers(Array.isArray(userRes.value) ? userRes.value : []);
       if (settingsRes.status === 'fulfilled') setSystemSettings(settingsRes.value || {});
+      if (couponRes.status === 'fulfilled') setCoupons(Array.isArray(couponRes.value) ? couponRes.value : []);
       if (dashRes.status === 'rejected' && dashRes.reason?.message?.includes('token')) {
         logout(); navigate('/login');
       }
@@ -605,6 +611,41 @@ export default function AdminDashboard() {
     try {
       await updateSystemSettings(token, systemSettings);
       alert('Settings saved.');
+    } catch (err) { alert(err.message); }
+  }
+
+  // ─── COUPONS (tuition-only discounts) ─────────────────────────────────────
+
+  async function handleCreateCoupon(e) {
+    e.preventDefault();
+    setCouponSaving(true); setCouponMsg('');
+    try {
+      await createCoupon(token, {
+        code: couponForm.code,
+        discount_type: couponForm.discount_type,
+        discount_value: couponForm.discount_type === 'full' ? 0 : Number(couponForm.discount_value),
+        max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : null,
+        expires_at: couponForm.expires_at || null,
+      });
+      setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', max_uses: '', expires_at: '' });
+      setCouponMsg('✓ Coupon created.');
+      fetchData();
+    } catch (err) { setCouponMsg(err.message); }
+    finally { setCouponSaving(false); }
+  }
+
+  async function toggleCouponActive(coupon) {
+    try {
+      await updateCoupon(token, coupon.id, { is_active: !coupon.is_active });
+      fetchData();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function handleDeleteCoupon(coupon) {
+    if (!confirm(`Delete coupon "${coupon.code}"? This cannot be undone.`)) return;
+    try {
+      await deleteCoupon(token, coupon.id);
+      fetchData();
     } catch (err) { alert(err.message); }
   }
 
@@ -1212,6 +1253,105 @@ export default function AdminDashboard() {
     );
   }
 
+  function CouponsTab() {
+    const now = new Date();
+    return (
+      <div className="max-w-3xl space-y-5">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Tuition Coupons</h2>
+          <p className="text-sm text-gray-500 mt-1">Discount codes for tuition installments only — never applies to the registration &amp; application fee.</p>
+        </div>
+
+        <form onSubmit={handleCreateCoupon} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Coupon Code</label>
+              <input type="text" required value={couponForm.code} onChange={(e) => setCouponForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="SUMMER2026" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Discount Type</label>
+              <select value={couponForm.discount_type} onChange={(e) => setCouponForm((p) => ({ ...p, discount_type: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+                <option value="percentage">Partial — Percentage off</option>
+                <option value="fixed">Partial — Fixed € amount off</option>
+                <option value="full">Full — 100% off (free installment)</option>
+              </select>
+            </div>
+          </div>
+          {couponForm.discount_type !== 'full' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {couponForm.discount_type === 'percentage' ? 'Discount Percentage (1-100)' : 'Discount Amount (€)'}
+              </label>
+              <input type="number" min="0" max={couponForm.discount_type === 'percentage' ? 100 : undefined} required value={couponForm.discount_value} onChange={(e) => setCouponForm((p) => ({ ...p, discount_value: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max Uses (blank = unlimited)</label>
+              <input type="number" min="1" value={couponForm.max_uses} onChange={(e) => setCouponForm((p) => ({ ...p, max_uses: e.target.value }))} placeholder="Unlimited" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Expires On (blank = never)</label>
+              <input type="date" value={couponForm.expires_at} onChange={(e) => setCouponForm((p) => ({ ...p, expires_at: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+          </div>
+          <button type="submit" disabled={couponSaving} className="w-full py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50" style={{ backgroundColor: '#0B3B2C' }}>
+            {couponSaving ? 'Creating…' : 'Create Coupon'}
+          </button>
+          {couponMsg && <p className={`text-sm font-medium px-3 py-2 rounded-lg ${couponMsg.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>{couponMsg}</p>}
+        </form>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">Discount</th>
+                <th className="px-4 py-3">Uses</th>
+                <th className="px-4 py-3">Expires</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {coupons.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No coupons yet.</td></tr>
+              )}
+              {coupons.map((c) => {
+                const expired = c.expires_at && new Date(c.expires_at) < now;
+                const usedUp = c.max_uses != null && c.used_count >= c.max_uses;
+                return (
+                  <tr key={c.id}>
+                    <td className="px-4 py-3 font-mono font-semibold text-gray-900">{c.code}</td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {c.discount_type === 'full' ? 'Full (100%)' : c.discount_type === 'percentage' ? `${c.discount_value}% off` : `€${c.discount_value} off`}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{c.used_count}{c.max_uses != null ? ` / ${c.max_uses}` : ' / ∞'}</td>
+                    <td className="px-4 py-3 text-gray-700">{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}</td>
+                    <td className="px-4 py-3">
+                      {!c.is_active ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Disabled</span>
+                        : expired ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">Expired</span>
+                        : usedUp ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">Used up</span>
+                        : <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button onClick={() => toggleCouponActive(c)} className="text-xs font-medium text-gray-600 hover:text-gray-900 mr-3">
+                        {c.is_active ? 'Disable' : 'Enable'}
+                      </button>
+                      <button onClick={() => handleDeleteCoupon(c)} className="text-xs font-medium text-red-600 hover:text-red-800">
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
@@ -1272,6 +1412,7 @@ export default function AdminDashboard() {
               {activeTab === 'finance'    && <FinanceTab />}
               {activeTab === 'activity'   && <ActivityTab />}
               {activeTab === 'settings'   && <SettingsTab />}
+              {activeTab === 'coupons'    && <CouponsTab />}
             </>
           )}
         </main>

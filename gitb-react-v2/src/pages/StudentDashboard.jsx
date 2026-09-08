@@ -68,6 +68,7 @@ export default function StudentDashboard() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentModal, setPaymentModal] = useState(null); // { courseId, plan } while the picker is open
   const [paymentCountry, setPaymentCountry] = useState('');
+  const [paymentCoupon, setPaymentCoupon] = useState('');
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', phone: '', profilePicture: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
@@ -201,6 +202,7 @@ export default function StudentDashboard() {
       || 'one_time';
     setPaymentModal({ courseId, plan, preview: null });
     setPaymentCountry('');
+    setPaymentCoupon('');
   }
 
   // Computes the local-currency amount server-side so it can be shown before
@@ -209,7 +211,7 @@ export default function StudentDashboard() {
     if (!paymentModal || !paymentCountry) return;
     setPaymentLoading(true); setError('');
     try {
-      const data = await createTuitionPayment(token, paymentModal.courseId, paymentModal.plan, paymentCountry);
+      const data = await createTuitionPayment(token, paymentModal.courseId, paymentModal.plan, paymentCountry, paymentCoupon);
       const payload = data?.data || data;
       if (payload?.fully_covered) {
         setPaymentSuccess(true);
@@ -914,6 +916,16 @@ export default function StudentDashboard() {
                   <>
                     <p className="text-sm text-gray-500 mb-5">Select your country of residence to see the amount you'll pay.</p>
                     <CountryPicker country={paymentCountry} onChange={setPaymentCountry} />
+                    <div className="mt-4">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">Coupon Code (optional)</label>
+                      <input
+                        type="text"
+                        value={paymentCoupon}
+                        onChange={(e) => setPaymentCoupon(e.target.value.toUpperCase())}
+                        placeholder="e.g. SUMMER2026"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#0C4E3A] focus:ring-2 focus:ring-[#0C4E3A]/10 text-sm uppercase"
+                      />
+                    </div>
                     {error && <p className="mt-4 text-sm text-red-600 font-medium">{error}</p>}
                     <div className="flex gap-3 mt-6">
                       <button
@@ -943,6 +955,12 @@ export default function StudentDashboard() {
                     <div className="rounded-2xl p-5 text-white mb-4" style={{ backgroundColor: '#0C4E3A' }}>
                       <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Amount to Pay</p>
                       <p className="text-2xl font-bold">{paymentModal.preview.currency} {paymentModal.preview.amount.toLocaleString()}</p>
+                      {paymentModal.preview.coupon_discount_applied > 0 && (
+                        <p className="text-xs text-white/70 mt-1">Coupon discount applied: -€{paymentModal.preview.coupon_discount_applied.toFixed(2)}</p>
+                      )}
+                      {paymentModal.preview.referral_discount_applied > 0 && (
+                        <p className="text-xs text-white/70 mt-1">Referral balance applied: -€{paymentModal.preview.referral_discount_applied.toFixed(2)}</p>
+                      )}
                     </div>
                     {error && <p className="mb-4 text-sm text-red-600 font-medium">{error}</p>}
                     <div className="flex gap-3">
