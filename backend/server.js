@@ -4239,6 +4239,104 @@ app.get("/api/my-enrollments", authenticate, async (req, res) => {
   }
 });
 
+// ============ LIVE LESSONS ============
+// A scheduled session + meeting link per course (Zoom/Meet/Teams etc.) —
+// students with a paid enrollment in that course see it on their dashboard
+// with a countdown and a Join button that opens near start time.
+
+app.get("/api/courses/:courseId/live-lessons", authenticate, async (req, res) => {
+  try {
+    const lessons = await db.collection("live_lessons")
+      .find({ course_id: req.params.courseId }, { projection: { _id: 0 } })
+      .sort({ scheduled_at: 1 })
+      .toArray();
+    res.json(lessons);
+  } catch (error) {
+    console.error("Get live lessons error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+app.post("/api/courses/:courseId/live-lessons", authenticate, requireRoles(["admin", "super_admin", "teacher", "lecturer"]), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { title, description, scheduled_at, duration_minutes, meeting_url } = req.body;
+    if (!title || !scheduled_at || !meeting_url) {
+      return res.status(422).json({ detail: "title, scheduled_at and meeting_url are required" });
+    }
+    const course = await db.collection("courses").findOne({ id: courseId });
+    if (!course) return res.status(404).json({ detail: "Course not found" });
+
+    const lesson = {
+      id: uuidv4(),
+      course_id: courseId,
+      course_title: course.title,
+      title,
+      description: description || "",
+      scheduled_at,
+      duration_minutes: Number(duration_minutes) || 60,
+      meeting_url,
+      created_at: new Date().toISOString(),
+      created_by: req.user.id,
+    };
+    await db.collection("live_lessons").insertOne(lesson);
+    const { _id, ...rest } = lesson;
+    res.json(rest);
+  } catch (error) {
+    console.error("Create live lesson error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+app.put("/api/live-lessons/:id", authenticate, requireRoles(["admin", "super_admin", "teacher", "lecturer"]), async (req, res) => {
+  try {
+    const updates = { ...req.body };
+    delete updates._id;
+    delete updates.id;
+    delete updates.course_id;
+    updates.updated_at = new Date().toISOString();
+    const result = await db.collection("live_lessons").updateOne({ id: req.params.id }, { $set: updates });
+    if (result.matchedCount === 0) return res.status(404).json({ detail: "Live lesson not found" });
+    res.json({ message: "Updated" });
+  } catch (error) {
+    console.error("Update live lesson error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+app.delete("/api/live-lessons/:id", authenticate, requireRoles(["admin", "super_admin", "teacher", "lecturer"]), async (req, res) => {
+  try {
+    await db.collection("live_lessons").deleteOne({ id: req.params.id });
+    res.json({ message: "Deleted" });
+  } catch (error) {
+    console.error("Delete live lesson error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+// Student dashboard: upcoming live lessons across every course they have a
+// PAID enrollment in (same gate as study materials — no paid tuition, no access).
+app.get("/api/my-live-lessons", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const enrollments = await db.collection("enrollments").find({
+      $or: [{ user_id: userId }, { student_id: userId }],
+      payment_status: "paid",
+    }).toArray();
+    const courseIds = [...new Set(enrollments.map((e) => e.course_id))];
+    if (courseIds.length === 0) return res.json([]);
+
+    const lessons = await db.collection("live_lessons")
+      .find({ course_id: { $in: courseIds } }, { projection: { _id: 0 } })
+      .sort({ scheduled_at: 1 })
+      .toArray();
+    res.json(lessons);
+  } catch (error) {
+    console.error("Get my live lessons error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
 // ============ TUITION REMINDERS (CRON) ============
 // There's no auto-billing for monthly plans — call this once a day from an
 // external scheduler (e.g. a Render Cron Job) pointed at this endpoint with

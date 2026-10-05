@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BookOpen, Monitor, ClipboardList, CreditCard, User, LogOut,
   Menu, X, CheckCircle, Circle, Play, FileText,
   Link as LinkIcon, File, Clock, Award, AlertCircle, Upload, Save,
-  ExternalLink, TrendingUp, BookMarked, XCircle, Loader2,
+  ExternalLink, TrendingUp, BookMarked, XCircle, Loader2, Video, Calendar,
 } from "lucide-react";
 import { Scene, Logo } from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
@@ -13,7 +13,7 @@ import {
   getMyCourses, getMyEnrollments, getCourseMaterials, getCourseQuizzes,
   getQuizById, submitQuiz, getMyQuizResults, markLessonComplete,
   getCourseProgress, createTuitionPayment, updateProfile, uploadFile,
-  fetchCourses, studentAddCourse, getMyReferrals, fetchConfig,
+  fetchCourses, studentAddCourse, getMyReferrals, fetchConfig, getMyLiveLessons,
 } from "../services/api";
 
 function isYouTube(url: string) {
@@ -77,6 +77,7 @@ export function StudentDashboard() {
   const [referrals, setReferrals] = useState<any>(null);
   const [referralCopied, setReferralCopied] = useState(false);
   const [banner, setBanner] = useState<any>(null);
+  const [liveLessons, setLiveLessons] = useState<any[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -103,15 +104,16 @@ export function StudentDashboard() {
   async function loadInitial() {
     setLoading(true); setError("");
     try {
-      const [coursesData, enrollData, resultsData, allCoursesData, referralsData, configData] = await Promise.allSettled([
+      const [coursesData, enrollData, resultsData, allCoursesData, referralsData, configData, lessonsData] = await Promise.allSettled([
         getMyCourses(token), getMyEnrollments(token), getMyQuizResults(token), fetchCourses(),
-        getMyReferrals(token), fetchConfig(),
+        getMyReferrals(token), fetchConfig(), getMyLiveLessons(token),
       ]);
       const c = coursesData.status === "fulfilled" ? coursesData.value : [];
       const e = enrollData.status === "fulfilled" ? enrollData.value : [];
       const r = resultsData.status === "fulfilled" ? resultsData.value : [];
       if (allCoursesData.status === "fulfilled") setAllCourses(Array.isArray(allCoursesData.value) ? allCoursesData.value : []);
       if (referralsData.status === "fulfilled") setReferrals(referralsData.value);
+      if (lessonsData.status === "fulfilled") setLiveLessons(Array.isArray(lessonsData.value) ? lessonsData.value : []);
       if (configData.status === "fulfilled" && (configData.value as any)?.dashboardBanner?.imageUrl) setBanner((configData.value as any).dashboardBanner);
       setCourses(c);
       setEnrollments(Array.isArray(e) ? e : []);
@@ -313,6 +315,39 @@ export function StudentDashboard() {
             </div>
           ))}
         </div>
+        {(() => {
+          const upcoming = liveLessons
+            .filter((l) => new Date(l.scheduled_at).getTime() + l.duration_minutes * 60000 >= Date.now())
+            .slice(0, 3);
+          if (upcoming.length === 0) return null;
+          return (
+            <div>
+              <h3 className="mb-3 font-display text-sm uppercase">Upcoming Live Lessons</h3>
+              <div className="space-y-3">
+                {upcoming.map((l) => {
+                  const start = new Date(l.scheduled_at).getTime();
+                  const end = start + l.duration_minutes * 60000;
+                  const now = Date.now();
+                  const canJoin = now >= start - 10 * 60000 && now <= end;
+                  return (
+                    <div key={l.id} className="flex flex-wrap items-center gap-4 rounded-2xl bg-white/70 p-4">
+                      <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-lime/40"><Video size={18} className="text-forest" /></span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">{l.title}</p>
+                        <p className="text-xs text-sub">{l.course_title} · <Calendar size={11} className="inline" /> {new Date(l.scheduled_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · {l.duration_minutes} min</p>
+                      </div>
+                      {canJoin ? (
+                        <a href={l.meeting_url} target="_blank" rel="noreferrer" className="btn-dark !py-2 text-sm">Join now <ExternalLink size={13} /></a>
+                      ) : (
+                        <span className="rounded-full bg-chip px-3 py-1.5 text-xs font-semibold text-sub">Opens 10 min before</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
         <div>
           <h3 className="mb-3 font-display text-sm uppercase">My Courses</h3>
           {courses.length === 0 ? (

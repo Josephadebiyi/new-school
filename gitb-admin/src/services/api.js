@@ -252,6 +252,66 @@ export async function updateCourse(token, courseId, payload) {
   return data;
 }
 
+export async function deleteCourse(token, courseId) {
+  const res = await fetch(`${API_BASE}/api/courses/${courseId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to delete course');
+  return data;
+}
+
+// ─── Live Lessons ─────────────────────────────────────────────────────────────
+
+export async function getLiveLessons(token, courseId) {
+  const res = await fetch(`${API_BASE}/api/courses/${courseId}/live-lessons`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch live lessons');
+  return res.json();
+}
+
+export async function createLiveLesson(token, courseId, payload) {
+  const res = await fetch(`${API_BASE}/api/courses/${courseId}/live-lessons`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to create live lesson');
+  return data;
+}
+
+export async function updateLiveLesson(token, id, payload) {
+  const res = await fetch(`${API_BASE}/api/live-lessons/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to update live lesson');
+  return data;
+}
+
+export async function deleteLiveLesson(token, id) {
+  const res = await fetch(`${API_BASE}/api/live-lessons/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to delete live lesson');
+  return data;
+}
+
+export async function getMyLiveLessons(token) {
+  const res = await fetch(`${API_BASE}/api/my-live-lessons`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch live lessons');
+  return res.json();
+}
+
 export async function getApplications(token) {
   const res = await fetch(`${API_BASE}/api/applications`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -427,6 +487,27 @@ export async function adminCreateQuiz(token, payload) {
   return data;
 }
 
+export async function updateQuiz(token, quizId, payload) {
+  const res = await fetch(`${API_BASE}/api/admin/quizzes/${quizId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to update quiz');
+  return data;
+}
+
+export async function deleteQuiz(token, quizId) {
+  const res = await fetch(`${API_BASE}/api/admin/quizzes/${quizId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to delete quiz');
+  return data;
+}
+
 export async function getAdminCourseQuizzes(token, courseId) {
   const res = await fetch(`${API_BASE}/api/admin/courses/${courseId}/quizzes`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -472,14 +553,6 @@ export async function getMyEnrollments(token) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to fetch enrollments');
-  return res.json();
-}
-
-export async function getMyLiveLessons(token) {
-  const res = await fetch(`${API_BASE}/api/my-live-lessons`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to fetch live lessons');
   return res.json();
 }
 

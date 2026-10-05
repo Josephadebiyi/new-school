@@ -1,11 +1,15 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   Briefcase,
+  Calendar,
   CheckCircle,
   CheckCircle2,
+  ClipboardList,
   Clock,
+  Edit,
   Euro,
+  ExternalLink,
   FileText,
   Inbox,
   LayoutDashboard,
@@ -14,27 +18,35 @@ import {
   LogOut,
   Mail,
   Percent,
+  Plus,
   RefreshCw,
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
   Tag,
+  Trash2,
+  Upload,
   Users,
+  Video,
   X,
   XCircle,
 } from "lucide-react";
-import { Scene, Logo } from "../components/Layout";
-import { useAuth } from "../context/AuthContext";
+import { Scene, Logo } from "./components/Layout";
+import { useAuth } from "./context/AuthContext";
 import {
   getApplications, approveApplication, rejectApplication, resendCredentials,
   getInternships, updateInternship,
-  getAdminCourses, updateCourse,
-  getSystemSettings, updateSystemSettings,
+  getAdminCourses, createCourse, updateCourse, deleteCourse,
+  getCourseMaterials, addCourseMaterial, deleteCourseMaterial,
+  getAdminCourseQuizzes, adminCreateQuiz, updateQuiz, deleteQuiz,
+  getLiveLessons, createLiveLesson, deleteLiveLesson,
+  getSystemSettings, updateSystemSettings, uploadFile,
   getCoupons, createCoupon, updateCoupon, deleteCoupon,
   getAdminReferrals, sendTestEmails, seedCourses,
-} from "../services/api";
+} from "./services/api";
 
 const ADMIN_ROLES = ["admin", "super_admin", "registrar", "staff"];
+const PUBLIC_SITE_URL = import.meta.env.VITE_PUBLIC_SITE_URL || "https://gitb.lt";
 
 /* ================================================================ LOGIN */
 export function AdminLogin() {
@@ -45,7 +57,7 @@ export function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (isAuthenticated && ADMIN_ROLES.includes(user?.role)) return <Navigate to="/admin/dashboard" replace />;
+  if (isAuthenticated && ADMIN_ROLES.includes(user?.role)) return <Navigate to="/dashboard" replace />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -57,7 +69,7 @@ export function AdminLogin() {
         setError("This account does not have admissions back-office access.");
         return;
       }
-      nav("/admin/dashboard");
+      nav("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email or password is incorrect.");
     } finally {
@@ -99,9 +111,9 @@ export function AdminLogin() {
                 {loading ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Log in
               </button>
             </form>
-            <Link to="/" className="mt-6 block text-center text-sm font-semibold text-sub hover:text-ink">
+            <a href={PUBLIC_SITE_URL} className="mt-6 block text-center text-sm font-semibold text-sub hover:text-ink">
               ← Back to gitb.lt
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -110,7 +122,7 @@ export function AdminLogin() {
 }
 
 /* ================================================================ DASHBOARD */
-type Tab = "overview" | "applications" | "internships" | "pricing" | "coupons" | "referrals" | "settings";
+type Tab = "overview" | "applications" | "internships" | "courses" | "coupons" | "referrals" | "settings";
 
 const APP_STATUSES = ["pending", "approved", "rejected"] as const;
 type AppStatusT = (typeof APP_STATUSES)[number];
@@ -148,8 +160,30 @@ export function AdminDashboard() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | AppStatusT>("all");
 
-  const [pricingCourse, setPricingCourse] = useState<any>(null);
+  // Unified "Manage course" modal: Details / Pricing / Materials / Quizzes / Live Lessons
+  const [manageCourse, setManageCourse] = useState<any>(null); // the course being managed, or {} for a new one
+  const [manageTab, setManageTab] = useState<"details" | "pricing" | "materials" | "quizzes" | "live">("details");
+  const [courseForm, setCourseForm] = useState<any>({});
+  const [courseSaving, setCourseSaving] = useState(false);
+  const [courseMsg, setCourseMsg] = useState("");
+  const [courseImageUploading, setCourseImageUploading] = useState(false);
+
   const [pricingForm, setPricingForm] = useState<any>({ price: 0, monthly_price: 0, payment_options: ["one_time"], pricing_tiers: [] });
+  const [pricingSaving, setPricingSaving] = useState(false);
+
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [materialForm, setMaterialForm] = useState({ title: "", type: "video", url: "", description: "", week: 1 });
+  const [materialUploading, setMaterialUploading] = useState(false);
+
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [quizzesLoading, setQuizzesLoading] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState<any>(null); // null = not editing; {} = new quiz
+
+  const [liveLessons, setLiveLessons] = useState<any[]>([]);
+  const [liveLessonsLoading, setLiveLessonsLoading] = useState(false);
+  const [lessonForm, setLessonForm] = useState({ title: "", description: "", scheduled_at: "", duration_minutes: 60, meeting_url: "" });
+  const [lessonSaving, setLessonSaving] = useState(false);
 
   const [couponForm, setCouponForm] = useState({ code: "", discount_type: "percentage", discount_value: "", max_uses: "", expires_at: "" });
   const [couponMsg, setCouponMsg] = useState("");
@@ -185,8 +219,8 @@ export function AdminDashboard() {
   }, [token]);
 
   useEffect(() => {
-    if (!isAuthenticated) { nav("/admin"); return; }
-    if (!ADMIN_ROLES.includes(user?.role)) { nav("/admin"); return; }
+    if (!isAuthenticated) { nav("/"); return; }
+    if (!ADMIN_ROLES.includes(user?.role)) { nav("/"); return; }
     fetchData();
   }, [isAuthenticated, user, nav, fetchData]);
 
@@ -232,34 +266,199 @@ export function AdminDashboard() {
     try { await updateInternship(token, id, patch); fetchData(); } catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
   }
 
-  function openPricingModal(course: any) {
-    setPricingCourse(course);
-    setPricingForm({
-      price: course.price?.upfront ?? 0,
-      monthly_price: course.price?.monthly ?? 0,
-      payment_options: course.payment_options || ["one_time"],
-      pricing_tiers: Array.isArray(course.pricing_tiers) ? course.pricing_tiers.map((t: any) => ({ ...t })) : [],
+  // ─── COURSE MANAGEMENT (Details / Pricing / Materials / Quizzes / Live Lessons) ───
+
+  function openManageCourse(course: any | null) {
+    const c = course || {};
+    setManageCourse(c);
+    setManageTab("details");
+    setCourseMsg("");
+    setCourseForm({
+      title: c.title || "", slug: c.slug || "", category: c.category || "Technology",
+      description: c.description || "", overview: c.overview || "",
+      duration_value: c.duration_value || 3, duration_unit: c.duration_unit || "months",
+      level: c.level || c.course_type || "Beginner", image_url: c.image_url || "",
+      outcomes: Array.isArray(c.outcomes) ? c.outcomes.join("\n") : "",
+      certifications: Array.isArray(c.certifications) ? c.certifications.join("\n") : "",
+      is_active: c.is_active !== false,
     });
+    setPricingForm({
+      price: c.price?.upfront ?? (typeof c.price === "number" ? c.price : 0),
+      monthly_price: c.monthly_price ?? c.price?.monthly ?? 0,
+      payment_options: c.payment_options || ["one_time"],
+      pricing_tiers: Array.isArray(c.pricing_tiers) ? c.pricing_tiers.map((t: any) => ({ ...t })) : [],
+    });
+    setMaterials([]); setQuizzes([]); setLiveLessons([]); setEditingQuiz(null);
+    if (c.id) {
+      loadMaterials(c.id);
+      loadQuizzes(c.id);
+      loadLiveLessons(c.id);
+    }
   }
+  function closeManageCourse() {
+    setManageCourse(null);
+  }
+
+  async function saveCourseDetails(e: FormEvent) {
+    e.preventDefault();
+    setCourseSaving(true); setCourseMsg("");
+    try {
+      const payload = {
+        ...courseForm,
+        outcomes: courseForm.outcomes.split("\n").map((s: string) => s.trim()).filter(Boolean),
+        certifications: courseForm.certifications.split("\n").map((s: string) => s.trim()).filter(Boolean),
+      };
+      let saved;
+      if (manageCourse.id) {
+        saved = await updateCourse(token, manageCourse.id, payload);
+      } else {
+        saved = await createCourse(token, payload);
+      }
+      setManageCourse(saved);
+      setCourseMsg("✓ Saved.");
+      fetchData();
+    } catch (err) { setCourseMsg(err instanceof Error ? err.message : "Failed to save"); }
+    finally { setCourseSaving(false); }
+  }
+
+  async function uploadCourseImage(file: File) {
+    setCourseImageUploading(true);
+    try {
+      const data = await uploadFile(token, file);
+      setCourseForm((p: any) => ({ ...p, image_url: data.url }));
+    } catch (err) { alert(err instanceof Error ? err.message : "Upload failed"); }
+    finally { setCourseImageUploading(false); }
+  }
+
+  async function handleDeleteCourse(course: any) {
+    if (!confirm(`Delete "${course.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteCourse(token, course.id);
+      if (manageCourse?.id === course.id) closeManageCourse();
+      fetchData();
+    } catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
+  }
+
   async function savePricing(e: FormEvent) {
     e.preventDefault();
+    setPricingSaving(true);
     try {
-      const id = pricingCourse.id;
-      await updateCourse(token, id, {
+      const saved = await updateCourse(token, manageCourse.id, {
         price: Number(pricingForm.price),
         monthly_price: Number(pricingForm.monthly_price),
         payment_options: pricingForm.payment_options,
         pricing_tiers: pricingForm.pricing_tiers,
       });
-      setPricingCourse(null);
+      setManageCourse(saved);
       fetchData();
     } catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
+    finally { setPricingSaving(false); }
   }
   function togglePaymentOption(opt: string) {
     setPricingForm((p: any) => ({
       ...p,
       payment_options: p.payment_options.includes(opt) ? p.payment_options.filter((o: string) => o !== opt) : [...p.payment_options, opt],
     }));
+  }
+
+  // ─── MATERIALS ─────────────────────────────────────────────────────────────
+
+  async function loadMaterials(courseId: string) {
+    setMaterialsLoading(true);
+    try { setMaterials(await getCourseMaterials(token, courseId)); }
+    catch { /* ignore */ }
+    finally { setMaterialsLoading(false); }
+  }
+  async function uploadMaterialFile(file: File) {
+    setMaterialUploading(true);
+    try {
+      const data = await uploadFile(token, file);
+      setMaterialForm((p) => ({ ...p, url: data.url }));
+    } catch (err) { alert(err instanceof Error ? err.message : "Upload failed"); }
+    finally { setMaterialUploading(false); }
+  }
+  async function handleAddMaterial(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await addCourseMaterial(token, manageCourse.id, materialForm);
+      setMaterialForm({ title: "", type: "video", url: "", description: "", week: materialForm.week });
+      loadMaterials(manageCourse.id);
+    } catch (err) { alert(err instanceof Error ? err.message : "Failed to add material"); }
+  }
+  async function handleDeleteMaterial(materialId: string) {
+    if (!confirm("Remove this material?")) return;
+    try { await deleteCourseMaterial(token, manageCourse.id, materialId); loadMaterials(manageCourse.id); }
+    catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
+  }
+
+  // ─── QUIZZES ───────────────────────────────────────────────────────────────
+
+  async function loadQuizzes(courseId: string) {
+    setQuizzesLoading(true);
+    try { setQuizzes(await getAdminCourseQuizzes(token, courseId)); }
+    catch { /* ignore */ }
+    finally { setQuizzesLoading(false); }
+  }
+  function openNewQuiz() {
+    setEditingQuiz({ title: "", description: "", time_limit_minutes: 30, questions: [{ question: "", options: ["", ""], correct_answer: "", points: 1 }] });
+  }
+  function openEditQuiz(quiz: any) {
+    setEditingQuiz({ ...quiz, questions: quiz.questions.map((q: any) => ({ ...q, options: [...q.options] })) });
+  }
+  async function saveQuiz(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const payload = { ...editingQuiz, course_id: manageCourse.id };
+      if (editingQuiz.id) await updateQuiz(token, editingQuiz.id, payload);
+      else await adminCreateQuiz(token, payload);
+      setEditingQuiz(null);
+      loadQuizzes(manageCourse.id);
+    } catch (err) { alert(err instanceof Error ? err.message : "Failed to save quiz"); }
+  }
+  async function handleDeleteQuiz(quizId: string) {
+    if (!confirm("Delete this quiz?")) return;
+    try { await deleteQuiz(token, quizId); loadQuizzes(manageCourse.id); }
+    catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
+  }
+  function updateQuizQuestion(qi: number, patch: any) {
+    setEditingQuiz((p: any) => {
+      const questions = [...p.questions];
+      questions[qi] = { ...questions[qi], ...patch };
+      return { ...p, questions };
+    });
+  }
+  function updateQuizOption(qi: number, oi: number, value: string) {
+    setEditingQuiz((p: any) => {
+      const questions = [...p.questions];
+      const options = [...questions[qi].options];
+      options[oi] = value;
+      questions[qi] = { ...questions[qi], options };
+      return { ...p, questions };
+    });
+  }
+
+  // ─── LIVE LESSONS ──────────────────────────────────────────────────────────
+
+  async function loadLiveLessons(courseId: string) {
+    setLiveLessonsLoading(true);
+    try { setLiveLessons(await getLiveLessons(token, courseId)); }
+    catch { /* ignore */ }
+    finally { setLiveLessonsLoading(false); }
+  }
+  async function handleCreateLesson(e: FormEvent) {
+    e.preventDefault();
+    setLessonSaving(true);
+    try {
+      await createLiveLesson(token, manageCourse.id, lessonForm);
+      setLessonForm({ title: "", description: "", scheduled_at: "", duration_minutes: 60, meeting_url: "" });
+      loadLiveLessons(manageCourse.id);
+    } catch (err) { alert(err instanceof Error ? err.message : "Failed to schedule lesson"); }
+    finally { setLessonSaving(false); }
+  }
+  async function handleDeleteLesson(id: string) {
+    if (!confirm("Cancel this live lesson?")) return;
+    try { await deleteLiveLesson(token, id); loadLiveLessons(manageCourse.id); }
+    catch (err) { alert(err instanceof Error ? err.message : "Failed"); }
   }
 
   async function handleCreateCoupon(e: FormEvent) {
@@ -315,7 +514,7 @@ export function AdminDashboard() {
     finally { setSeedLoading(false); }
   }
 
-  const signOut = () => { logout(); nav("/admin"); };
+  const signOut = () => { logout(); nav("/"); };
 
   const current = applications.find((a) => a.id === openApp);
   const currentInt = internships.find((i) => i.id === openInt);
@@ -324,7 +523,7 @@ export function AdminDashboard() {
     ["overview", "Overview", LayoutDashboard],
     ["applications", "Applications", Users],
     ["internships", "Internships", Briefcase],
-    ["pricing", "Pricing", Tag],
+    ["courses", "Courses", Tag],
     ["coupons", "Coupons", Percent],
     ["referrals", "Referrals", Users],
     ["settings", "Settings", SettingsIcon],
@@ -376,9 +575,9 @@ export function AdminDashboard() {
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-forest">GITB Admissions</p>
                   <h1 className="display mt-1 text-3xl capitalize sm:text-4xl">{tab}</h1>
                 </div>
-                <Link to="/apply" target="_blank" className="btn-ghost !py-2.5 text-[13px]">
+                <a href={`${PUBLIC_SITE_URL}/apply`} target="_blank" rel="noreferrer" className="btn-ghost !py-2.5 text-[13px]">
                   Open applicant portal ↗
-                </Link>
+                </a>
               </div>
 
               {error && <p className="mt-4 rounded-xl bg-orange/10 p-3 text-sm font-medium text-[#8a3d00]">{error}</p>}
@@ -447,7 +646,7 @@ export function AdminDashboard() {
                       {internships.length === 0 ? (
                         <p className="py-8 text-center text-sub">
                           No internship applications yet. Submit one from the{" "}
-                          <Link to="/internships" target="_blank" className="font-semibold text-ink underline">Internships page</Link>.
+                          <a href={`${PUBLIC_SITE_URL}/internships`} target="_blank" rel="noreferrer" className="font-semibold text-ink underline">Internships page</a>.
                         </p>
                       ) : (
                         <div className="overflow-x-auto">
@@ -473,32 +672,42 @@ export function AdminDashboard() {
                     </Panel>
                   )}
 
-                  {tab === "pricing" && (
-                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                      {courses.map((course) => {
-                        const hasPrice = (course.price?.upfront > 0 || course.price?.monthly > 0) || (course.pricing_tiers?.length > 0);
-                        return (
-                          <div key={course.id} className="glass sheen rounded-2xl p-5">
-                            <h4 className="font-semibold">{course.title}</h4>
-                            <p className="text-xs text-sub">{course.category}</p>
-                            <div className="mt-3 space-y-1 text-sm">
-                              {course.pricing_tiers?.length > 0 ? (
-                                course.pricing_tiers.map((t: any) => (
-                                  <div key={t.id} className="flex justify-between"><span className="text-sub">{t.label || t.id}:</span><span className="font-medium">€{t.price_monthly}/mo</span></div>
-                                ))
-                              ) : (
-                                <>
-                                  <div className="flex justify-between"><span className="text-sub">One-time:</span><span className="font-medium">€{course.price?.upfront ?? 0}</span></div>
-                                  <div className="flex justify-between"><span className="text-sub">Monthly:</span><span className="font-medium">€{course.price?.monthly ?? 0}/mo</span></div>
-                                </>
-                              )}
+                  {tab === "courses" && (
+                    <div className="mt-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-sub">{courses.length} course{courses.length === 1 ? "" : "s"}</p>
+                        <button onClick={() => openManageCourse(null)} className="btn-dark text-sm"><Plus size={14} /> New Course</button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {courses.map((course) => {
+                          const hasPrice = (course.price?.upfront > 0 || course.price?.monthly > 0) || (course.pricing_tiers?.length > 0);
+                          return (
+                            <div key={course.id} className="glass sheen rounded-2xl p-5">
+                              {course.image_url && <img src={course.image_url} alt="" className="mb-3 h-28 w-full rounded-xl object-cover" />}
+                              <h4 className="font-semibold">{course.title}</h4>
+                              <p className="text-xs text-sub">{course.category}</p>
+                              <div className="mt-3 space-y-1 text-sm">
+                                {course.pricing_tiers?.length > 0 ? (
+                                  course.pricing_tiers.map((t: any) => (
+                                    <div key={t.id} className="flex justify-between"><span className="text-sub">{t.label || t.id}:</span><span className="font-medium">€{t.price_monthly}/mo</span></div>
+                                  ))
+                                ) : (
+                                  <>
+                                    <div className="flex justify-between"><span className="text-sub">One-time:</span><span className="font-medium">€{course.price?.upfront ?? 0}</span></div>
+                                    <div className="flex justify-between"><span className="text-sub">Monthly:</span><span className="font-medium">€{course.price?.monthly ?? 0}/mo</span></div>
+                                  </>
+                                )}
+                              </div>
+                              {!hasPrice && <p className="mt-2 rounded-lg bg-orange/10 px-2 py-1 text-xs text-[#8a3d00]">No price set — students can't pay yet</p>}
+                              <div className="mt-3 flex gap-2">
+                                <button onClick={() => openManageCourse(course)} className="btn-dark flex-1 text-sm"><Edit size={13} /> Manage</button>
+                                <button onClick={() => handleDeleteCourse(course)} className="btn bg-orange/10 text-[#9f1d10] hover:bg-orange/20"><Trash2 size={14} /></button>
+                              </div>
                             </div>
-                            {!hasPrice && <p className="mt-2 rounded-lg bg-orange/10 px-2 py-1 text-xs text-[#8a3d00]">No price set — students can't pay yet</p>}
-                            <button onClick={() => openPricingModal(course)} className="btn-dark mt-3 w-full text-sm">Edit Pricing</button>
-                          </div>
-                        );
-                      })}
-                      {courses.length === 0 && <p className="text-sub">No courses found.</p>}
+                          );
+                        })}
+                        {courses.length === 0 && <p className="text-sub">No courses found — seed the catalog from Settings, or create one above.</p>}
+                      </div>
                     </div>
                   )}
 
@@ -679,56 +888,304 @@ export function AdminDashboard() {
       )}
       {currentInt && <InternshipDrawer rec={currentInt} onClose={() => setOpenInt(null)} update={(p) => updateInt(currentInt.id, p)} />}
 
-      {pricingCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-deep/50 p-4 backdrop-blur-sm" onClick={() => setPricingCourse(null)}>
-          <div className="panel w-full max-w-md rounded-[24px] p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-start justify-between">
-              <h2 className="display text-xl">Pricing — {pricingCourse.title}</h2>
-              <button onClick={() => setPricingCourse(null)} className="grid h-9 w-9 place-items-center rounded-xl bg-chip"><X size={16} /></button>
+      {manageCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-deep/50 p-4 backdrop-blur-sm" onClick={closeManageCourse}>
+          <div className="panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[24px]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between p-6 pb-0">
+              <h2 className="display text-xl">{manageCourse.id ? `Manage — ${manageCourse.title}` : "New Course"}</h2>
+              <button onClick={closeManageCourse} className="grid h-9 w-9 place-items-center rounded-xl bg-chip"><X size={16} /></button>
             </div>
-            <form onSubmit={savePricing} className="space-y-4">
-              {pricingForm.pricing_tiers.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="label">Pricing tiers (per month)</p>
-                  {pricingForm.pricing_tiers.map((t: any, i: number) => (
-                    <div key={t.id} className="flex items-center gap-3">
-                      <span className="w-24 text-sm font-medium capitalize">{t.id}</span>
-                      <input
-                        type="number" min="0" value={t.price_monthly}
-                        onChange={(e) => setPricingForm((p: any) => {
-                          const tiers = [...p.pricing_tiers];
-                          tiers[i] = { ...tiers[i], price_monthly: Number(e.target.value) };
-                          return { ...p, pricing_tiers: tiers };
-                        })}
-                        className="field"
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <>
+
+            {manageCourse.id && (
+              <div className="mt-4 flex gap-1 overflow-x-auto px-6">
+                {(["details", "pricing", "materials", "quizzes", "live"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setManageTab(t)}
+                    className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold capitalize ${manageTab === t ? "bg-ink text-white" : "bg-chip text-sub hover:text-ink"}`}
+                  >
+                    {t === "live" ? "Live Lessons" : t}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {(manageTab === "details" || !manageCourse.id) && (
+                <form onSubmit={saveCourseDetails} className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="label">Title</span>
+                      <input required value={courseForm.title} onChange={(e) => setCourseForm((p: any) => ({ ...p, title: e.target.value }))} className="field" />
+                    </label>
+                    <label className="block">
+                      <span className="label">Slug (used in URLs, blank = auto)</span>
+                      <input value={courseForm.slug} onChange={(e) => setCourseForm((p: any) => ({ ...p, slug: e.target.value }))} className="field font-mono" placeholder="cybersecurity-acceleration" />
+                    </label>
+                    <label className="block">
+                      <span className="label">Category</span>
+                      <input value={courseForm.category} onChange={(e) => setCourseForm((p: any) => ({ ...p, category: e.target.value }))} className="field" />
+                    </label>
+                    <label className="block">
+                      <span className="label">Level</span>
+                      <select value={courseForm.level} onChange={(e) => setCourseForm((p: any) => ({ ...p, level: e.target.value }))} className="field">
+                        {["Beginner", "Intermediate", "Advanced", "All Levels"].map((l) => <option key={l}>{l}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="label">Duration</span>
+                      <input type="number" min="1" value={courseForm.duration_value} onChange={(e) => setCourseForm((p: any) => ({ ...p, duration_value: Number(e.target.value) }))} className="field" />
+                    </label>
+                    <label className="block">
+                      <span className="label">Duration unit</span>
+                      <select value={courseForm.duration_unit} onChange={(e) => setCourseForm((p: any) => ({ ...p, duration_unit: e.target.value }))} className="field">
+                        <option value="months">months</option>
+                        <option value="weeks">weeks</option>
+                      </select>
+                    </label>
+                  </div>
                   <label className="block">
-                    <span className="label">One-time price (€)</span>
-                    <input type="number" min="0" value={pricingForm.price} onChange={(e) => setPricingForm((p: any) => ({ ...p, price: e.target.value }))} className="field" />
+                    <span className="label">Short description</span>
+                    <textarea rows={2} value={courseForm.description} onChange={(e) => setCourseForm((p: any) => ({ ...p, description: e.target.value }))} className="field resize-y" />
                   </label>
                   <label className="block">
-                    <span className="label">Monthly price (€)</span>
-                    <input type="number" min="0" value={pricingForm.monthly_price} onChange={(e) => setPricingForm((p: any) => ({ ...p, monthly_price: e.target.value }))} className="field" />
+                    <span className="label">Overview (shown on the course detail page)</span>
+                    <textarea rows={4} value={courseForm.overview} onChange={(e) => setCourseForm((p: any) => ({ ...p, overview: e.target.value }))} className="field resize-y" />
                   </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="label">What you'll learn (one per line)</span>
+                      <textarea rows={4} value={courseForm.outcomes} onChange={(e) => setCourseForm((p: any) => ({ ...p, outcomes: e.target.value }))} className="field resize-y" />
+                    </label>
+                    <label className="block">
+                      <span className="label">Certifications (one per line)</span>
+                      <textarea rows={4} value={courseForm.certifications} onChange={(e) => setCourseForm((p: any) => ({ ...p, certifications: e.target.value }))} className="field resize-y" />
+                    </label>
+                  </div>
                   <div>
-                    <span className="label">Payment options</span>
-                    <div className="flex gap-2">
-                      {["one_time", "monthly"].map((opt) => (
-                        <button type="button" key={opt} onClick={() => togglePaymentOption(opt)} className={`chip ${pricingForm.payment_options.includes(opt) ? "!bg-lime" : ""}`}>
-                          {opt.replace("_", " ")}
-                        </button>
+                    <span className="label">Course image</span>
+                    {courseForm.image_url && <img src={courseForm.image_url} alt="" className="mb-2 h-32 w-full rounded-xl object-cover" />}
+                    <label className="btn-ghost cursor-pointer">
+                      {courseImageUploading ? <><Loader2 size={14} className="animate-spin" /> Uploading…</> : <><Upload size={14} /> Upload image</>}
+                      <input type="file" accept="image/*" className="hidden" disabled={courseImageUploading} onChange={(e) => e.target.files?.[0] && uploadCourseImage(e.target.files[0])} />
+                    </label>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={courseForm.is_active} onChange={(e) => setCourseForm((p: any) => ({ ...p, is_active: e.target.checked }))} className="h-4 w-4 accent-[#0b3b2c]" />
+                    Visible to applicants
+                  </label>
+                  <button type="submit" disabled={courseSaving} className="btn-dark w-full disabled:opacity-50">{courseSaving ? "Saving…" : manageCourse.id ? "Save Details" : "Create Course"}</button>
+                  {courseMsg && <p className={`text-sm font-medium ${courseMsg.startsWith("✓") ? "text-forest" : "text-[#8a3d00]"}`}>{courseMsg}</p>}
+                </form>
+              )}
+
+              {manageTab === "pricing" && manageCourse.id && (
+                <form onSubmit={savePricing} className="space-y-4">
+                  {pricingForm.pricing_tiers.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="label">Pricing tiers (per month)</p>
+                      {pricingForm.pricing_tiers.map((t: any, i: number) => (
+                        <div key={t.id} className="flex items-center gap-3">
+                          <span className="w-24 text-sm font-medium capitalize">{t.id}</span>
+                          <input
+                            type="number" min="0" value={t.price_monthly}
+                            onChange={(e) => setPricingForm((p: any) => {
+                              const tiers = [...p.pricing_tiers];
+                              tiers[i] = { ...tiers[i], price_monthly: Number(e.target.value) };
+                              return { ...p, pricing_tiers: tiers };
+                            })}
+                            className="field"
+                          />
+                        </div>
                       ))}
                     </div>
-                  </div>
-                </>
+                  ) : (
+                    <>
+                      <label className="block">
+                        <span className="label">One-time price (€)</span>
+                        <input type="number" min="0" value={pricingForm.price} onChange={(e) => setPricingForm((p: any) => ({ ...p, price: e.target.value }))} className="field" />
+                      </label>
+                      <label className="block">
+                        <span className="label">Monthly price (€)</span>
+                        <input type="number" min="0" value={pricingForm.monthly_price} onChange={(e) => setPricingForm((p: any) => ({ ...p, monthly_price: e.target.value }))} className="field" />
+                      </label>
+                      <div>
+                        <span className="label">Payment options</span>
+                        <div className="flex gap-2">
+                          {["one_time", "monthly"].map((opt) => (
+                            <button type="button" key={opt} onClick={() => togglePaymentOption(opt)} className={`chip ${pricingForm.payment_options.includes(opt) ? "!bg-lime" : ""}`}>
+                              {opt.replace("_", " ")}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <button type="submit" disabled={pricingSaving} className="btn-dark w-full disabled:opacity-50">{pricingSaving ? "Saving…" : "Save Pricing"}</button>
+                </form>
               )}
-              <button type="submit" className="btn-dark w-full">Save Pricing</button>
-            </form>
+
+              {manageTab === "materials" && manageCourse.id && (
+                <div className="space-y-5">
+                  <form onSubmit={handleAddMaterial} className="space-y-3 rounded-2xl bg-white/70 p-4">
+                    <p className="font-display text-xs uppercase">Add material</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input required placeholder="Title" value={materialForm.title} onChange={(e) => setMaterialForm((p) => ({ ...p, title: e.target.value }))} className="field" />
+                      <select value={materialForm.type} onChange={(e) => setMaterialForm((p) => ({ ...p, type: e.target.value }))} className="field">
+                        {["video", "pdf", "document", "link"].map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <input type="number" min="1" placeholder="Week" value={materialForm.week} onChange={(e) => setMaterialForm((p) => ({ ...p, week: Number(e.target.value) }))} className="field" />
+                      <div className="flex gap-2">
+                        <input placeholder="URL (YouTube, PDF, link…)" value={materialForm.url} onChange={(e) => setMaterialForm((p) => ({ ...p, url: e.target.value }))} className="field flex-1" />
+                        <label className="btn-ghost cursor-pointer whitespace-nowrap">
+                          {materialUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                          <input type="file" className="hidden" disabled={materialUploading} onChange={(e) => e.target.files?.[0] && uploadMaterialFile(e.target.files[0])} />
+                        </label>
+                      </div>
+                    </div>
+                    <textarea placeholder="Description (optional)" rows={2} value={materialForm.description} onChange={(e) => setMaterialForm((p) => ({ ...p, description: e.target.value }))} className="field resize-y" />
+                    <button type="submit" disabled={!materialForm.url} className="btn-dark w-full disabled:opacity-40">Add Material</button>
+                  </form>
+                  {materialsLoading ? (
+                    <Loader2 size={24} className="mx-auto animate-spin text-forest" />
+                  ) : materials.length === 0 ? (
+                    <p className="text-center text-sm text-sub">No materials yet.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {materials.map((m) => (
+                        <li key={m.id} className="flex items-center gap-3 rounded-xl bg-white/70 p-3">
+                          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-lime/40"><Video size={15} className="text-forest" /></span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{m.title}</p>
+                            <p className="text-xs text-sub">Week {m.week} · {m.type}</p>
+                          </div>
+                          <button onClick={() => handleDeleteMaterial(m.id)} className="p-2 text-sub hover:text-[#9f1d10]"><Trash2 size={15} /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {manageTab === "quizzes" && manageCourse.id && (
+                <div className="space-y-5">
+                  {editingQuiz ? (
+                    <form onSubmit={saveQuiz} className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input required placeholder="Quiz title" value={editingQuiz.title} onChange={(e) => setEditingQuiz((p: any) => ({ ...p, title: e.target.value }))} className="field" />
+                        <input type="number" min="1" placeholder="Time limit (minutes)" value={editingQuiz.time_limit_minutes} onChange={(e) => setEditingQuiz((p: any) => ({ ...p, time_limit_minutes: Number(e.target.value) }))} className="field" />
+                      </div>
+                      <textarea placeholder="Description (optional)" rows={2} value={editingQuiz.description} onChange={(e) => setEditingQuiz((p: any) => ({ ...p, description: e.target.value }))} className="field resize-y" />
+                      <div className="space-y-4">
+                        {editingQuiz.questions.map((q: any, qi: number) => (
+                          <div key={qi} className="rounded-2xl bg-white/70 p-4">
+                            <div className="mb-2 flex items-center justify-between">
+                              <p className="font-display text-xs uppercase">Question {qi + 1}</p>
+                              {editingQuiz.questions.length > 1 && (
+                                <button type="button" onClick={() => setEditingQuiz((p: any) => ({ ...p, questions: p.questions.filter((_: any, i: number) => i !== qi) }))} className="text-sub hover:text-[#9f1d10]"><Trash2 size={14} /></button>
+                              )}
+                            </div>
+                            <input required placeholder="Question text" value={q.question} onChange={(e) => updateQuizQuestion(qi, { question: e.target.value })} className="field mb-2" />
+                            <div className="space-y-2">
+                              {q.options.map((opt: string, oi: number) => (
+                                <div key={oi} className="flex items-center gap-2">
+                                  <input
+                                    type="radio" name={`correct-${qi}`} checked={q.correct_answer === opt && opt !== ""}
+                                    onChange={() => updateQuizQuestion(qi, { correct_answer: opt })}
+                                    className="accent-[#0b3b2c]"
+                                  />
+                                  <input
+                                    placeholder={`Option ${oi + 1}`} value={opt}
+                                    onChange={(e) => updateQuizOption(qi, oi, e.target.value)}
+                                    className="field flex-1 !py-2"
+                                  />
+                                  {q.options.length > 2 && (
+                                    <button type="button" onClick={() => updateQuizQuestion(qi, { options: q.options.filter((_: string, i: number) => i !== oi) })} className="p-1 text-sub"><X size={14} /></button>
+                                  )}
+                                </div>
+                              ))}
+                              <button type="button" onClick={() => updateQuizQuestion(qi, { options: [...q.options, ""] })} className="text-xs font-semibold text-forest">+ Add option</button>
+                            </div>
+                            <p className="mt-2 text-xs text-sub">Select the radio button next to the correct answer.</p>
+                          </div>
+                        ))}
+                      </div>
+                      <button type="button" onClick={() => setEditingQuiz((p: any) => ({ ...p, questions: [...p.questions, { question: "", options: ["", ""], correct_answer: "", points: 1 }] }))} className="btn-ghost w-full">
+                        <Plus size={14} /> Add question
+                      </button>
+                      <div className="flex gap-3">
+                        <button type="button" onClick={() => setEditingQuiz(null)} className="btn-ghost flex-1">Cancel</button>
+                        <button type="submit" className="btn-dark flex-1">Save Quiz</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <button onClick={openNewQuiz} className="btn-dark w-full"><Plus size={14} /> New Quiz</button>
+                      {quizzesLoading ? (
+                        <Loader2 size={24} className="mx-auto animate-spin text-forest" />
+                      ) : quizzes.length === 0 ? (
+                        <p className="text-center text-sm text-sub">No quizzes yet.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {quizzes.map((qz) => (
+                            <li key={qz.id} className="flex items-center gap-3 rounded-xl bg-white/70 p-3">
+                              <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-lime/40"><ClipboardList size={15} className="text-forest" /></span>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold">{qz.title}</p>
+                                <p className="text-xs text-sub">{qz.questions?.length || 0} questions · {qz.time_limit_minutes} min</p>
+                              </div>
+                              <button onClick={() => openEditQuiz(qz)} className="p-2 text-sub hover:text-ink"><Edit size={15} /></button>
+                              <button onClick={() => handleDeleteQuiz(qz.id)} className="p-2 text-sub hover:text-[#9f1d10]"><Trash2 size={15} /></button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {manageTab === "live" && manageCourse.id && (
+                <div className="space-y-5">
+                  <form onSubmit={handleCreateLesson} className="space-y-3 rounded-2xl bg-white/70 p-4">
+                    <p className="font-display text-xs uppercase">Schedule a live lesson</p>
+                    <input required placeholder="Title" value={lessonForm.title} onChange={(e) => setLessonForm((p) => ({ ...p, title: e.target.value }))} className="field" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="label">Date & time</span>
+                        <input required type="datetime-local" value={lessonForm.scheduled_at} onChange={(e) => setLessonForm((p) => ({ ...p, scheduled_at: e.target.value }))} className="field" />
+                      </label>
+                      <label className="block">
+                        <span className="label">Duration (minutes)</span>
+                        <input type="number" min="15" value={lessonForm.duration_minutes} onChange={(e) => setLessonForm((p) => ({ ...p, duration_minutes: Number(e.target.value) }))} className="field" />
+                      </label>
+                    </div>
+                    <input required placeholder="Meeting link (Zoom, Google Meet, Teams…)" value={lessonForm.meeting_url} onChange={(e) => setLessonForm((p) => ({ ...p, meeting_url: e.target.value }))} className="field" />
+                    <textarea placeholder="Description (optional)" rows={2} value={lessonForm.description} onChange={(e) => setLessonForm((p) => ({ ...p, description: e.target.value }))} className="field resize-y" />
+                    <button type="submit" disabled={lessonSaving} className="btn-dark w-full disabled:opacity-50">{lessonSaving ? "Scheduling…" : "Schedule Lesson"}</button>
+                  </form>
+                  {liveLessonsLoading ? (
+                    <Loader2 size={24} className="mx-auto animate-spin text-forest" />
+                  ) : liveLessons.length === 0 ? (
+                    <p className="text-center text-sm text-sub">No live lessons scheduled.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {liveLessons.map((l) => (
+                        <li key={l.id} className="flex items-center gap-3 rounded-xl bg-white/70 p-3">
+                          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-lime/40"><Calendar size={15} className="text-forest" /></span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{l.title}</p>
+                            <p className="text-xs text-sub">{new Date(l.scheduled_at).toLocaleString()} · {l.duration_minutes} min</p>
+                          </div>
+                          <a href={l.meeting_url} target="_blank" rel="noreferrer" className="p-2 text-sub hover:text-ink"><ExternalLink size={15} /></a>
+                          <button onClick={() => handleDeleteLesson(l.id)} className="p-2 text-sub hover:text-[#9f1d10]"><Trash2 size={15} /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

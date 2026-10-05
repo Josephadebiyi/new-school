@@ -4,6 +4,8 @@ import { Menu, X, Mail, MapPin } from "lucide-react";
 import { contact, nav } from "../data/site";
 import { Sparkle } from "./Sparkle";
 
+const ADMIN_URL = import.meta.env.VITE_ADMIN_URL || "https://admin.gitb.lt";
+
 /** Fixed 3D-style environment: green sky, glossy orbs, frosted glass slabs, reflective floor. */
 export function Scene() {
   return (
@@ -192,9 +194,9 @@ function Footer() {
               Contact
             </Link>
             <span>Privacy Policy</span>
-            <Link to="/admin" className="hover:text-white">
+            <a href={ADMIN_URL} className="hover:text-white">
               Staff log in
-            </Link>
+            </a>
           </span>
         </div>
       </div>

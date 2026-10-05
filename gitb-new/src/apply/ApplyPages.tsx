@@ -21,12 +21,11 @@ import {
   contact,
   courses,
   languageCourses,
-  languagePlans,
   programs,
-  tuitionLabel,
   type Course,
 } from "../data/site";
 import { ApplyShell, Badge, useApplyHref } from "./ApplyShell";
+import { findLiveCourse, liveTuitionLabel, useLivePricing } from "./useLivePricing";
 
 const TYPES = [
   { id: "all", label: "All types" },
@@ -38,6 +37,7 @@ const TYPES = [
 export function ApplyHome() {
   const nav = useNavigate();
   const href = useApplyHref();
+  const live = useLivePricing();
   const onSearch = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -110,6 +110,7 @@ export function ApplyHome() {
                       </Link>
                       <p className="text-[13px] text-sub">
                         {c.type === "language" ? "Language course" : "Professional program"}, online · {c.duration}
+                        {live && <> · {liveTuitionLabel(findLiveCourse(live, c.slug))}</>}
                       </p>
                     </div>
                     <Link to={href(c.slug)} className="hidden text-[13px] font-bold text-forest hover:underline sm:block">
@@ -151,36 +152,37 @@ export function ApplyHome() {
               Find programmes <ArrowRight size={16} />
             </Link>
           </div>
-          <FeesCard />
+          <FeesCard live={live} />
         </aside>
       </section>
     </ApplyShell>
   );
 }
 
-function FeesCard() {
+function FeesCard({ live }: { live: ReturnType<typeof useLivePricing> }) {
+  const fee = live?.applicationFee ?? APPLICATION_FEE;
   return (
     <div className="glass-lime sheen rounded-[26px] p-6">
       <h3 className="font-display text-lg uppercase">Fees</h3>
       <dl className="mt-4 space-y-3 text-sm">
         <div className="flex items-center justify-between gap-3 rounded-xl bg-white/60 px-4 py-3">
           <dt className="font-semibold">Application / administrative fee</dt>
-          <dd className="font-display text-lg">€{APPLICATION_FEE}</dd>
+          <dd className="font-display text-lg">€{fee}</dd>
         </div>
-        {languagePlans.map((p) => (
-          <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/60 px-4 py-3">
-            <dt>
-              <span className="font-semibold">Language course · {p.name}</span>
-              <span className="block text-ink/65">{p.classesPerWeek} classes per week</span>
-            </dt>
-            <dd className="font-display text-lg">
-              €{p.perMonth}
-              <span className="text-xs">/mo</span>
-            </dd>
-          </div>
-        ))}
+        {courses.map((c) => {
+          const liveCourse = findLiveCourse(live, c.slug);
+          return (
+            <div key={c.slug} className="flex items-center justify-between gap-3 rounded-xl bg-white/60 px-4 py-3">
+              <dt>
+                <span className="font-semibold">{c.title}</span>
+                <span className="block text-ink/65">{c.type === "language" ? "Standard / Intensive" : c.category}</span>
+              </dt>
+              <dd className="whitespace-nowrap text-right font-display text-base">{liveTuitionLabel(liveCourse)}</dd>
+            </div>
+          );
+        })}
       </dl>
-      <p className="mt-3 text-xs text-ink/70">Professional program tuition: contact {contact.admissions}.</p>
+      <p className="mt-3 text-xs text-ink/70">Questions about tuition? Contact {contact.admissions}.</p>
     </div>
   );
 }
@@ -189,6 +191,7 @@ function FeesCard() {
 export function ApplyCourses() {
   const [params, setParams] = useSearchParams();
   const href = useApplyHref();
+  const live = useLivePricing();
   const [copied, setCopied] = useState(false);
   const q = params.get("q") ?? "";
   const type = (params.get("type") ?? "all") as (typeof TYPES)[number]["id"];
@@ -331,7 +334,7 @@ export function ApplyCourses() {
 
         <div className="mt-8 space-y-5">
           {results.map((c) => (
-            <ResultCard key={c.slug} course={c} applyTo={href(c.slug)} />
+            <ResultCard key={c.slug} course={c} applyTo={href(c.slug)} live={findLiveCourse(live, c.slug)} applicationFee={live?.applicationFee ?? APPLICATION_FEE} />
           ))}
           {results.length === 0 && (
             <p className="glass rounded-2xl p-6 text-center text-sub">
@@ -348,7 +351,7 @@ export function ApplyCourses() {
   );
 }
 
-function ResultCard({ course: c, applyTo }: { course: Course; applyTo: string }) {
+function ResultCard({ course: c, applyTo, live, applicationFee }: { course: Course; applyTo: string; live: any; applicationFee: number }) {
   return (
     <article className="glass sheen grid gap-5 rounded-[24px] p-5 md:grid-cols-[180px_1fr_260px] md:p-6">
       <div className="text-sm">
@@ -369,7 +372,7 @@ function ResultCard({ course: c, applyTo }: { course: Course; applyTo: string })
           <dd>Study location: Online</dd>
         </dl>
         <p className="mt-3 text-sm">
-          Tuition fee: <strong>{tuitionLabel(c)}</strong>
+          Tuition fee: <strong>{liveTuitionLabel(live)}</strong>
         </p>
         <Link to={`/apply/courses/${c.slug}`} className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-chip px-4 py-2.5 pt-2.5 text-sm font-semibold hover:bg-white">
           <Info size={15} /> More information
@@ -384,7 +387,7 @@ function ResultCard({ course: c, applyTo }: { course: Course; applyTo: string })
           <CreditCard size={16} className="mt-0.5 shrink-0 text-forest" />
           <span>
             <strong>Application fee</strong>
-            <span className="block text-sub">€{APPLICATION_FEE} one-time, administrative</span>
+            <span className="block text-sub">€{applicationFee} one-time, administrative</span>
           </span>
         </p>
         <p className="flex items-start gap-2 text-sm">
@@ -403,6 +406,7 @@ function ResultCard({ course: c, applyTo }: { course: Course; applyTo: string })
 export function ApplyCourse() {
   const { slug } = useParams();
   const href = useApplyHref();
+  const live = useLivePricing();
   const c = courses.find((x) => x.slug === slug);
   if (!c)
     return (
@@ -413,6 +417,10 @@ export function ApplyCourse() {
       </ApplyShell>
     );
 
+  const liveCourse = findLiveCourse(live, c.slug);
+  const applicationFee = live?.applicationFee ?? APPLICATION_FEE;
+  const tiers = Array.isArray(liveCourse?.pricing_tiers) ? liveCourse.pricing_tiers : [];
+
   const rows: [string, ReactNode][] = [
     ["Study location", "Online (GITB, Vilnius, Lithuania)"],
     ["Type", c.type === "language" ? "Language course, online" : "Professional program, online"],
@@ -421,24 +429,23 @@ export function ApplyCourse() {
     ["Awards", c.certificates.join(" · ")],
     [
       "Tuition fee",
-      c.type === "language" ? (
+      tiers.length > 0 ? (
         <div className="space-y-2">
-          {languagePlans.map((p) => (
-            <p key={p.id}>
-              <strong>
-                €{p.perMonth} per month — {p.name}
-              </strong>{" "}
-              <span className="text-sub">({p.classesPerWeek} classes per week)</span>
+          {tiers.map((t: any) => (
+            <p key={t.id}>
+              <strong>€{t.price_monthly} per month{t.label ? ` — ${t.label}` : ""}</strong>
             </p>
           ))}
         </div>
+      ) : liveTuitionLabel(liveCourse) !== "On request — ask admissions" ? (
+        <strong>{liveTuitionLabel(liveCourse)}</strong>
       ) : (
         <span>
           On request — email <a href={`mailto:${contact.admissions}`} className="font-semibold underline">{contact.admissions}</a>
         </span>
       ),
     ],
-    ["Application fee", <span key="f"><strong>€{APPLICATION_FEE} one-time</strong> <span className="text-sub">(administrative fee)</span></span>],
+    ["Application fee", <span key="f"><strong>€{applicationFee} one-time</strong> <span className="text-sub">(administrative fee)</span></span>],
     [
       "Entry qualification",
       c.type === "language"
@@ -487,15 +494,23 @@ export function ApplyCourse() {
                 <CreditCard size={17} className="shrink-0 text-lime" />
                 <span>
                   <strong>Application fee</strong>
-                  <span className="block text-white/60">€{APPLICATION_FEE} one-time, administrative</span>
+                  <span className="block text-white/60">€{applicationFee} one-time, administrative</span>
                 </span>
               </p>
-              {c.type === "language" && (
+              {tiers.length > 0 && (
                 <p className="flex gap-3">
                   <CalendarCheck size={17} className="shrink-0 text-lime" />
                   <span>
-                    <strong>From €{languagePlans[0].perMonth}/month</strong>
-                    <span className="block text-white/60">Standard 2×/week · Intensive 3×/week €{languagePlans[1].perMonth}</span>
+                    <strong>From €{Math.min(...tiers.map((t: any) => Number(t.price_monthly) || 0))}/month</strong>
+                    <span className="block text-white/60">{tiers.map((t: any) => `${t.label || t.id}: €${t.price_monthly}`).join(" · ")}</span>
+                  </span>
+                </p>
+              )}
+              {tiers.length === 0 && liveTuitionLabel(liveCourse) !== "On request — ask admissions" && (
+                <p className="flex gap-3">
+                  <CalendarCheck size={17} className="shrink-0 text-lime" />
+                  <span>
+                    <strong>{liveTuitionLabel(liveCourse)}</strong>
                   </span>
                 </p>
               )}

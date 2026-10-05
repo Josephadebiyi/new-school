@@ -25,7 +25,6 @@ import { ApplySuccess } from "./portal/ApplySuccess";
 import { StudentDashboard } from "./student/Dashboard";
 import { TeacherDashboard } from "./teacher/TeacherDashboard";
 import { StaffDashboard } from "./staff/StaffDashboard";
-import { AdminDashboard, AdminLogin } from "./admin/Admin";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -56,8 +55,6 @@ createRoot(document.getElementById("root")!).render(
         <Route path="apply/courses/:slug" element={<ApplyCourse />} />
         <Route path="apply/portal" element={<Portal />} />
         <Route path="apply/success" element={<ApplySuccess />} />
-        <Route path="admin" element={<AdminLogin />} />
-        <Route path="admin/dashboard" element={<AdminDashboard />} />
       </Routes>
     </BrowserRouter>
     </AuthProvider>
