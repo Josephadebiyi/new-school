@@ -117,6 +117,10 @@ function Footer() {
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/65">
               Practical, career-minded programs in technology and business — fully online, ACTD-accredited.
             </p>
+            <div className="mt-4 flex items-center gap-3">
+              <img src="/img/eu-flag.png" alt="EU" className="h-5 w-auto rounded-sm opacity-80" />
+              <img src="/img/actd-banner.png" alt="ACTD — American Council of Training and Development" className="h-7 w-auto opacity-75" />
+            </div>
           </div>
           <div>
             <h4 className="font-display text-xs uppercase tracking-wider text-lime">Programs</h4>
@@ -188,7 +192,7 @@ function Footer() {
               Contact
             </Link>
             <span>Privacy Policy</span>
-            <Link to="/admin/login" className="hover:text-white">
+            <Link to="/admin" className="hover:text-white">
               Staff log in
             </Link>
           </span>

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform } from "motion/react";
 import {
   ArrowRight,
-  BadgeCheck,
   Briefcase,
   Check,
   ChevronLeft,
@@ -393,8 +392,8 @@ export function AccreditationSection() {
         <div className="glass sheen relative overflow-hidden rounded-[30px] p-7 sm:p-10">
           <div className="orb-soft absolute -bottom-16 -right-10 h-56 w-56 opacity-60" />
           <div className="relative grid items-center gap-8 md:grid-cols-[auto_1fr_auto]">
-            <div className="grid h-28 w-28 place-items-center rounded-3xl bg-ink shadow-xl">
-              <BadgeCheck size={52} className="text-lime" />
+            <div className="grid h-28 w-28 place-items-center rounded-3xl bg-white p-4 shadow-xl">
+              <img src="/img/actd-logo.png" alt="ACTD — American Council of Training and Development" className="h-full w-full object-contain" />
             </div>
             <div>
               <Eyebrow>Accreditation</Eyebrow>

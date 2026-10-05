@@ -296,6 +296,10 @@ export function VerifyPage() {
             </p>
           )}
         </form>
+        <div className="mx-auto mt-8 flex max-w-xl items-center justify-center gap-6">
+          <img src="/img/eu-flag.png" alt="EU" className="h-10 w-auto rounded opacity-90" />
+          <img src="/img/actd-logo.png" alt="ACTD Accredited" className="h-14 w-auto" />
+        </div>
       </section>
     </>
   );
