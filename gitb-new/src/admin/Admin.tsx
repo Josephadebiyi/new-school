@@ -31,7 +31,7 @@ import {
   getAdminCourses, updateCourse,
   getSystemSettings, updateSystemSettings,
   getCoupons, createCoupon, updateCoupon, deleteCoupon,
-  getAdminReferrals, sendTestEmails,
+  getAdminReferrals, sendTestEmails, seedCourses,
 } from "../services/api";
 
 const ADMIN_ROLES = ["admin", "super_admin", "registrar", "staff"];
@@ -160,6 +160,8 @@ export function AdminDashboard() {
   const [settingsMsg, setSettingsMsg] = useState("");
   const [testEmailSending, setTestEmailSending] = useState(false);
   const [testEmailMsg, setTestEmailMsg] = useState("");
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedMsg, setSeedMsg] = useState("");
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -301,6 +303,16 @@ export function AdminDashboard() {
       setTestEmailMsg(`✓ Test emails sent to ${user?.email}.`);
     } catch (err) { setTestEmailMsg(err instanceof Error ? err.message : "Failed"); }
     finally { setTestEmailSending(false); }
+  }
+  async function handleSeedCourses(replace: boolean) {
+    if (replace && !confirm("This will DELETE all existing courses and replace them with the 9 standard GITB courses. Continue?")) return;
+    setSeedLoading(true); setSeedMsg("");
+    try {
+      const data = await seedCourses(token, replace);
+      setSeedMsg(`✓ ${data.inserted} courses added to the database.`);
+      fetchData();
+    } catch (err) { setSeedMsg(err instanceof Error ? err.message : "Failed"); }
+    finally { setSeedLoading(false); }
   }
 
   const signOut = () => { logout(); nav("/admin"); };
@@ -626,6 +638,19 @@ export function AdminDashboard() {
                         <button type="submit" disabled={settingsSaving} className="btn-dark w-full disabled:opacity-50">{settingsSaving ? "Saving…" : "Save Settings"}</button>
                         {settingsMsg && <p className={`text-sm font-medium ${settingsMsg.startsWith("✓") ? "text-forest" : "text-[#8a3d00]"}`}>{settingsMsg}</p>}
                       </form>
+                      <div className="glass sheen space-y-3 rounded-2xl p-6">
+                        <h3 className="font-display text-sm uppercase">Course Database</h3>
+                        <p className="text-sm text-sub">Seed the database with the 9 standard GITB courses (matching the current site's catalog). Safe to run if courses are empty.</p>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => handleSeedCourses(false)} disabled={seedLoading} className="btn-dark flex-1 disabled:opacity-50">
+                            {seedLoading ? <><RefreshCw size={14} className="animate-spin" /> Working…</> : "Seed Courses (safe)"}
+                          </button>
+                          <button type="button" onClick={() => handleSeedCourses(true)} disabled={seedLoading} className="btn flex-1 border-2 border-[#9f1d10] text-[#9f1d10] hover:bg-orange/10 disabled:opacity-50">
+                            Replace All Courses
+                          </button>
+                        </div>
+                        {seedMsg && <p className={`text-sm font-medium ${seedMsg.startsWith("✓") ? "text-forest" : "text-[#8a3d00]"}`}>{seedMsg}</p>}
+                      </div>
                       <div className="glass sheen space-y-3 rounded-2xl p-6">
                         <h3 className="font-display text-sm uppercase">Email System Test</h3>
                         <p className="text-sm text-sub">Send a test email for every notification type to your own address.</p>

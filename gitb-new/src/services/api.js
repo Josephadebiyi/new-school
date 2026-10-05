@@ -624,6 +624,17 @@ export async function sendTestEmails(token, email) {
   return data;
 }
 
+export async function seedCourses(token, replace = false) {
+  const res = await fetch(`${API_BASE}/api/admin/seed-courses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ replace }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to seed courses');
+  return data;
+}
+
 export async function getActivityLog(token, limit = 100) {
   const res = await fetch(`${API_BASE}/api/admin/activity?limit=${limit}`, {
     headers: { Authorization: `Bearer ${token}` },
