@@ -26,24 +26,58 @@ const imageUpload = multer({
   }
 });
 
-const documentStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
+const documentFileFilter = (req, file, cb) => {
+  const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.webp', '.mp4', '.webm', '.doc', '.docx'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowed.includes(ext)) cb(null, true);
+  else cb(new Error('File type not allowed. Please upload an image, PDF, Word document, or common video format.'));
+};
+
+// Memory storage (not disk) — Render's filesystem is ephemeral and wiped on
+// every redeploy/restart, so anything written to local disk (admissions
+// documents, CVs) would silently vanish. uploadDocumentBuffer() below uploads
+// to Cloudinary when configured, same as imageUpload, with local-disk as a
+// fallback only for local dev / no-Cloudinary setups.
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: documentFileFilter,
 });
 
-const documentUpload = multer({
-  storage: documentStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-  fileFilter: (req, file, cb) => {
-    const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.webp', '.mp4', '.webm'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) cb(null, true);
-    else cb(new Error('File type not allowed. Please upload an image, PDF, or common video format.'));
-  }
+// Internship applications need two named file fields (cv + optional coverLetter)
+// in one request, rather than the single "file" field the endpoints above use.
+const internshipUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: documentFileFilter,
 });
+
+// Shared upload path for document-type files (IDs, certificates, CVs, cover
+// letters): Cloudinary when configured (persists across Render restarts),
+// local disk otherwise. Returns { url, filename, name, size }.
+async function uploadDocumentBuffer(file) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (cloudName && apiKey && apiSecret) {
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "gitb-documents", resource_type: "auto" },
+        (err, res) => (err ? reject(err) : resolve(res))
+      );
+      stream.end(file.buffer);
+    });
+    return { url: result.secure_url, filename: result.public_id, name: file.originalname, size: file.size };
+  }
+
+  // Fallback: local disk (not persistent on Render)
+  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+  fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
+  console.warn("⚠️  CLOUDINARY not configured — document saved locally and will be lost on restart.");
+  return { url: `/api/uploads/${filename}`, filename, name: file.originalname, size: file.size };
+}
 const { Resend } = require("resend");
 const PDFDocument = require("pdfkit");
 
@@ -346,6 +380,16 @@ const applicationLimiter = rateLimit({
   message: { detail: "Too many application submissions from this IP. Please try again later." },
 });
 
+// A little more generous than applicationLimiter since one application
+// can involve several document uploads (ID, certificates, etc.) before submit.
+const applicationUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { detail: "Too many document uploads from this IP. Please try again later." },
+});
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -456,6 +500,14 @@ async function confirmApplicationFee(meta, verified) {
     motivation: meta.motivation || null,
     referred_by_code: meta.referred_by_code || null,
     attached_coupon_code: meta.attached_coupon_code || null,
+    citizenship: meta.citizenship || null,
+    gender: meta.gender || null,
+    programs: Array.isArray(meta.programs) ? meta.programs : [],
+    education: Array.isArray(meta.education) ? meta.education : [],
+    languages: Array.isArray(meta.languages) ? meta.languages : [],
+    documents: Array.isArray(meta.documents) ? meta.documents : [],
+    declaration: meta.declaration === true,
+    pricing_tier_id: meta.pricing_tier_id || null,
     status: "pending",
     payment_status: "paid",
     flw_reference: verified.tx_ref,
@@ -732,10 +784,27 @@ app.post("/api/upload/document", requireAuthToken, documentUpload.single("file")
     if (!req.file) {
       return res.status(400).json({ detail: "No file uploaded" });
     }
-    const fileUrl = `/api/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl, filename: req.file.filename });
+    const result = await uploadDocumentBuffer(req.file);
+    res.json({ url: result.url, filename: result.filename });
   } catch (error) {
     console.error("Document upload error:", error);
+    res.status(500).json({ detail: "Upload failed. Please try again." });
+  }
+});
+
+// Public document upload for the admissions wizard — applicants have no
+// account yet at this point (no account is created until admin approval),
+// so this can't be gated by requireAuthToken like the one above. Rate-limited
+// instead of auth-gated.
+app.post("/api/applications/upload-document", applicationUploadLimiter, documentUpload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ detail: "No file uploaded" });
+    }
+    const result = await uploadDocumentBuffer(req.file);
+    res.json(result);
+  } catch (error) {
+    console.error("Application document upload error:", error);
     res.status(500).json({ detail: "Upload failed. Please try again." });
   }
 });
@@ -2613,7 +2682,11 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
       first_name, last_name, email, phone, course_id,
       country, city, address, date_of_birth,
       identification_url, high_school_certificate_url,
-      motivation, referral_code, coupon_code
+      motivation, referral_code, coupon_code,
+      // Richer admissions-wizard fields (all optional/additive — none of
+      // these existed in the original simple application form).
+      citizenship, gender, programs, education, languages, documents,
+      declaration, pricing_tier_id,
     } = req.body;
 
     if (!first_name || !last_name || !email || !course_id) {
@@ -2624,6 +2697,9 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
     }
     if (!country) {
       return res.status(422).json({ detail: "Country of residence is required" });
+    }
+    if (declaration !== true) {
+      return res.status(422).json({ detail: "You must confirm the declaration before submitting your application" });
     }
 
     // Validate referral code, if provided. A referrer can't refer themselves,
@@ -2662,6 +2738,16 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
     if (!course) {
       console.error("Course not found for id:", course_id);
       return res.status(404).json({ detail: "Course not found. Please select a valid programme." });
+    }
+
+    // If the course has multiple pricing tiers (e.g. language courses:
+    // Standard/Intensive), a tier choice is required so tuition pricing
+    // later (see /api/tuition/pay) knows which price to charge.
+    if (Array.isArray(course.pricing_tiers) && course.pricing_tiers.length > 0) {
+      const validTier = course.pricing_tiers.some((t) => t.id === pricing_tier_id);
+      if (!validTier) {
+        return res.status(422).json({ detail: "Please select a pricing option for this programme." });
+      }
     }
 
     // Block only if a PAID application already exists — never block on pending/failed
@@ -2718,6 +2804,14 @@ app.post("/api/applications/create", applicationLimiter, async (req, res) => {
         motivation: (motivation || "").slice(0, 1000),
         referred_by_code: referredByCode,
         attached_coupon_code: attachedCouponCode,
+        citizenship: citizenship || "",
+        gender: gender || "",
+        programs: Array.isArray(programs) ? programs.slice(0, 3) : [],
+        education: Array.isArray(education) ? education.slice(0, 10) : [],
+        languages: Array.isArray(languages) ? languages.slice(0, 10) : [],
+        documents: Array.isArray(documents) ? documents.slice(0, 10) : [],
+        declaration: declaration === true,
+        pricing_tier_id: pricing_tier_id || "",
         eur_amount: currentApplicationFee
       },
       created_at: new Date().toISOString()
@@ -2917,13 +3011,20 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       }
     }
 
-    // Get course info for price
+    // Get course info for price — if the course has pricing tiers (e.g.
+    // language courses: Standard/Intensive) and the applicant picked one,
+    // quote that tier's price instead of the course's flat price.
     const course = await db.collection("courses").findOne({ id: application.course_id });
-    const coursePrice = course ? (
-      typeof course.price === 'object' && course.price !== null
-        ? (course.price.upfront || course.price.monthly || 0)
-        : (Number(course.price) || 0)
-    ) : 0;
+    const selectedTier = course && Array.isArray(course.pricing_tiers)
+      ? course.pricing_tiers.find((t) => t.id === application.pricing_tier_id)
+      : null;
+    const coursePrice = selectedTier
+      ? Number(selectedTier.price_upfront ?? selectedTier.price_monthly ?? 0)
+      : course ? (
+          typeof course.price === 'object' && course.price !== null
+            ? (course.price.upfront || course.price.monthly || 0)
+            : (Number(course.price) || 0)
+        ) : 0;
 
     // A coupon entered at application time only actually attaches to the
     // student's account now, once they're approved — it's re-validated here
@@ -2945,6 +3046,7 @@ app.post("/api/applications/:applicationId/approve", authenticate, requireRoles(
       course_title: application.course_title,
       application_id: applicationId,
       attached_coupon_code: attachedCouponCode,
+      pricing_tier_id: application.pricing_tier_id || null,
       enrolled_at: new Date().toISOString(),
       status: "pending_payment", // Requires tuition payment
       payment_status: "unpaid",
@@ -3128,6 +3230,103 @@ app.post("/api/applications/:applicationId/resend-email", authenticate, requireR
   }
 });
 
+// ============ INTERNSHIP APPLICATIONS ============
+// A separate, simpler flow from admissions: no fee, no payment, no account —
+// just a CV + form that staff review. Own collection, own fields, since
+// there's no overlap with the `applications` (admissions) schema.
+
+app.post("/api/internships/apply", applicationLimiter, internshipUpload.fields([
+  { name: "cv", maxCount: 1 },
+  { name: "coverLetter", maxCount: 1 },
+]), async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ detail: "Database not available" });
+
+    const {
+      trackSlug, track, durationMonths, startDate, hoursPerWeek,
+      firstName, lastName, email, phone, country, city,
+      education, gitbStatus, linkedin, portfolio, motivation,
+    } = req.body;
+
+    if (!firstName || !lastName || !email || !phone || !trackSlug) {
+      return res.status(422).json({ detail: "Missing required fields" });
+    }
+    const cvFile = req.files?.cv?.[0];
+    if (!cvFile) {
+      return res.status(422).json({ detail: "A CV (PDF or Word, max 5MB) is required" });
+    }
+    const coverLetterFile = req.files?.coverLetter?.[0];
+
+    const cvUpload = await uploadDocumentBuffer(cvFile);
+    const coverLetterUpload = coverLetterFile ? await uploadDocumentBuffer(coverLetterFile) : null;
+
+    const internship = {
+      id: uuidv4(),
+      reference: `INT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000000)).padStart(6, "0")}`,
+      track_slug: trackSlug,
+      track_title: track || trackSlug,
+      duration_months: Number(durationMonths) || null,
+      start_date: startDate || null,
+      hours_per_week: hoursPerWeek || null,
+      first_name: firstName,
+      last_name: lastName,
+      email: email.toLowerCase().trim(),
+      phone,
+      country: country || null,
+      city: city || null,
+      education: education || null,
+      gitb_status: gitbStatus || null,
+      linkedin: linkedin || null,
+      portfolio: portfolio || null,
+      motivation: (motivation || "").slice(0, 2000),
+      cv_url: cvUpload.url,
+      cv_name: cvFile.originalname,
+      cover_letter_url: coverLetterUpload ? coverLetterUpload.url : null,
+      cover_letter_name: coverLetterFile ? coverLetterFile.originalname : null,
+      status: "Submitted",
+      note: "",
+      created_at: new Date().toISOString(),
+    };
+    await db.collection("internships").insertOne(internship);
+
+    res.json({ reference: internship.reference, name: firstName, email: internship.email });
+  } catch (error) {
+    console.error("Internship application error:", error);
+    res.status(500).json({ detail: "An unexpected error occurred. Please try again." });
+  }
+});
+
+app.get("/api/internships", authenticate, requireRoles(["admin", "registrar", "staff", "super_admin"]), async (req, res) => {
+  try {
+    const internships = await db.collection("internships")
+      .find({}, { projection: { _id: 0 } })
+      .sort({ created_at: -1 })
+      .toArray();
+    res.json(internships);
+  } catch (error) {
+    console.error("Get internships error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
+app.put("/api/internships/:id", authenticate, requireRoles(["admin", "registrar", "staff", "super_admin"]), async (req, res) => {
+  try {
+    const { status, note } = req.body;
+    const updates = {};
+    if (status !== undefined) updates.status = status;
+    if (note !== undefined) updates.note = note;
+    if (Object.keys(updates).length === 0) {
+      return res.status(422).json({ detail: "Nothing to update" });
+    }
+    const result = await db.collection("internships").updateOne({ id: req.params.id }, { $set: updates });
+    if (result.matchedCount === 0) return res.status(404).json({ detail: "Internship application not found" });
+    res.json({ message: "Updated" });
+  } catch (error) {
+    console.error("Update internship error:", error);
+    res.status(500).json({ detail: "Internal server error" });
+  }
+});
+
 // ============ TUITION PAYMENT ROUTES ============
 
 // Get student's pending courses (approved but not paid tuition)
@@ -3208,7 +3407,7 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = req.user;
-    const { course_id, payment_plan, country, coupon_code } = req.body;
+    const { course_id, payment_plan, country, coupon_code, pricing_tier_id } = req.body;
 
     if (!course_id) {
       return res.status(422).json({ detail: "Course ID is required" });
@@ -3239,12 +3438,18 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
         course_id: course_id,
         application_id: application ? application.id : null,
         attached_coupon_code: application?.attached_coupon_code || null,
+        pricing_tier_id: application?.pricing_tier_id || null,
         status: "pending_payment",
         payment_status: "unpaid",
         created_at: new Date().toISOString()
       };
       await db.collection("enrollments").insertOne(enrollment);
     }
+
+    // A tier picked in the payment modal wins if given; otherwise fall back
+    // to whatever tier was chosen at application time (mirrors the coupon
+    // fallback right below).
+    const effectivePricingTierId = pricing_tier_id || enrollment.pricing_tier_id || null;
 
     // A code typed into the payment modal wins if given; otherwise fall back
     // to whatever coupon got attached to this enrollment at application time.
@@ -3289,13 +3494,27 @@ app.post("/api/tuition/pay", authenticate, async (req, res) => {
       return res.status(400).json({ detail: "Tuition already fully paid for this course" });
     }
 
+    // If the course has multiple pricing tiers (e.g. language courses:
+    // Standard/Intensive), price from the selected tier instead of the
+    // course's flat price fields.
+    let selectedTier = null;
+    if (Array.isArray(course.pricing_tiers) && course.pricing_tiers.length > 0) {
+      selectedTier = course.pricing_tiers.find((t) => t.id === effectivePricingTierId) || null;
+      if (!selectedTier) {
+        return res.status(422).json({ detail: "Please select a pricing option for this programme." });
+      }
+    }
+
     // Safely extract numeric price — course.price may be a number, an object {monthly,upfront}, or null/undefined
-    const rawUpfront =
-      typeof course.price === 'number' ? course.price
+    const rawUpfront = selectedTier
+      ? Number(selectedTier.price_upfront ?? 0)
+      : typeof course.price === 'number' ? course.price
       : typeof course.price === 'object' && course.price !== null
         ? Number(course.price.upfront ?? course.price.monthly ?? 0)
         : Number(course.price) || 0;
-    const rawMonthly = Number(course.monthly_price) || 0;
+    const rawMonthly = selectedTier
+      ? Number(selectedTier.price_monthly ?? 0)
+      : Number(course.monthly_price) || 0;
 
     const upfrontAmount = rawUpfront;
     const monthlyAmount = rawMonthly || (rawUpfront > 0 ? Math.ceil(rawUpfront / 12) : 0);
@@ -4687,84 +4906,114 @@ app.post("/api/admin/seed-courses", authenticate, requireRoles(["admin", "super_
       });
     }
 
+    // Matches the new site's catalog exactly (gitb-new/src/data/site.ts) —
+    // slugs here must match the slugs there so /api/courses/public/:slug
+    // resolves and pricing is live/admin-editable instead of "On request".
+    // The 6 programs seed with no price set — admin must set real prices
+    // via the Pricing tab before students can pay for them (tuition/applications
+    // for a course with no price set are blocked with a clear error, by design).
     const GITB_COURSES = [
       {
-        id: uuidv4(), slug: "uiux-webflow-design",
-        title: "UI/UX & Webflow Design", category: "Design", level: "Beginner",
-        duration: "3 Months", image_url: "/images/course-uiux.jpg",
-        description: "Master user experience design and build stunning websites with Webflow. Learn to design from wireframe to pixel-perfect prototype, then bring it to life without writing a single line of code.",
+        id: uuidv4(), slug: "cybersecurity-acceleration",
+        title: "Cybersecurity Acceleration Program", category: "Technology", level: "Intermediate",
+        duration: "4 Months", image_url: "",
+        description: "Fast-track your path into cybersecurity with hands-on labs, real-world simulations and industry mentors.",
+        outcomes: ["Ethical hacking & penetration testing", "Security vulnerability assessment", "Web & network security testing", "Compliance & risk management"],
+        curriculum: [],
+        certifications: ["GITB Diploma", "CompTIA PenTest+"],
+        price: 0, monthly_price: 0, payment_options: ["one_time"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "data-science-ai",
+        title: "Data Science & AI", category: "Technology & Data", level: "Beginner",
+        duration: "6 Months", image_url: "",
+        description: "Master Python, machine learning and AI to turn raw data into business insight — guided by data scientists and AI engineers from world-class companies.",
+        outcomes: ["Python for data", "Machine learning", "Applied AI", "Turning data into business insight"],
+        curriculum: [],
+        certifications: ["GITB Diploma"],
+        price: 0, monthly_price: 0, payment_options: ["one_time"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "ui-ux-design",
+        title: "UI/UX & Webflow Design Bootcamp", category: "Design & Technology", level: "Beginner",
+        duration: "3 Months", image_url: "",
+        description: "Go from wireframes to polished, hire-worthy prototypes — taught fully online by working designers from top global companies.",
         outcomes: ["UI/UX design principles", "Wireframing & prototyping", "Webflow website development", "User research & usability testing"],
-        curriculum: [
-          { week: "Week 1–2", title: "Foundations of UX", desc: "Design thinking, user research, and empathy mapping." },
-          { week: "Week 3–4", title: "UI Fundamentals", desc: "Typography, colour theory, grids, and component systems." },
-          { week: "Week 5–6", title: "Figma Prototyping", desc: "High-fidelity wireframes and interactive prototypes." },
-          { week: "Week 7–10", title: "Webflow Development", desc: "CMS, animations, responsiveness, and launch." },
-          { week: "Week 11–12", title: "Portfolio & Capstone", desc: "Ship a real project and prepare your design portfolio." },
-        ],
+        curriculum: [],
         certifications: ["GITB Diploma", "Google UX Design Certificate"],
-        price: 290, monthly_price: 30, payment_options: ["one_time", "monthly"], is_active: true,
+        price: 0, monthly_price: 0, payment_options: ["one_time"], is_active: true,
       },
       {
-        id: uuidv4(), slug: "identity-access-management",
-        title: "Identity & Access Management", category: "Security", level: "Intermediate",
-        duration: "3 Months", image_url: "/images/course-iam.jpg",
-        description: "Become an IAM specialist. Learn to design and implement identity frameworks, role-based access control, and multi-factor authentication systems used by enterprise organisations globally.",
-        outcomes: ["IAM frameworks & policies", "Role-based access control (RBAC)", "Single sign-on (SSO) & MFA", "Compliance & governance (ISO 27001, NIST)"],
-        curriculum: [
-          { week: "Week 1–2", title: "IAM Foundations", desc: "Core concepts: identity lifecycle, authentication vs authorisation." },
-          { week: "Week 3–4", title: "Directory Services", desc: "Active Directory, LDAP, and Azure AD configuration." },
-          { week: "Week 5–6", title: "SSO & Federation", desc: "SAML, OAuth 2.0, OpenID Connect in production." },
-          { week: "Week 7–9", title: "RBAC & Governance", desc: "Policy design, least-privilege models, compliance auditing." },
-          { week: "Week 10–12", title: "Capstone Project", desc: "Design and document an IAM deployment for a mock enterprise." },
-        ],
-        certifications: ["GITB Diploma", "Certified Identity & Access Manager (CIAM)"],
-        price: 290, monthly_price: 30, payment_options: ["one_time", "monthly"], is_active: true,
+        id: uuidv4(), slug: "full-stack-web-development",
+        title: "Full Stack Web Development", category: "Technology", level: "Beginner",
+        duration: "3 Months", image_url: "",
+        description: "Build modern, fully functional web applications from front to back with hands-on projects, real codebases and mentorship from professional developers.",
+        outcomes: ["Front-end development", "Back-end development", "Working in real codebases", "Shipping full applications"],
+        curriculum: [],
+        certifications: ["GITB Diploma"],
+        price: 0, monthly_price: 0, payment_options: ["one_time"], is_active: true,
       },
       {
-        id: uuidv4(), slug: "french-spanish-lithuanian",
-        title: "French · Spanish · Lithuanian", category: "Language", level: "All Levels",
-        duration: "3–6 Months", image_url: "/images/course-languages.jpg",
-        description: "Gain professional fluency in French, Spanish, or Lithuanian. From business communication to cultural immersion — our instructors guide you from beginner to certified proficiency.",
-        outcomes: ["Beginner to advanced proficiency", "Business & professional communication", "Cultural insights & real-life conversations", "Official language certification prep"],
-        curriculum: [
-          { week: "Month 1", title: "Core Foundations", desc: "Alphabet, pronunciation, everyday vocabulary and phrases." },
-          { week: "Month 2", title: "Grammar & Structure", desc: "Tenses, sentence construction, and reading comprehension." },
-          { week: "Month 3", title: "Professional Communication", desc: "Business writing, presentations, and formal conversation." },
-          { week: "Month 4–6", title: "Fluency & Certification", desc: "Advanced conversation, exam prep (DELF/DELE/LKI)." },
-        ],
-        certifications: ["GITB Diploma", "Official Language Certification (DELF, DELE, LKI)"],
-        price: 220, monthly_price: 25, payment_options: ["one_time", "monthly"], is_active: true,
+        id: uuidv4(), slug: "project-management",
+        title: "Project Management", category: "Business & Management", level: "Intermediate",
+        duration: "4 Months", image_url: "",
+        description: "Learn the industry-standard methodologies, tools and leadership skills that deliver projects on time, on budget and on scope.",
+        outcomes: ["Industry-standard methodologies", "Project tools", "Leadership skills", "Delivering on time, budget and scope"],
+        curriculum: [],
+        certifications: ["GITB Diploma"],
+        price: 0, monthly_price: 0, payment_options: ["one_time"], is_active: true,
       },
       {
         id: uuidv4(), slug: "kyc-compliance",
-        title: "KYC & Compliance", category: "Finance", level: "Intermediate",
-        duration: "2 Months", image_url: "/images/course-kyc.jpg",
-        description: "Master the compliance skills in highest demand across banking and fintech. Learn KYC procedures, AML regulations, and customer due diligence frameworks used by global financial institutions.",
-        outcomes: ["KYC & AML regulations", "Customer due diligence", "Risk-based assessment", "Fraud detection & prevention"],
-        curriculum: [
-          { week: "Week 1–2", title: "Regulatory Landscape", desc: "FATF, EU AMLD, FinCEN — the global compliance framework." },
-          { week: "Week 3–4", title: "KYC Procedures", desc: "CDD, EDD, onboarding workflows, and documentation." },
-          { week: "Week 5–6", title: "AML & Fraud Detection", desc: "Transaction monitoring, red flags, and SAR filing." },
-          { week: "Week 7–8", title: "Capstone & Exam Prep", desc: "Case studies and CKYCA certification preparation." },
-        ],
+        title: "KYC & Compliance Sprint", category: "Finance & Law", level: "Intermediate",
+        duration: "2 Months", image_url: "",
+        description: "Get job-ready in KYC and financial compliance through real-world case studies, regulatory frameworks and mentorship from compliance professionals.",
+        outcomes: ["Know Your Customer (KYC)", "KYC & AML regulations", "Customer due diligence", "Risk-based assessment", "Fraud detection & prevention"],
+        curriculum: [],
         certifications: ["GITB Diploma", "Certified KYC Analyst (CKYCA)"],
-        price: 195, monthly_price: 30, payment_options: ["one_time", "monthly"], is_active: true,
+        price: 0, monthly_price: 0, payment_options: ["one_time"], is_active: true,
       },
       {
-        id: uuidv4(), slug: "cybersecurity-vulnerability-tester",
-        title: "Cyber-Security Vulnerability Tester", category: "Security", level: "Intermediate",
-        duration: "4 Months", image_url: "/images/course-cybersec.jpg",
-        description: "Become a certified penetration tester. Learn ethical hacking, vulnerability assessment, and web & network security testing skills that land jobs at top cybersecurity firms.",
-        outcomes: ["Ethical hacking & penetration testing", "Security vulnerability assessment", "Web & network security testing", "Compliance & risk management"],
-        curriculum: [
-          { week: "Week 1–3", title: "Security Fundamentals", desc: "CIA triad, threat modelling, and attack surfaces." },
-          { week: "Week 4–6", title: "Network Penetration", desc: "Reconnaissance, scanning, exploitation with Kali Linux." },
-          { week: "Week 7–9", title: "Web App Security", desc: "OWASP Top 10, Burp Suite, and XSS/SQLi labs." },
-          { week: "Week 10–12", title: "Reporting & Compliance", desc: "Writing professional pen-test reports, risk frameworks." },
-          { week: "Week 13–16", title: "Capstone & Certification", desc: "Full assessment of a live-scope environment. CompTIA PenTest+ prep." },
+        id: uuidv4(), slug: "spanish",
+        title: "Spanish Language Course", category: "Languages", level: "All Levels",
+        duration: "Monthly", image_url: "",
+        description: "Learn Spanish in live online classes. Choose Standard (2 classes a week) or Intensive (3 classes a week) and enrol month by month.",
+        outcomes: ["Speaking & listening", "Grammar & vocabulary", "Reading & writing", "Everyday and professional situations"],
+        curriculum: [],
+        certifications: ["GITB course certificate"],
+        price: 0, monthly_price: 0, payment_options: ["monthly"], is_active: true,
+        pricing_tiers: [
+          { id: "standard", label: "Standard — 2 classes/week", price_monthly: 120 },
+          { id: "intensive", label: "Intensive — 3 classes/week", price_monthly: 220 },
         ],
-        certifications: ["GITB Diploma", "CompTIA PenTest+"],
-        price: 340, monthly_price: 35, payment_options: ["one_time", "monthly"], is_active: true,
+      },
+      {
+        id: uuidv4(), slug: "french",
+        title: "French Language Course", category: "Languages", level: "All Levels",
+        duration: "Monthly", image_url: "",
+        description: "Learn French in live online classes. Choose Standard (2 classes a week) or Intensive (3 classes a week) and enrol month by month.",
+        outcomes: ["Speaking & listening", "Grammar & vocabulary", "Reading & writing", "Everyday and professional situations"],
+        curriculum: [],
+        certifications: ["GITB course certificate"],
+        price: 0, monthly_price: 0, payment_options: ["monthly"], is_active: true,
+        pricing_tiers: [
+          { id: "standard", label: "Standard — 2 classes/week", price_monthly: 120 },
+          { id: "intensive", label: "Intensive — 3 classes/week", price_monthly: 220 },
+        ],
+      },
+      {
+        id: uuidv4(), slug: "lithuanian",
+        title: "Lithuanian Language Course", category: "Languages", level: "All Levels",
+        duration: "Monthly", image_url: "",
+        description: "Learn Lithuanian in live online classes — ideal if you live, study or work in Lithuania. Choose Standard (2 classes a week) or Intensive (3 classes a week).",
+        outcomes: ["Speaking & listening", "Grammar & vocabulary", "Reading & writing", "Everyday life in Lithuania"],
+        curriculum: [],
+        certifications: ["GITB course certificate"],
+        price: 0, monthly_price: 0, payment_options: ["monthly"], is_active: true,
+        pricing_tiers: [
+          { id: "standard", label: "Standard — 2 classes/week", price_monthly: 120 },
+          { id: "intensive", label: "Intensive — 3 classes/week", price_monthly: 220 },
+        ],
       },
     ];
 
